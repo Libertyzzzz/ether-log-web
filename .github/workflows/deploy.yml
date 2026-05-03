@@ -27,14 +27,12 @@ jobs:
           npm install
           npm run build
 
-      # 4. 部署到服务器 (使用 SSH)
+      # 4. 部署到服务器 (使用 SCP)
       - name: Deploy to Server
-
-        uses: easingthemes/ssh-deploy@main
-        env:
-          password: ${{ secrets.SERVER_SSH_KEY }}
-          ARGS: "-rlgoDzvc -i --delete"
-          SOURCE: "dist/" # Vue 构建后的目录
-          REMOTE_HOST: ${{ secrets.REMOTE_HOST }}
-          REMOTE_USER: ${{ secrets.REMOTE_USER }}
-          TARGET: "/home/dust/app/ether-log-web" # 文件存放目录
+        uses: appleboy/scp-action@master
+        with:
+          password: ${{ secrets.SERVER_SSH_KEY }}          
+          source: "dist/" # Vue 构建后的目录
+          host: ${{ secrets.REMOTE_HOST }}
+          username: ${{ secrets.REMOTE_USER }}
+          target: "/home/dust/app/ether-log-web" # 文件存放目录git
