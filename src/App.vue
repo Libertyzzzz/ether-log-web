@@ -805,8 +805,16 @@ onMounted(() => {
 
       <section class="section-intro">
         <div class="section-meta">
-          <span class="section-label">博客主页</span>
-          <p class="section-copy">导航、最新文章、关于与订阅入口，构成一个完整的个人技术博客首页。让访客一眼找到内容、作者定位和下一步行动。</p>
+          <div class="section-meta-left">
+            <span class="section-label">JOURNAL / DUST</span>
+            <h2 class="section-title">Tracing Thoughts, Shaping Logic.</h2>
+          </div>
+          <div class="section-meta-right">
+            <p class="section-copy">
+              万物起于微末，亦如尘埃。<br />
+              在繁杂的世界里，捕捉转瞬即逝的审美，固化永恒的逻辑。
+            </p>
+          </div>
         </div>
         <div class="category-list">
           <button
@@ -1481,32 +1489,60 @@ onMounted(() => {
   font-size: 0.95rem;
 }
 .section-intro {
-  max-width: 64rem;
-  margin: 0 auto 5rem;
+  max-width: 72rem;
+  margin: 0 auto 5.5rem;
   padding: 1rem 1.5rem 0;
   display: grid;
   gap: 2.75rem;
 }
 .section-meta {
+  display: grid;
+  grid-template-columns: minmax(0, 1.1fr) minmax(18rem, 0.9fr);
+  gap: 3rem;
+  align-items: stretch;
+  max-width: 100%;
+}
+.section-meta-left,
+.section-meta-right {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-  max-width: 54rem;
+  gap: 0.85rem;
+}
+.section-meta-left {
+  justify-content: flex-start;
+}
+.section-meta-right {
+  justify-content: center;
+  padding-left: 2rem;
+  border-left: 1px solid rgba(148, 163, 184, 0.18);
 }
 .section-label {
-  font-size: 0.75rem;
-  font-weight: 900;
+  font-size: 0.72rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.25em;
-  color: #60a5fa;
+  letter-spacing: 0.28em;
+  color: #2563eb;
+}
+.section-title {
+  margin: 0;
+  font-size: clamp(2.4rem, 3.8vw, 3.6rem);
+  font-weight: 700;
+  line-height: 1.04;
+  letter-spacing: -0.03em;
+  color: #0f172a;
 }
 .section-copy {
   margin: 0;
-  color: #697386;
-  font-size: 1.35rem;
-  font-weight: 750;
-  line-height: 1.85;
-  max-width: 58rem;
+  color: #334155;
+  font-size: 1rem;
+  font-weight: 400;
+  line-height: 1.9;
+  max-width: 100%;
+}
+.section-copy br {
+  content: '';
+  display: block;
+  margin-bottom: 0.45rem;
 }
 .category-list {
   display: flex;
@@ -1552,8 +1588,18 @@ onMounted(() => {
     margin-bottom: 3.5rem;
     gap: 2rem;
   }
+  .section-meta {
+    grid-template-columns: 1fr;
+  }
+  .section-meta-right {
+    border-left: none;
+    padding-left: 0;
+  }
+  .section-title {
+    font-size: 2.2rem;
+  }
   .section-copy {
-    font-size: 1.05rem;
+    font-size: 1rem;
     line-height: 1.75;
   }
   .category-list {
