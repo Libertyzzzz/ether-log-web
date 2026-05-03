@@ -895,21 +895,9 @@ onMounted(() => {
     </section>
 
     <section v-if="currentPage === 'profile'" class="profile-page">
-      <div class="section-header">
-        <span class="section-label">个人主页</span>
-        <h2>欢迎回到你的控制空间</h2>
-        <p>这里展示你的账户信息、文章概览和近期互动。</p>
-      </div>
+      
 
-      <div class="profile-banner">
-        <div>
-          <p>已登录用户可以查看文章统计、管理评论、并快速进入发布或编辑模式。</p>
-        </div>
-        <div class="profile-banner-actions">
-          <button class="action-pill" type="button" @click="openDashboard">进入控制面板</button>
-          <button class="action-pill" type="button" @click="openPublishModal()">写新文章</button>
-        </div>
-      </div>
+      
 
       <div class="profile-grid">
         <div class="profile-card profile-summary">
@@ -924,10 +912,7 @@ onMounted(() => {
             </div>
           </div>
 
-          <div class="profile-quick-actions">
-            <button class="profile-action-button" type="button" @click="openDashboard">进入控制面板</button>
-            <button class="profile-action-button danger" type="button" @click="logout">退出登录</button>
-          </div>
+          
 
           <div class="profile-stats">
             <div>
@@ -984,21 +969,7 @@ onMounted(() => {
     </section>
 
     <section v-if="currentPage === 'dashboard'" class="dashboard-page">
-      <div class="section-header">
-        <span class="section-label">控制面板</span>
-        <h2>文章与评论管理中心</h2>
-        <p>集中查看文章绩效、管理评论和快速进入编辑。</p>
-      </div>
-
-      <div class="dashboard-banner">
-        <div>
-          <p>仪表盘汇总当前文章、评论和浏览数据，方便你在一个视图内完成内容决策。</p>
-        </div>
-        <div class="dashboard-banner-actions">
-          <button class="action-pill" type="button" @click="openPublishModal()">新建文章</button>
-          <button class="action-pill secondary" type="button" @click="openProfile">返回个人主页</button>
-        </div>
-      </div>
+     
 
       <div class="stats-grid">
         <div class="stat-card">
@@ -1708,7 +1679,7 @@ onMounted(() => {
 .profile-page,
 .dashboard-page {
   max-width: 64rem;
-  margin: 3rem auto;
+  margin: 10rem auto;
   padding: 0 1.5rem;
 }
 .section-header {
