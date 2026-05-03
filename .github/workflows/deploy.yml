@@ -1,0 +1,39 @@
+name: Deploy Dust Blog
+
+on:
+  push:
+    branches:
+      - main # 只有在 main 分支有推送时才触发
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1. 拉取代码
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # 2. 安装 Node.js (针对你的 Vue 3 环境)
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: 'npm'
+
+      # 3. 安装依赖并构建
+      - name: Install and Build
+        run: |
+          npm install
+          npm run build
+
+      # 4. 部署到服务器 (使用 SSH)
+      - name: Deploy to Server
+        uses: easingthemes/ssh-deploy@main
+        env:
+          SSH_PRIVATE_KEY: ${{ secrets.SERVER_SSH_KEY }}
+          ARGS: "-rlgoDzvc -i --delete"
+          SOURCE: "dist/" # Vue 构建后的目录
+          REMOTE_HOST: ${{ secrets.SERVER_HOST }}
+          REMOTE_USER: ${{ secrets.SERVER_USER }}
+          TARGET: "/home/dust/app/ether-log-web" # 文件存放目录
