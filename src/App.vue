@@ -1152,30 +1152,36 @@ onMounted(() => {
       <div class="about-card">
         <span class="section-label">关于 EtherLog</span>
         <h3>极简而不简单的技术博客</h3>
-        <p>EtherLog 专注于记录架构思考、开发实践与系统设计。首页展示导航、最新文章、作者信息与行动入口，让读者快速获取价值。</p>
+        <p>EtherLog 专注于记录架构思考、开发实践与系统设计。首页展示导航、最新文章、信息与行动入口，让读者快速获取价值。</p>
       </div>
       <div class="about-card">
         <span class="section-label">核心模块</span>
         <h3>最新更新 / 分类 / 关注</h3>
-        <p>以文章为核心，辅以分类、作者介绍与订阅入口，满足技术博客常见需求。同时保留简洁视觉与沉浸式阅读体验。</p>
+        <p>以文章为核心，辅以分类、介绍与订阅入口，支持未来拓展需求。同时保留简洁视觉与沉浸式阅读体验。</p>
       </div>
       <div class="about-card">
         <span class="section-label">下一步</span>
         <h3>持续更新与归档</h3>
-        <p>未来可继续补充作者档案、标签云、精选专题和邮件订阅，让博客从首页变成长期积累的知识枢纽。</p>
+        <p>未来可继续相关档案、标签云、精选专题和邮件订阅，让博客从首页变成长期积累的知识枢纽。</p>
       </div>
     </section>
 
     <section v-if="currentPage === 'home'" id="contact" class="contact-section">
       <h2>想要更多更新？</h2>
-      <p>在 EtherLog，首页不仅是展示，更是入口。你可以加上订阅、社交、站内搜索等动作，帮助读者快速进入下一个内容。</p>
-      <a class="contact-button" href="mailto:hello@etherlog.example.com">联系我 / 订阅</a>
+      <p>在 EtherLog，首页不仅是展示，更是入口。未来会逐步加上订阅、社交、站内搜索等动作，帮助读者快速进入下一个内容。</p>
+      <a class="contact-button" href="mailto:cyril.xu.work@gmail.com">联系我 / 订阅</a>
     </section>
 
     <!-- 4. 页脚 -->
     <footer v-if="currentPage === 'home'" class="footer">
-      <span>© 2026 ETHERLOG STUDIO. REBORN VERSION.</span>
-      <span>STABLE PRODUCTION</span>
+      <div class="footer-brand">
+        <span class="footer-company">NEXTIFY</span>
+        <span class="footer-copy">© 2026 NEXTIFY. All rights reserved.</span>
+      </div>
+      <div class="footer-meta">
+        <span>Minimal web publishing for modern creators.</span>
+        <span>EtherLog by NEXTIFY</span>
+      </div>
     </footer>
   </div>
 </template>
@@ -1212,25 +1218,35 @@ onMounted(() => {
   box-shadow: 0 1px 2px rgba(0,0,0,0.05);
 }
 
+.nav-logo {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
 .logo-box {
   width: 2rem;
   height: 2rem;
-  background: black;
-  color: white;
-  border-radius: 0.5rem;
+  background: #111827;
+  color: #f8fafc;
+  border-radius: 0.75rem;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-weight: bold;
-  font-style: italic;
-  font-size: 0.875rem;
+  font-weight: 800;
+  font-style: normal;
+  font-size: 0.85rem;
+  letter-spacing: -0.04em;
 }
 
 .logo-text {
-  font-weight: bold;
+  display: inline-flex;
+  align-items: center;
+  line-height: 1;
+  font-weight: 700;
   letter-spacing: -0.05em;
   text-transform: uppercase;
-  margin-left: 0.75rem;
+  margin: 0;
 }
 
 .nav-links {
@@ -2611,13 +2627,41 @@ onMounted(() => {
   flex-direction: column;
   justify-content: space-between;
   align-items: center;
-  color: #d1d5db;
-  font-size: 9px;
-  font-weight: 900;
-  letter-spacing: 0.4em;
-  gap: 1.5rem;
+  color: #6b7280;
+  font-size: 0.8rem;
+  letter-spacing: 0.08em;
+  gap: 1.25rem;
 }
-@media (min-width: 768px) { .footer { flex-direction: row; } }
+.footer-brand,
+.footer-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  text-align: center;
+}
+.footer-company {
+  font-size: 0.95rem;
+  font-weight: 800;
+  letter-spacing: 0.25em;
+  color: #111827;
+  text-transform: uppercase;
+}
+.footer-copy,
+.footer-meta span {
+  color: #6b7280;
+  font-weight: 500;
+}
+@media (min-width: 768px) {
+  .footer {
+    flex-direction: row;
+    align-items: flex-start;
+  }
+  .footer-brand,
+  .footer-meta {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
 
 @keyframes pulse {
   0%, 100% { opacity: 1; }
