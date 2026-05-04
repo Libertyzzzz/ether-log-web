@@ -3,7 +3,7 @@
  * EtherLog - 核心首页组件 (Vue 3 最终修复版)
  * 专注点：Bento Grid 响应式布局 + 消除全局样式干扰
  */
-import { computed, nextTick, ref, reactive, onMounted } from 'vue'
+import { computed, nextTick, ref, reactive, onMounted, onUnmounted} from 'vue'
 import axios from 'axios'
 import { 
   Bold,
@@ -134,6 +134,7 @@ const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const imageInput = ref<HTMLInputElement | null>(null)
 const isPreviewingMarkdown = ref(false)
 const isUploadingImage = ref(false)
+const showUserMenu = ref(false)
 const publishForm = reactive<ArticlePublishRequest>({
   title: '',
   subtitle: '',
@@ -644,6 +645,32 @@ function logout() {
   localStorage.removeItem('authUser')
 }
 
+function handleStatusClick() {
+  if (!isLoggedIn.value) {
+    openLoginModal()
+    return
+  }
+
+  showUserMenu.value = !showUserMenu.value
+
+}
+
+function closeUserMenu() {
+  showUserMenu.value = false
+}
+
+function handleLogout() {
+  closeUserMenu()
+  logout()
+}
+
+function handleClickOutside(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.status-badge-wrapper')) {
+    closeUserMenu()
+  }
+}
+
 onMounted(() => {
   const storedUser = localStorage.getItem('authUser')
   const storedToken = localStorage.getItem('authToken')
@@ -656,6 +683,12 @@ onMounted(() => {
   }
 
   fetchArticles()
+  document.addEventListener('click', handleClickOutside)
+
+})
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
@@ -683,9 +716,25 @@ onMounted(() => {
           <button v-else class="nav-action-button" type="button" @click.prevent="openLoginModal">Login</button>
         </div>
 
-        <div class="status-badge">
-          <div class="dot"></div>
-          <span>{{ isLoggedIn ? 'SIGNED IN' : 'SYSTEM READY' }}</span>
+        <div class="status-badge-wrapper"> 
+          <div class="status-badge" :class="{ 'clickable': isLoggedIn, 'active': showUserMenu }" @click="handleStatusClick">
+            <div class="dot"></div>
+            <span>{{ isLoggedIn ? 'SIGNED IN' : 'SYSTEM READY' }}</span>
+          </div>
+
+          <div v-if="isLoggedIn && showUserMenu" class="user-dropdown-menu" @click.stop>
+            <div class="dropdown-header">
+              <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
+              <div class="dropdown-user-info">
+                <strong>{{ getLoginUserName() }}</strong>
+                <span>{{ loginUser.email || '未设置邮箱' }}</span>
+              </div>
+            </div>
+            <div class="dropdown-divider"></div>
+            <button class="dropdown-item danger" type="button" @click="handleLogout">
+              <span>退出登录</span>
+            </button>
+          </div>
         </div>
       </div>
     </nav>
@@ -1247,6 +1296,9 @@ onMounted(() => {
   display: flex;
   align-items: center;
 }
+.status-badge-wrapper {
+  position: relative;
+}
 .status-badge {
   display: inline-flex;
   align-items: center;
@@ -1256,6 +1308,97 @@ onMounted(() => {
   font-size: 0.75rem;
   letter-spacing: 0.12em;
   text-transform: uppercase;
+  transition: all 0.2s ease;
+}
+.status-badge.clickable {
+  cursor: pointer;
+  padding: 0.5rem 0.85rem;
+  border-radius: 9999px;
+}
+.status-badge.clickable:hover,
+.status-badge.active {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+.user-dropdown-menu {
+  position: absolute;
+  top: calc(100% + 0.75rem);
+  right: 0;
+  min-width: 240px;
+  background: white;
+  border-radius: 1.25rem;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  padding: 0.75rem;
+  z-index: 1001;
+  animation: dropdownFadeIn 0.2s ease;
+}
+@keyframes dropdownFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-8px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+.dropdown-header {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 0.75rem;
+}
+.dropdown-avatar {
+  width: 2.75rem;
+  height: 2.75rem;
+  border-radius: 0.85rem;
+  object-fit: cover;
+  border: 1px solid rgba(37, 99, 235, 0.12);
+}
+.dropdown-user-info {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.dropdown-user-info strong {
+  font-size: 0.95rem;
+  color: #0f172a;
+}
+.dropdown-user-info span {
+  font-size: 0.78rem;
+  color: #64748b;
+}
+.dropdown-divider {
+  height: 1px;
+  background: rgba(226, 232, 240, 0.8);
+  margin: 0.5rem 0;
+}
+.dropdown-item {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 0.75rem 0.85rem;
+  border: none;
+  background: transparent;
+  border-radius: 0.85rem;
+  color: #334155;
+  font-size: 0.88rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.dropdown-item:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+.dropdown-item.danger {
+  color: #dc2626;
+}
+.dropdown-item.danger:hover {
+  background: rgba(239, 68, 68, 0.08);
+  color: #b91c1c;
 }
 .status-badge .dot {
   width: 0.55rem;

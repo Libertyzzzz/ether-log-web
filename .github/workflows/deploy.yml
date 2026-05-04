@@ -36,3 +36,4 @@ jobs:
           host: ${{ secrets.REMOTE_HOST }}
           username: ${{ secrets.REMOTE_USER }}
           target: "/home/dust/app/ether-log-web" # 文件存放目录git
+          
