@@ -4,7 +4,11 @@
  * 专注点：Bento Grid 响应式布局 + 消除全局样式干扰
  */
 import { computed, nextTick, ref, reactive, onMounted, onUnmounted} from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+
+const route = useRoute()
+const router = useRouter()
 import { 
   Bold,
   Code2,
@@ -160,7 +164,10 @@ const filteredArticles = computed(() => {
 
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
 const isEditMode = computed(() => editingArticleId.value !== null)
-const currentPage = ref<'home'|'posts'|'about'|'profile'|'dashboard'>('home')
+// const currentPage = ref<'home'|'posts'|'about'|'profile'|'dashboard'>('home')
+const currentPage = computed(() => {
+  return (route.meta.page as string) || 'home'
+})
 const showActionsInCurrentView = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
 const myComments = ref<Array<{ id: number; author: string; articleTitle: string; content: string; status: string; createTime: string }>>([
   { id: 1, author: 'Alice', articleTitle: '深度学习与架构优化', content: '这篇文章很有洞见，尤其是最后的性能建议。', status: '已审核', createTime: '2026-04-28 14:12' },
@@ -173,6 +180,7 @@ const totalViews = computed(() => articles.value.reduce((sum, item) => sum + (it
 const commentCount = computed(() => myComments.value.length)
 
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
+
 
 function getLoginUserName() {
   return loginUser.value.nickname || loginUser.value.username || loginUser.value.email || 'User'
@@ -450,23 +458,28 @@ function closeArticleDetail() {
 }
 
 function openProfile() {
-  currentPage.value = 'profile'
+  router.push({ name: 'profile' })
   selectedArticle.value = null
   selectedArticlePreview.value = null
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function openDashboard() {
-  currentPage.value = 'dashboard'
+  router.push({ name: 'dashboard' })
   selectedArticle.value = null
   selectedArticlePreview.value = null
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function navigateToSection(sectionId: string) {
-  currentPage.value = 'home'
+  router.push({ name: sectionId })
   selectedArticle.value = null
   selectedArticlePreview.value = null
+
+  if (sectionId === 'home') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
+  }
 
   requestAnimationFrame(() => {
     const target = document.getElementById(sectionId)
@@ -638,7 +651,7 @@ function logout() {
   loginForm.email = ''
   loginForm.password = ''
   loginError.value = ''
-  currentPage.value = 'home'
+  router.push({ name: 'home' })
   selectedArticle.value = null
   selectedArticlePreview.value = null
   localStorage.removeItem('authToken')
@@ -808,7 +821,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <section v-else-if="currentPage === 'home'" class="home-page">
+<section v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'" class="home-page">
     <!-- 2. Hero 巨幕区 -->
     <header id="home" class="hero-section">
       <div class="hero-copy">
@@ -1168,7 +1181,7 @@ onUnmounted(() => {
       </div>
     </div>
 
-    <section v-if="currentPage === 'home'" id="about" class="about-section">
+<section v-if="currentPage === 'home' || currentPage === 'about'" id="about" class="about-section">
       <div class="about-card">
         <span class="section-label">关于 EtherLog</span>
         <h3>极简而不简单的技术博客</h3>
