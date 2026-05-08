@@ -4,8 +4,16 @@ import { useRouter } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 
+import { onMounted } from 'vue'
+
+onMounted(() => {
+  document.title = 'Aether Valuation | 人间估值'
+})
+
 type AssessmentStep = 'input' | 'loading' | 'result'
 type GenderModel = 'MALE' | 'FEMALE'
+
+
 
 interface AssessmentForm {
   gender: GenderModel
@@ -173,32 +181,40 @@ const playfulVerdict = computed(() => {
   const score = result.value?.score ?? 0
   if (score >= 90) {
     return {
-      title: '稀有皮肤，建议低调上线',
-      subtitle: '系统提示：你这个配置容易让算法开始反思自己。',
-      badge: 'SSR'
+      title: '稀有皮肤，建议低调',
+      subtitle: '拥有让人眼前一亮的魅力值，简直是行走的惊喜',
+      badge: '夯'
     }
   }
 
-  if (score >= 75) {
+  if (score >= 80) {
     return {
-      title: '优质版本，稳定发布',
-      subtitle: '综合表现在线，属于“别乱更新系统也挺好用”的类型。',
-      badge: 'PRO'
+      title: '品质在线，值得信赖',
+      subtitle: '各方面都表现不错，是那种让人觉得很舒服的存在',
+      badge: '顶级'
+    }
+  }
+
+  if (score >= 70) {
+    return {
+      title: '潜力股选手',
+      subtitle: '已经很棒了，再打磨一下就是精品',
+      badge: '人上人'
     }
   }
 
   if (score >= 60) {
     return {
-      title: '可持续迭代版',
-      subtitle: '不是满配，但补丁空间很明确，属于越养越顺手。',
-      badge: 'PLUS'
+      title: '成长型选手',
+      subtitle: '基础不错，还有很大提升空间，未来可期。',
+      badge: 'NPC'
     }
   }
 
   return {
-    title: '早期测试版，潜力待编译',
-    subtitle: '先别急着破防，这份报告更像版本日志，不是人生判决书。',
-    badge: 'BETA'
+    title: '原生态宝藏',
+    subtitle: '先别急着破防，每个人都有自己的闪光点，这份报告只是记录当下的状态',
+    badge: '拉完了'
   }
 })
 
@@ -292,7 +308,7 @@ function normalizeResult(payload: unknown): AssessmentResult {
   return {
     score: normalizeScore(source.score),
     marketLevel: source.marketLevel || '估值完成',
-    report: source.report || '后端已完成评估，但未返回报告文本。',
+    report: source.report || '系统已完成评估，但未返回报告文本。',
     radar: {
       assets: normalizeScore(radar.assets),
       biological: normalizeScore(radar.biological),
@@ -356,7 +372,7 @@ async function startAnalysis() {
       ? error.response.data.message
       : error instanceof Error
         ? error.message
-        : '评估接口暂时不可用，请确认后端 /api/v2/assessment/evaluate 已启动。'
+        : '访问人数太多啦，评估功能暂不可用呢，WWWW'
   } finally {
     stopLoadingMessages()
   }
@@ -428,19 +444,19 @@ onUnmounted(() => {
     <nav class="assessment-nav">
       <button class="brand-button" type="button" @click="router.push({ name: 'home' })">
         <span class="brand-mark">V</span>
-        <span>Valuation Studio</span>
+        <span>Aether Valuation | 人间估值</span>
       </button>
       <div class="nav-meta">
-        <span>PLAYFUL DIAGNOSTIC</span>
-        <button type="button" @click="router.push({ name: 'home' })">Exit</button>
+        <span>PLAYFUL DIAGNOSTIC</span>         
       </div>
     </nav>
 
     <section class="assessment-hero">
       <div class="hero-copy">
         <span class="eyebrow">SATIRE FIRST / DATA SECOND</span>
-        <h1>人间估值，但别太当真。</h1>
-        <p>像 Typeform 一样轻松填写，像 Apple 产品页一样安静呈现。它会生成一份好看的玩笑报告，但不会定义任何真实的人。</p>
+        <h1>人间估值</h1>
+        <p>轻松填写，静静欣赏。这会是一份有趣的报告，但它永远不会定义真实的你。</p>
+
       </div>
       <aside class="hero-panel" aria-label="当前输入摘要">
         <span class="panel-kicker">LIVE PREVIEW</span>
@@ -456,18 +472,19 @@ onUnmounted(() => {
 
     <section v-if="step === 'input'" class="assessment-layout animate-fade-in">
       <form class="input-panel" @submit.prevent="startAnalysis">
-        <div class="panel-heading">
-          <span>INPUT</span>
-          <h2>把样本放进机器里。</h2>
-        </div>
         <div class="input-note">
-          <strong>Relaxed mode</strong>
-          <span>这是一份娱乐报告，选项只用于生成玩笑版画像。分数不是结论，只是一个漂亮的 UI 事件。</span>
+            <div class="note-header">
+                <span class="note-emoji">🎭</span>
+                <strong>开始你的表演吧</strong>
+            </div>
+            <p class="note-content">
+                这是一份纯娱乐的估值报告，数据仅用于生成带梗的画像。<br>
+                <strong>分数不构成任何真实评价，笑一笑就行～</strong>
+            </p>
         </div>
 
-        <div class="form-section-title">
-          <span>01</span>
-          <strong>基础样本</strong>
+        <div class="form-section-title">          
+          <strong>基础建模与资信评估</strong>
         </div>
         <div class="form-grid">
           <div class="field field-wide">
@@ -585,8 +602,8 @@ onUnmounted(() => {
         </div>
 
         <div class="form-section-title spaced">
-          <span>02</span>
-          <strong>风格与心理参数</strong>
+          
+          <strong>软性标签与心理溢价</strong>
         </div>
         <div class="range-grid">
           <label v-for="field in rangeFields" :key="field.key" class="range-field">
@@ -600,7 +617,7 @@ onUnmounted(() => {
         </div>
 
         <p v-if="errorMessage" class="error-banner">{{ errorMessage }}</p>
-        <button class="submit-button" type="submit" :disabled="!canSubmit">Generate playful report</button>
+        <button class="submit-button" type="submit" :disabled="!canSubmit">生成报告</button>
       </form>
     </section>
 
@@ -625,9 +642,9 @@ onUnmounted(() => {
         </div>
 
         <div class="score-orb">
-          <span>{{ playfulVerdict.badge }}</span>
-          <strong>{{ result.score }}</strong>
-          <em>{{ result.marketLevel }}</em>
+            <span class="badge-highlight">{{ playfulVerdict.badge }}</span>
+            <strong>{{ result.score }}</strong>
+            <em>{{ result.marketLevel }}</em>
         </div>
       </div>
 
@@ -673,12 +690,12 @@ onUnmounted(() => {
 
         <section class="report-card">
           <span class="panel-kicker">REPORT</span>
-          <h3>算法小作文</h3>
+          <h3>报告解读</h3>
           <div class="memo-toolbar">
             <i></i>
             <i></i>
             <i></i>
-            <span>generated-by-backend.txt</span>
+            <span>Generated-by-Nextify</span>
           </div>
           <p>{{ result.report }}</p>
         </section>
@@ -693,36 +710,68 @@ onUnmounted(() => {
       </div>
 
       <div class="result-actions">
-        <button type="button" class="secondary-button" @click="router.push({ name: 'home' })">Exit</button>
-        <button type="button" class="submit-button" @click="resetAssessment">Run another sample</button>
+        
+        <button type="button" class="submit-button single-action-btn" @click="resetAssessment">重新生成</button>
       </div>
     </section>
   </main>
 </template>
 
 <style scoped>
+
+.note-header {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.note-header .note-emoji {
+  font-size: 28px;
+}
+
+.note-header strong {
+  font-size: 22px;
+  font-weight: 800;
+  color: #111827;
+  letter-spacing: -0.02em;
+}
+
+.note-content {
+  margin: 0;
+  color: #475569;
+  font-size: 15.5px;
+  line-height: 1.75;
+}
+
+.note-content strong {
+  color: #334155;
+  font-weight: 700;
+}
+
 .assessment-root {
   min-height: 100vh;
   background: #f5f5f7;
   color: #111827;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  padding: 24px;
+  padding: 24px 20px;
 }
 
 .assessment-nav {
-  width: min(1240px, 100%);
-  margin: 0 auto 28px;
-  min-height: 78px;
-  padding: 0 24px;
-  border-radius: 40px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.06);
-  backdrop-filter: blur(18px);
+  width: min(1140px, 100%);
+  max-width: 1140px;
+  margin: 0 auto 32px;  
+  padding: 0 32px;
+  height: 78px;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.98);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+  backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 16px;
+  
 }
 
 .brand-button,
@@ -739,6 +788,9 @@ onUnmounted(() => {
   color: #111827;
   font-weight: 900;
   font-size: 18px;
+  border: 0;
+  background: transparent;
+  cursor: pointer;
 }
 
 .brand-mark {
@@ -751,12 +803,21 @@ onUnmounted(() => {
   background: #111827;
   color: #f8fafc;
   font-weight: 900;
+  font-size: 20px;
+}
+
+.diagnostic-text {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
 }
 
 .nav-meta {
   display: inline-flex;
   align-items: center;
-  gap: 16px;
+  
 }
 
 .nav-meta span {
@@ -779,15 +840,17 @@ onUnmounted(() => {
 .assessment-layout,
 .result-stage,
 .loading-panel {
-  width: min(1240px, 100%);
-  margin: 0 auto;
+  width: min(1140px, 100%);
+  max-width: 1240px;
+  margin-left: auto;
+  margin-right: auto;
 }
 
 .assessment-hero {
   display: grid;
-  grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
-  gap: 24px;
-  margin-bottom: 24px;
+  grid-template-columns: 1.35fr 0.65fr;
+  gap: 28x;
+  margin-bottom: 32px;
 }
 
 .hero-copy,
@@ -878,8 +941,11 @@ onUnmounted(() => {
 }
 
 .input-panel {
-  max-width: 980px;
+  width: 100%;
+  padding: 48px 48px; /* 增加内边距 */
+  max-width: 1140px;
   margin: 0 auto;
+  border-radius: 16px;
 }
 
 .panel-heading {
@@ -1167,16 +1233,47 @@ onUnmounted(() => {
   position: relative;
   z-index: 1;
   aspect-ratio: 1;
+  width: 100%;
+  max-width: 380px;
   border-radius: 50%;
-  background:
-    radial-gradient(circle at 35% 30%, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.86)),
-    #ffffff;
+  background: radial-gradient(circle at 38% 32%, rgba(255,255,255,0.98), #ffffff);
   border: 1px solid #dbe3ef;
-  box-shadow: inset 0 0 0 14px rgba(37, 99, 235, 0.06), 0 30px 80px rgba(37, 99, 235, 0.16);
+  box-shadow: 
+    inset 0 0 0 18px rgba(37, 99, 235, 0.08),
+    0 30px 80px rgba(37, 99, 235, 0.22),
+    0 0 0 12px rgba(255,255,255,0.6);
   display: grid;
   place-items: center;
   align-content: center;
   text-align: center;
+  padding: 20px;
+}
+
+.badge-highlight {
+  display: inline-block;
+  color: #2563eb;
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 0.25em;
+  text-transform: uppercase;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  margin-bottom: 8px;
+  text-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
+  position: relative;
+}
+
+.badge-highlight::after {
+  content: '';
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 48px;
+  height: 3px;
+  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
+  border-radius: 999px;
 }
 
 .score-orb span {
@@ -1186,17 +1283,22 @@ onUnmounted(() => {
   letter-spacing: 0.18em;
 }
 
+/* 强化分数数字 */
 .score-orb strong {
-  font-size: 112px;
-  line-height: 0.9;
+  font-size: 128px;
+  line-height: 0.85;
   font-weight: 950;
+  color: #0f172a;
+  margin: 8px 0 4px;
+  text-shadow: 0 4px 20px rgba(15, 23, 42, 0.15);
 }
 
 .score-orb em {
-  max-width: 220px;
-  color: #64748b;
+  font-size: 17px;
   font-style: normal;
-  font-weight: 900;
+  font-weight: 800;
+  color: #475569;
+  letter-spacing: 0.02em;
 }
 
 .result-grid {
@@ -1409,13 +1511,32 @@ onUnmounted(() => {
 }
 
 .result-actions {
-  display: grid;
-  grid-template-columns: 220px minmax(0, 1fr);
-  gap: 12px;
+  display: flex;
+  justify-content: center;
+  margin-top: 32px;
+  padding: 0 20px;
 }
 
 .result-actions .submit-button {
   margin-top: 0;
+  min-height: 62px;
+  padding: 0 48px;
+  font-size: 16px;
+  font-weight: 900;
+  border-radius: 9999px;
+  box-shadow: 0 10px 30px rgba(17, 24, 39, 0.15);
+  transition: all 0.2s ease;
+}
+
+.result-actions .submit-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 16px 40px rgba(17, 24, 39, 0.2);
+}
+
+/* 单按钮专属样式 */
+.single-action-btn {
+  max-width: 380px;
+  width: 100%;
 }
 
 .secondary-button {
@@ -1472,6 +1593,7 @@ onUnmounted(() => {
 
   .assessment-nav {
     border-radius: 24px;
+    margin: 0 auto 32px;
   }
 
   .hero-copy {
