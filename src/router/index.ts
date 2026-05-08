@@ -1,6 +1,7 @@
 // src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import App from '../App.vue'
+import Assessment from '../views/Assessment.vue'
 
 const router = createRouter({
   history: createWebHistory(),
@@ -34,6 +35,11 @@ const router = createRouter({
       name: 'dashboard',
       component: App,
       meta: { page: 'dashboard' }
+    },
+    {
+      path: '/assessment',
+      name: 'assessment',
+      component: Assessment
     }
   ]
 })

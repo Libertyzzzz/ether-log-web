@@ -46,6 +46,11 @@ export default defineConfig(({ mode }) => {
           target: backendUrl,
           changeOrigin: true,
           secure: mode !== 'development'
+        },
+        '/v2': {
+          target: backendUrl,
+          changeOrigin: true,
+          secure: mode !== 'development'
         }
       }
     }
