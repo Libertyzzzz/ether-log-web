@@ -126,7 +126,7 @@ const loadingMessages = [
 ]
 
 const rangeFields = [
-  { key: 'workStability', label: '职业稳定性', hint: '1 到 5，越高越像系统长期支持版', min: 1, max: 5 },
+  { key: 'workStability', label: '职业稳定性', hint: '1 到 5，越高越稳定', min: 1, max: 5 },
   { key: 'aestheticStyle', label: '审美风格', hint: '1 到 5，从随缘穿搭到人形 Lookbook', min: 1, max: 5 },
   { key: 'photoSkill', label: '摄影水平', hint: '1 到 5，决定朋友圈素材能否抢救', min: 1, max: 5 },
   { key: 'cookingSkill', label: '厨艺', hint: '1 到 4，从泡面工程到厨房 MVP', min: 1, max: 4 },
@@ -135,15 +135,15 @@ const rangeFields = [
   { key: 'consumptionView', label: '消费观', hint: '1 到 4，花钱姿势是否优雅落地', min: 1, max: 4 },
   { key: 'talkBreadth', label: '知识面 / 接梗能力', hint: '1 到 5，聊天频道宽度', min: 1, max: 5 },
   { key: 'stubbornness', label: '任性值', hint: '1 到 10，别太满，满了像锁死配置', min: 1, max: 10 },
-  { key: 'emotionalStability', label: '情绪稳态', hint: '1 到 5，低功耗稳定运行能力', min: 1, max: 5 },
-  { key: 'replyLatency', label: '回消延迟', hint: '1 秒回，4 轮回，系统会懂', min: 1, max: 4 },
-  { key: 'exBonding', label: '前任纠缠度', hint: '1 到 5，历史缓存清理状态', min: 1, max: 5 },
+  { key: 'emotionalStability', label: '情绪稳态', hint: '1 到 5， 值越大情绪越稳定 ', min: 1, max: 5 },
+  { key: 'replyLatency', label: '回消延迟', hint: '1 秒回，4 轮回', min: 1, max: 4 },
+  { key: 'exBonding', label: '前任纠缠度', hint: '1 到 5， 纠缠越深', min: 1, max: 5 },
   { key: 'socialFilters', label: '朋友圈美化率', hint: '1 到 5，滤镜浓度检测', min: 1, max: 5 },
-  { key: 'controlDesire', label: '控制欲', hint: '1 到 5，遥控器握持强度', min: 1, max: 5 },
-  { key: 'sharingDesire', label: '分享欲', hint: '1 到 5，日常广播频率', min: 1, max: 5 },
+  { key: 'controlDesire', label: '控制欲', hint: '1 到 5，  控制欲逐递增', min: 1, max: 5 },
+  { key: 'sharingDesire', label: '分享欲', hint: '1 到 5， 分享欲逐渐递增', min: 1, max: 5 },
   { key: 'relationshipGoal', label: '恋爱目的', hint: '1 纯爱，4 结婚，路线越清晰越好沟通', min: 1, max: 4 },
   { key: 'coldViolenceProb', label: '冷暴力倾向', hint: '1 到 5，静音模式触发概率', min: 1, max: 5 },
-  { key: 'empathyLevel', label: '同理心', hint: '1 到 5，是否能读懂对方弹窗', min: 1, max: 5 }
+  { key: 'empathyLevel', label: '同理心', hint: '1 到 5， 共情力递增', min: 1, max: 5 }
 ] as const
 
 const canSubmit = computed(() => {
@@ -187,7 +187,7 @@ const playfulVerdict = computed(() => {
     }
   }
 
-  if (score >= 80) {
+  if (score >= 75) {
     return {
       title: '品质在线，值得信赖',
       subtitle: '各方面都表现不错，是那种让人觉得很舒服的存在',
@@ -195,7 +195,7 @@ const playfulVerdict = computed(() => {
     }
   }
 
-  if (score >= 70) {
+  if (score >= 55) {
     return {
       title: '潜力股选手',
       subtitle: '已经很棒了，再打磨一下就是精品',
@@ -203,7 +203,7 @@ const playfulVerdict = computed(() => {
     }
   }
 
-  if (score >= 60) {
+  if (score >= 30) {
     return {
       title: '成长型选手',
       subtitle: '基础不错，还有很大提升空间，未来可期。',
@@ -328,7 +328,7 @@ function startLoadingMessages() {
     index += 1
     loadingMsg.value = loadingMessages[index % loadingMessages.length]
   }, 900)
-}
+} 
 
 function stopLoadingMessages() {
   if (loadingTimer) {
