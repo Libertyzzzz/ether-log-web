@@ -19,12 +19,20 @@ const isGenerating = ref(false) // [新增] 生成状态
 // 在其他 ref 之后添加
 const qrCodeRef = ref<HTMLElement | null>(null)
 
+const isSharedReport = ref(false)
+
+// 卡片颜色自适应函数
+const adjustColor = (color, amount) => {
+  return color;
+};
+
 
 // 检测URL中的分享ID
 onMounted(async () => {
   document.title = 'Aether Valuation | 人间估值'
   const shareId = route.params.shareId || route.query.id
   if (shareId) {
+    isSharedReport.value = true 
     loadingMsg.value = '正在从尘埃中恢复报告...'
     step.value = 'loading'
     try {
@@ -36,6 +44,7 @@ onMounted(async () => {
     } catch (e) {
       errorMessage.value = '报告已过期或不存在'
       step.value = 'input'
+      isSharedReport.value = false
     }
   }
 })
@@ -53,67 +62,95 @@ const currentShareUrl = computed(() => {
   return `${window.location.origin}/assessment?id=${result.value.shareId}`
 })
 
+// ─── 海报雷达图 SVG 辅助函数 ───
+const hexAngle = (i: number) => (Math.PI / 180) * (i * 60 - 90)
+
+const hexPoints = (cx: number, cy: number, r: number): string =>
+  Array.from({ length: 6 }, (_, i) => {
+    const a = hexAngle(i)
+    return `${cx + r * Math.cos(a)},${cy + r * Math.sin(a)}`
+  }).join(' ')
+
+const hexAxis = (cx: number, cy: number, r: number) =>
+  Array.from({ length: 6 }, (_, i) => {
+    const a = hexAngle(i)
+    return { x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+  })
+
+const RADAR_ORDER = ['assets', 'biological', 'aesthetic', 'emotional', 'social', 'maintenance'] as const
+
+const radarPolygon = (cx: number, cy: number, r: number): string =>
+  RADAR_ORDER.map((key, i) => {
+    const item = radarItems.value.find(d => d.key === key)
+    const ratio = (item?.value ?? 0) / 100
+    const a = hexAngle(i)
+    return `${cx + r * ratio * Math.cos(a)},${cy + r * ratio * Math.sin(a)}`
+  }).join(' ')
+
+const radarDots = (cx: number, cy: number, r: number) =>
+  RADAR_ORDER.map((key, i) => {
+    const item = radarItems.value.find(d => d.key === key)
+    const ratio = (item?.value ?? 0) / 100
+    const a = hexAngle(i)
+    return { x: cx + r * ratio * Math.cos(a), y: cy + r * ratio * Math.sin(a) }
+  })
+
+const RADAR_LABELS = ['生存资源', '生物属性', '审美溢价', '情绪带宽', '社交博弈', '维护成本']
+const radarLabelPositions = (cx: number, cy: number, r: number) =>
+  RADAR_LABELS.map((label, i) => {
+    const a = hexAngle(i)
+    return { label, x: cx + r * Math.cos(a), y: cy + r * Math.sin(a) }
+  })
+
 // 4. 生成 Apple 质感海报
 const savePoster = async () => {
-  if (!posterRef.value) return
+  if (!posterRef.value) {
+    console.error('posterRef 为空，DOM 未挂载')
+    alert('海报容器未找到，请稍后重试')
+    return
+  }
   isGenerating.value = true
-  
+
   try {
-    // 确保DOM完全渲染后再执行截图
     await nextTick()
-    
-    // 如果有分享链接，先生成二维码
+    await new Promise(resolve => setTimeout(resolve, 100))
+
     if (currentShareUrl.value) {
-      // 创建一个临时的canvas元素来生成二维码
       const tempCanvas = document.createElement('canvas')
-      tempCanvas.width = 120
-      tempCanvas.height = 120
-      
+      tempCanvas.width = 72
+      tempCanvas.height = 72
+
       try {
-        // 生成二维码到临时canvas
-        await QRCode.toCanvas(
-          tempCanvas, 
-          currentShareUrl.value, 
-          {
-            width: 120,
-            height: 120,
-            margin: 2,
-            color: {
-              dark: '#111827',
-              light: '#ffffff'
-            }
-          }
-        )
-        
-        // 找到海报中的二维码容器并替换内容
+        await QRCode.toCanvas(tempCanvas, currentShareUrl.value, {
+          width: 72,
+          margin: 1,
+          color: { dark: '#0f172a', light: '#ffffff' }
+        })
         const qrContainer = posterRef.value.querySelector('.qr-code')
         if (qrContainer) {
-          // 清空容器
           qrContainer.innerHTML = ''
-          // 添加生成的canvas
           qrContainer.appendChild(tempCanvas)
         }
-        
-        // 等待渲染完成
         await nextTick()
         await new Promise(resolve => setTimeout(resolve, 300))
       } catch (error) {
         console.error('生成二维码失败:', error)
-        // 如果生成失败，保留占位符文本
-        const qrPlaceholder = posterRef.value.querySelector('.qr-placeholder')
-        if (qrPlaceholder) {
-          qrPlaceholder.textContent = '二维码生成失败'
-        }
       }
     }
-    
+
     const canvas = await html2canvas(posterRef.value, {
-      scale: 3, // 高清导出
+      scale: 3,
       useCORS: true,
-      backgroundColor: '#ffffff' // 改为白色背景
+      allowTaint: true,
+      backgroundColor: '#ffffff'
+    }).catch(error => {
+      console.error('html2canvas 错误:', error)
+      alert('海报生成失败：' + (error?.message || '未知错误'))
+      return null
     })
+    if (!canvas) return
     const link = document.createElement('a')
-    link.download = `Dust-Valuation-${result.value?.score}.png`
+    link.download = `Aether-Valuation-${result.value?.score}.png`
     link.href = canvas.toDataURL('image/png')
     link.click()
   } finally {
@@ -293,11 +330,25 @@ const strongestRadarItem = computed(() => {
 
 const playfulVerdict = computed(() => {
   const score = result.value?.score ?? 0
+  let themeColor = ''
+
+  if (score >= 90) {
+    themeColor = '#10b981' // emerald-500 - 最高等级绿色
+  } else if (score >= 75) {
+    themeColor = '#2563eb' // blue-600 - 高等级蓝色
+  } else if (score >= 55) {
+    themeColor = '#8b5cf6' // violet-500 - 中等级紫色
+  } else if (score >= 30) {
+    themeColor = '#f59e0b' // amber-500 - 中低等级橙色
+  } else {
+    themeColor = '#ef4444' // red-500 - 低等级红色
+  }
   if (score >= 90) {
     return {
       title: '稀有皮肤，建议低调',
       subtitle: '拥有让人眼前一亮的魅力值，简直是行走的惊喜',
-      badge: '夯'
+      badge: '夯',
+      color: themeColor
     }
   }
 
@@ -305,7 +356,9 @@ const playfulVerdict = computed(() => {
     return {
       title: '品质在线，值得信赖',
       subtitle: '各方面都表现不错，是那种让人觉得很舒服的存在',
-      badge: '顶级'
+      badge: '顶级',
+      color: themeColor
+
     }
   }
 
@@ -313,7 +366,9 @@ const playfulVerdict = computed(() => {
     return {
       title: '潜力股选手',
       subtitle: '已经很棒了，再打磨一下就是精品',
-      badge: '人上人'
+      badge: '人上人',
+      color: themeColor
+
     }
   }
 
@@ -321,14 +376,18 @@ const playfulVerdict = computed(() => {
     return {
       title: '成长型选手',
       subtitle: '基础不错，还有很大提升空间，未来可期。',
-      badge: 'NPC'
+      badge: 'NPC',
+      color: themeColor
+
     }
   }
 
   return {
     title: '原生态宝藏',
     subtitle: '先别急着破防，每个人都有自己的闪光点，这份报告只是记录当下的状态',
-    badge: '拉完了'
+    badge: '拉完了',
+    color: themeColor
+
   }
 })
 
@@ -827,37 +886,116 @@ onUnmounted(() => {
       </div>
 
       
-
-      <div class="result-actions animate-fade-in">
-        <button class="submit-button gold-action" @click="savePoster" :disabled="isGenerating">
-          {{ isGenerating ? '正在渲染...' : '生成估值海报' }}
-        </button>
-        <button class="secondary-button" @click="copyShareLink">复制分享链接</button>
-        <button class="secondary-button" @click="resetAssessment">重新评估</button>
-      </div>
-
-    <div ref="posterRef" class="poster-canvas">
-      <div class="poster-inner">
-        <div class="poster-header">
-          <span class="brand">Aether Valuation</span>
-          <span class="tag">PLAYFUL DIAGNOSTIC / V2</span>
+      <template v-if="!isSharedReport">
+        <div class="result-actions animate-fade-in">
+          <button class="submit-button gold-action" @click="savePoster" :disabled="isGenerating">
+            {{ isGenerating ? '正在渲染...' : '生成估值海报' }}
+          </button>
+          <button class="secondary-button" @click="copyShareLink">复制分享链接</button>
+          <button class="secondary-button" @click="resetAssessment">重新评估</button>
         </div>
-        <div class="poster-main">
-          <div class="p-score">{{ result.score }}</div>
-          <div class="p-level">「{{ result.marketLevel }}」</div>
-          <div class="p-badge">{{ playfulVerdict.badge }}</div>
-          <p class="p-report">{{ result.report }}</p>
-        </div>
-        <div class="poster-footer">
-          <!-- 二维码容器 -->
-          <div class="qr-container">
-            <div v-if="currentShareUrl" class="qr-code"></div>
-            <div v-else class="qr-placeholder">扫描二维码开启估值...</div>
+      </template>
+ 
+      <div ref="posterRef" class="poster-canvas">
+
+        <!-- ① 顶部色条 -->
+        <div class="poster-accent-bar" :style="{ background: playfulVerdict.color }"></div>
+
+        <div class="poster-inner">
+
+          <!-- ② 品牌行 -->
+          <div class="poster-brand-row">
+            <div class="poster-brand-dot" :style="{ background: playfulVerdict.color }"></div>
+            <span class="poster-brand-name">Aether Valuation</span>
+            <span class="poster-brand-ver">人间估值</span>
           </div>
-          <p>AETHER SYSTEMM · 真正的你不被数字定义</p>
+
+
+
+          <!-- ③ HERO 区 -->
+          <div class="poster-hero">
+            <div class="poster-hero-grid"></div>
+
+            <!-- 数字行：inline-flex，数字左，badge右上角自然跟随 -->
+            <div class="poster-hero-num-row">
+              <span class="poster-score-num" :style="{ color: playfulVerdict.color }">{{ result.score }}</span>
+              <div class="poster-hero-badge" :style="{ background: playfulVerdict.color }">{{ playfulVerdict.badge }}</div>
+            </div>
+
+            <!-- 市场级别：独占一行，不挤数字 -->
+            <div class="poster-hero-market" :style="{ color: playfulVerdict.color }">{{ result.marketLevel }}</div>
+
+            <!-- 英文小字装饰 -->
+            <div class="poster-hero-en">
+              <span>{{ result.marketLevel.toUpperCase() }} · {{ playfulVerdict.title.toUpperCase() }}</span>
+            </div>
+          </div>
+
+          <!-- ⑤ 六维雷达：视觉中心区块，独立背景 -->
+          <div class="poster-radar-section">
+            <p class="poster-section-label">六维画像</p>
+            <div class="poster-radar-body">
+              <svg class="poster-radar-svg" viewBox="-20 -20 220 220" xmlns="http://www.w3.org/2000/svg">
+                <polygon v-for="r in [0.25, 0.5, 0.75, 1.0]" :key="r"
+                  :points="hexPoints(90, 90, 72 * r)"
+                  fill="none" stroke="#e2e8f0" stroke-width="1"/>
+                <line v-for="(pt, i) in hexAxis(90, 90, 72)" :key="'ax'+i"
+                  x1="90" y1="90" :x2="pt.x" :y2="pt.y"
+                  stroke="#e2e8f0" stroke-width="1"/>
+                <polygon
+                  :points="radarPolygon(90, 90, 72)"
+                  :fill="playfulVerdict.color"
+                  fill-opacity="0.15"
+                  :stroke="playfulVerdict.color"
+                  stroke-width="1.5"
+                  stroke-linejoin="round"/>
+                <circle v-for="(pt, i) in radarDots(90, 90, 72)" :key="'dot'+i"
+                  :cx="pt.x" :cy="pt.y" r="2.5"
+                  :fill="playfulVerdict.color"/>
+                <text v-for="(item, i) in radarLabelPositions(90, 90, 84)" :key="'lbl'+i"
+                  :x="item.x" :y="item.y"
+                  text-anchor="middle" dominant-baseline="middle"
+                  font-size="10" fill="#64748b"
+                  font-family="PingFang SC, system-ui, sans-serif">{{ item.label }}</text>
+              </svg>
+
+              <div class="poster-radar-list">
+                <div v-for="item in radarItems" :key="item.key" class="poster-radar-row">
+                  <span class="poster-radar-label">{{ item.label }}</span>
+                  <div class="poster-radar-bar-wrap">
+                    <div class="poster-radar-bar-fill"
+                      :style="{ width: item.value + '%', background: playfulVerdict.color }"></div>
+                  </div>
+                  <span class="poster-radar-val">{{ item.value }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- ⑦ 报告摘要 -->
+          <p class="poster-report-text">{{ result.report }}</p>
+
+          <!-- ⑧ 页脚 -->
+          <div class="poster-footer">
+            <div class="poster-footer-left">
+              <p class="poster-footer-tip">扫码测测你的人间估值</p>
+              <p class="poster-footer-sub">真正的你，不被任何数字定义</p>
+            </div>
+            <div class="poster-qr-wrap">
+              <div v-if="currentShareUrl" class="qr-code"></div>
+              <div v-else class="poster-qr-placeholder">
+                <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5">
+                  <rect x="3" y="3" width="7" height="7" rx="1"/>
+                  <rect x="14" y="3" width="7" height="7" rx="1"/>
+                  <rect x="3" y="14" width="7" height="7" rx="1"/>
+                  <circle cx="17.5" cy="17.5" r="2.5"/>
+                </svg>
+              </div>
+            </div>
+          </div>
+
         </div>
       </div>
-    </div>
     </section>
   </main>
 </template>
@@ -1675,187 +1813,314 @@ onUnmounted(() => {
   margin: 20px 0 10px;
 }
 
-.poster-hidden-capture {
-  position: absolute;
-  left: -9999px;
-  top: 0;
-  width: 375px;
-  background: #fff;
-  color: #000;
-  padding: 40px 30px;
-  font-family: "PingFang SC", sans-serif;
-  text-align: center;
-}
-
-.poster-label {
-  font-size: 24px;
-  font-weight: 800;
-  margin-bottom: 5px;
-}
-
-.poster-badge {
-  font-size: 18px;
-  font-weight: 900;
-  letter-spacing: 4px;
-  margin-bottom: 20px;
-}
-
-.poster-report {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #4b5563;
-  text-align: left;
-}
+/* ════════════════════════════════════════
+   海报样式 — Apple 设计哲学重构版
+   宽度 420px，三段布局：顶部/中部/底部
+   ════════════════════════════════════════ */
 
 .poster-canvas {
   position: absolute;
+  top: 0;
   left: -9999px;
-  width: 375px;
-  background: #fff;
-  color: #000;
-  padding: 40px 30px;
-  font-family: "PingFang SC", system-ui, -apple-system, sans-serif;
-  text-align: center;
-  border-radius: 16px;
-  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+  width: 420px;
+  background: #ffffff;
+  font-family: "PingFang SC", "SF Pro Display", -apple-system, system-ui, sans-serif;
+  overflow: hidden;
+  box-sizing: border-box;
+}
+
+/* 顶部 4px 主题色条 */
+.poster-accent-bar {
+  height: 4px;
+  width: 100%;
 }
 
 .poster-inner {
+  padding: 0 0 36px;
+}
+
+/* 品牌行单独加横向 padding */
+.poster-brand-row {
+  padding: 24px 28px 0;
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin-bottom: 0;
+}
+
+/* HERO 以下区块横向 padding */
+.poster-divider,
+.poster-footer {
+  padding-left: 28px;
+  padding-right: 28px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+/* brand-row 样式已在上方合并 */
+
+.poster-brand-dot {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.poster-brand-name {
+  font-size: 12px;
+  font-weight: 700;
+  color: #0f172a;
+  letter-spacing: 0.02em;
+}
+
+.poster-brand-ver {
+  font-size: 11px;
+  color: #94a3b8;
+  font-weight: 400;
+  margin-left: auto;
+  letter-spacing: 0.04em;
+}
+
+/* ══ HERO 区 ══ */
+.poster-hero {
+  position: relative;
+  padding: 20px 28px 20px;
+  overflow: hidden;
   text-align: center;
 }
 
-.poster-header {
-  margin-bottom: 30px;
+.poster-hero-grid {
+  position: absolute;
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148,163,184,0.18) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148,163,184,0.18) 1px, transparent 1px);
+  background-size: 22px 22px;
+  z-index: 0;
 }
 
-.poster-header .brand {
-  display: block;
-  font-size: 20px;
-  font-weight: 800;
-  color: #111827;
-  margin-bottom: 8px;
-}
-
-.poster-header .tag {
-  font-size: 12px;
-  color: #64748b;
-  font-weight: 600;
-  letter-spacing: 0.1em;
-}
-
-.poster-main {
-  margin: 20px 0 30px;
-}
-
-.p-score {
-  font-size: 72px;
-  font-weight: 900;
-  color: #111827;
-  margin: 20px 0 10px;
+/* 数字行：数字 + badge 水平排列，垂直居中对齐 */
+.poster-hero-num-row {
+  position: relative;
+  z-index: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
   line-height: 1;
 }
 
-.p-level {
-  font-size: 18px;
-  color: #475569;
-  margin: 10px 0 20px;
-  font-weight: 600;
-}
-
-.p-badge {
-  font-size: 20px;
+/* 分数 */
+.poster-score-num {
+  font-size: 80px;
   font-weight: 900;
-  letter-spacing: 4px;
-  margin-bottom: 20px;
-  display: inline-block;
-  padding: 8px 20px;
-  border-radius: 999px;
-  background: rgba(37, 99, 235, 0.1);
-  color: #1e40af;
+  line-height: 1;
+  letter-spacing: -0.05em;
+  display: block;
+  text-shadow:
+    0 2px 0 rgba(255,255,255,0.4),
+    0 6px 20px rgba(0,0,0,0.1);
 }
 
-.p-report {
-  font-size: 14px;
-  line-height: 1.6;
-  color: #4b5563;
-  text-align: left;
-  margin: 0;
-  text-align: justify;
-}
-
-.poster-footer {
-  margin-top: 30px;
-  padding-top: 20px;
-  border-top: 1px solid #e2e8f0;
-}
-
-.poster-footer .qr-placeholder {
-  width: 120px;
-  height: 120px;
-  margin: 0 auto 16px;
-  background: #f8fafc;
-  border: 1px dashed #cbd5e1;
-  border-radius: 8px;
-  display: flex;
+/* badge：与数字垂直居中，圆角矩形胶囊 */
+.poster-hero-badge {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  color: #94a3b8;
-  font-size: 12px;
+  height: 38px;
+  padding: 0 20px;
+  border-radius: 16px;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  flex-shrink: 0;
+  box-shadow:
+    0 4px 14px rgba(0,0,0,0.18),
+    inset 0 1px 0 rgba(255,255,255,0.3),
+    inset 0 -1px 0 rgba(0,0,0,0.1);
+}
+
+/* 市场级别：独占行，数字下方，留够间距 */
+.poster-hero-market {
+  position: relative;
+  z-index: 1;
+  display: block;
+  font-size: 32px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  line-height: 1.2;
+  margin-top: 10px;
   margin-bottom: 12px;
 }
 
-.poster-footer p {
-  margin: 0;
-  font-size: 12px;
-  color: #94a3b8;
-  font-weight: 500;
+/* 英文装饰一行 */
+.poster-hero-en {
+  position: relative;
+  z-index: 1;
 }
 
-.qr-container {
+.poster-hero-en span {
+  font-size: 10px;
+  font-weight: 600;
+  color: #94a3b8;
+  letter-spacing: 0.2em;
+  line-height: 1.6;
+}
+
+/* ── 分割线 ── */
+.poster-divider {
+  height: 1px;
+  background: #f1f5f9;
+  margin: 0 0 20px;
+}
+
+/* ── 六维画像 ── */
+.poster-radar-section {
+  margin-bottom: 0;
+  padding: 24px 28px 30px;
+  background: #fafbfc;
+  border-top: 1px solid #f1f5f9;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.poster-section-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #64748b;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  margin: 0 0 16px;
+}
+
+.poster-radar-body {
   display: flex;
-  justify-content: center;
   align-items: center;
-  margin: 0 auto 16px;
-  width: 140px;
-  height: 140px;
-  background: #ffffff;
-  border-radius: 12px;
-  padding: 10px;
+  gap: 20px;
+}
+
+.poster-radar-svg {
+  width: 210px;
+  height: 210px;
+  flex-shrink: 0;
+}
+
+.poster-radar-list {
+  flex: 1;
+  display: grid;
+  gap: 11px;
+}
+
+.poster-radar-row {
+  display: grid;
+  grid-template-columns: 52px 1fr 26px;
+  align-items: center;
+  gap: 7px;
+}
+
+.poster-radar-label {
+  font-size: 11px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.poster-radar-bar-wrap {
+  height: 4px;
+  background: #e8eef4;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.poster-radar-bar-fill {
+  height: 100%;
+  border-radius: 999px;
+}
+
+.poster-radar-val {
+  font-size: 11px;
+  color: #0f172a;
+  font-weight: 700;
+  text-align: right;
+}
+
+/* ── 报告摘要 ── */
+.poster-report-text {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #475569;
+  margin: 0;
+  padding: 20px 28px 20px;
   box-sizing: border-box;
+  width: 100%;
+  text-align: left;
+  word-break: break-all;
+  letter-spacing: 0.01em;
+}
+
+/* ── 页脚 ── */
+.poster-footer {
+  margin-top: 20px;
+  padding-top: 16px;
+  border-top: 1px solid #f1f5f9;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.poster-footer-left {
+  flex: 1;
+}
+
+.poster-footer-tip {
+  font-size: 12px;
+  font-weight: 600;
+  color: #0f172a;
+  margin: 0 0 3px;
+}
+
+.poster-footer-sub {
+  font-size: 10px;
+  color: #94a3b8;
+  margin: 0;
+  line-height: 1.5;
+}
+
+.poster-qr-wrap {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
 }
 
 .qr-code {
-  width: 120px;
-  height: 120px;
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-.qr-placeholder {
-  width: 120px;
-  height: 120px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  color: #94a3b8;
-  font-size: 12px;
-  background: #f8fafc;
-  border-radius: 8px;
+.qr-code canvas {
+  width: 56px !important;
+  height: 56px !important;
 }
 
-.qr-error {
-  width: 120px;
-  height: 120px;
+.poster-qr-placeholder {
+  width: 56px;
+  height: 56px;
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #ef4444;
-  font-size: 12px;
-  text-align: center;
-  padding: 8px;
-  box-sizing: border-box;
 }
+
+/* ─── 按钮 ─── */
 .result-actions .submit-button {
   margin-top: 0;
   min-height: 62px;
