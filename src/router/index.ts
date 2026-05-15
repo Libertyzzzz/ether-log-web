@@ -38,7 +38,27 @@ const router = createRouter({
     },
     {
       path: '/assessment',
-      name: 'assessment',
+      name: 'assessment-home',
+      component: Assessment
+    },
+    {
+      path: '/assessment/evaluate',
+      name: 'assessment-evaluate',
+      component: Assessment
+    },
+    {
+      path: '/assessment/processing',
+      name: 'assessment-processing',
+      component: Assessment
+    },
+    {
+      path: '/assessment/result',
+      name: 'assessment-result',
+      component: Assessment
+    },
+    {
+      path: '/assessment/share/:shareId',
+      name: 'assessment-share',
       component: Assessment
     }
   ]

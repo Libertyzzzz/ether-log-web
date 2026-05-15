@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useRoute } from 'vue-router'
 import axios from 'axios'
@@ -7,8 +7,6 @@ import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
 import { Link, MessageCircle, Share2, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
-
-import { onMounted } from 'vue'
 
 // 分享模块
 const route = useRoute()
@@ -21,27 +19,38 @@ const isShareMenuOpen = ref(false)
 const isWechatShareOpen = ref(false)
 const wechatQrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const assessmentHistoryLockKey = 'assessment-history-lock'
+const assessmentEntryPath = '/assessment'
+let activeShareId = ''
 // 在其他 ref 之后添加
 // const qrCodeRef = ref<HTMLElement | null>(null)
 
 const isSharedReport = ref(false)
 
-// 评估页面锁定
+// 评估页面锁定：允许 /assessment 域内前进后退，但不退回主站。
 const lockAssessmentHistory = () => {
+  const state = window.history.state || {}
+  if (state[assessmentHistoryLockKey]) return
+
+  const currentPath = `${window.location.pathname}${window.location.search}${window.location.hash}`
   window.history.replaceState(
-    { ...(window.history.state || {}), [assessmentHistoryLockKey]: 'base' },
+    { ...state, [assessmentHistoryLockKey]: 'guard' },
     '',
-    window.location.href
+    assessmentEntryPath
   )
-  window.history.pushState(
-    { ...(window.history.state || {}), [assessmentHistoryLockKey]: 'locked' },
-    '',
-    window.location.href
-  )
+
+  if (currentPath !== assessmentEntryPath) {
+    window.history.pushState(
+      { ...state, [assessmentHistoryLockKey]: 'page' },
+      '',
+      currentPath
+    )
+  }
 }
 
 const handleAssessmentBack = () => {
-  window.location.replace('about:blank')
+  if (!window.location.pathname.startsWith(assessmentEntryPath)) {
+    window.location.replace('about:blank')
+  }
 }
 
 // 卡片颜色自适应函数
@@ -50,33 +59,15 @@ const handleAssessmentBack = () => {
 // };
 
 
-// 检测URL中的分享ID
-onMounted(async () => {
+onMounted(() => {
   document.title = 'Aether Valuation | 人间估值'
   lockAssessmentHistory()
   window.addEventListener('popstate', handleAssessmentBack)
-  const shareId = route.params.shareId || route.query.id
-  if (shareId) {
-    isSharedReport.value = true 
-    loadingMsg.value = '正在从尘埃中恢复报告...'
-    step.value = 'loading'
-    try {
-      const res = await axios.get(`/api/v2/assessment/share/${shareId}`)
-      result.value = normalizeResult(res.data.data)
-      step.value = 'result'
-      await nextTick()
-      renderRadar()
-    } catch (e) {
-      errorMessage.value = '报告已过期或不存在'
-      step.value = 'intro'
-      isSharedReport.value = false
-    }
-  }
 })
 
 const resultShareUrl = computed(() => {
   if (!result.value?.shareId) return ''
-  return `${window.location.origin}/assessment?id=${result.value.shareId}`
+  return `${window.location.origin}/assessment/share/${result.value.shareId}`
 })
 
 const assessmentShareUrl = computed(() => resultShareUrl.value || `${window.location.origin}/assessment`)
@@ -93,22 +84,27 @@ const closeShareMenu = () => {
   isShareMenuOpen.value = false
 }
 
+const writeClipboardText = async (text: string) => {
+  if (navigator.clipboard?.writeText) {
+    await navigator.clipboard.writeText(text)
+    return
+  }
+
+  const input = document.createElement('textarea')
+  input.value = text
+  input.setAttribute('readonly', '')
+  input.style.position = 'fixed'
+  input.style.opacity = '0'
+  document.body.appendChild(input)
+  input.select()
+  document.execCommand('copy')
+  document.body.removeChild(input)
+}
+
 const copyShareLink = async () => {
   if (!assessmentShareUrl.value) return
   try {
-    if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(assessmentShareText.value)
-    } else {
-      const input = document.createElement('textarea')
-      input.value = assessmentShareText.value
-      input.setAttribute('readonly', '')
-      input.style.position = 'fixed'
-      input.style.opacity = '0'
-      document.body.appendChild(input)
-      input.select()
-      document.execCommand('copy')
-      document.body.removeChild(input)
-    }
+    await writeClipboardText(assessmentShareText.value)
     alert('分享文案已复制到剪贴板, 去惊艳朋友圈吧')
   } catch (error) {
     console.error('复制分享链接失败:', error)
@@ -116,6 +112,17 @@ const copyShareLink = async () => {
   } finally {
     closeShareMenu()
     isWechatShareOpen.value = false
+  }
+}
+
+const copyAssessmentInviteLink = async () => {
+  const inviteText = `人间估值｜快来市场测试一下吧\n${window.location.origin}/assessment`
+  try {
+    await writeClipboardText(inviteText)
+    alert('测试邀请已复制到剪贴板')
+  } catch (error) {
+    console.error('复制测试邀请失败:', error)
+    window.prompt('复制失败，请手动复制测试邀请', inviteText)
   }
 }
 
@@ -337,6 +344,7 @@ const loadingMsg = ref('正在校对输入指标...')
 const errorMessage = ref('')
 const result = ref<AssessmentResult | null>(null)
 const lastInputSnapshot = ref<AssessmentResult['inputSnapshot'] | null>(null)
+const isAnalysisRunning = ref(false)
 let chart: echarts.ECharts | null = null
 let loadingTimer: number | undefined
 
@@ -665,9 +673,97 @@ function stopLoadingMessages() {
   }
 }
 
+async function loadSharedAssessment(shareId: string) {
+  if (activeShareId === shareId && result.value) {
+    step.value = 'result'
+    isSharedReport.value = true
+    await nextTick()
+    renderRadar()
+    return
+  }
+
+  activeShareId = shareId
+  isSharedReport.value = true
+  loadingMsg.value = '正在从尘埃中恢复报告...'
+  errorMessage.value = ''
+  result.value = null
+  lastInputSnapshot.value = null
+  step.value = 'loading'
+
+  try {
+    const res = await axios.get(`/api/v2/assessment/share/${shareId}`)
+    result.value = normalizeResult(res.data.data)
+    step.value = 'result'
+    await nextTick()
+    renderRadar()
+  } catch (e) {
+    activeShareId = ''
+    errorMessage.value = '报告已过期或不存在'
+    isSharedReport.value = false
+    step.value = 'intro'
+    router.replace({ name: 'assessment-home' })
+  }
+}
+
+async function syncAssessmentRoute() {
+  const legacyShareId = typeof route.query.id === 'string' ? route.query.id : ''
+  if (legacyShareId) {
+    await router.replace({ name: 'assessment-share', params: { shareId: legacyShareId } })
+    return
+  }
+
+  if (route.name === 'assessment-share') {
+    const shareId = String(route.params.shareId || '')
+    if (shareId) {
+      await loadSharedAssessment(shareId)
+      return
+    }
+    router.replace({ name: 'assessment-home' })
+    return
+  }
+
+  if (route.name === 'assessment-evaluate') {
+    isSharedReport.value = false
+    errorMessage.value = ''
+    step.value = 'input'
+    return
+  }
+
+  if (route.name === 'assessment-result') {
+    if (!result.value) {
+      router.replace({ name: 'assessment-home' })
+      return
+    }
+    step.value = 'result'
+    await nextTick()
+    renderRadar()
+    return
+  }
+
+  if (route.name === 'assessment-processing') {
+    if (!isAnalysisRunning.value && !result.value) {
+      router.replace({ name: 'assessment-evaluate' })
+      return
+    }
+    step.value = 'loading'
+    return
+  }
+
+  activeShareId = ''
+  isSharedReport.value = false
+  result.value = null
+  lastInputSnapshot.value = null
+  errorMessage.value = ''
+  step.value = 'intro'
+}
+
+watch(() => route.fullPath, () => {
+  void syncAssessmentRoute()
+}, { immediate: true })
+
 function enterAssessment() {
   errorMessage.value = ''
-  step.value = 'input'
+  router.push({ name: 'assessment-evaluate' })
 }
 
 function startOwnAssessmentFromShare() {
@@ -676,7 +772,7 @@ function startOwnAssessmentFromShare() {
   errorMessage.value = ''
   isSharedReport.value = false
   step.value = 'intro'
-  router.replace({ name: 'assessment' })
+  router.push({ name: 'assessment-home' })
 }
 
 async function startAnalysis() {
@@ -692,8 +788,10 @@ async function startAnalysis() {
     height: form.height,
     visualHeight: form.visualHeight
   }
+  isAnalysisRunning.value = true
   step.value = 'loading'
   startLoadingMessages()
+  await router.push({ name: 'assessment-processing' })
 
   try {
     const response = await axios.post<ApiResponse<AssessmentResult> | AssessmentResult>(
@@ -710,17 +808,22 @@ async function startAnalysis() {
 
     result.value = normalizeResult(payload)
     step.value = 'result'
+    await router.push({ name: 'assessment-result' })
 
     await nextTick()
     renderRadar()
   } catch (error) {
     step.value = 'input'
+    if (route.name !== 'assessment-evaluate') {
+      router.replace({ name: 'assessment-evaluate' })
+    }
     errorMessage.value = axios.isAxiosError(error) && error.response?.data?.message
       ? error.response.data.message
       : error instanceof Error
         ? error.message
         : '访问人数太多啦，评估功能暂不可用呢，WWWW'
   } finally {
+    isAnalysisRunning.value = false
     stopLoadingMessages()
   }
 }
@@ -732,6 +835,7 @@ function resetAssessment() {
   step.value = 'input'
   chart?.dispose()
   chart = null
+  router.push({ name: 'assessment-evaluate' })
 }
 
 function renderRadar() {
@@ -791,7 +895,7 @@ onUnmounted(() => {
 <template>
   <main class="assessment-root">
     <nav class="assessment-nav">
-      <button class="brand-button" type="button" @click="router.push({ name: 'home' })">
+      <button class="brand-button" type="button" @click="router.push({ name: 'assessment-home' })">
         <span class="brand-mark">V</span>
         <span>Aether Valuation | 人间估值</span>
       </button>
@@ -1149,7 +1253,7 @@ onUnmounted(() => {
             <button class="submit-button shared-primary-action" type="button" @click="startOwnAssessmentFromShare">
               我也测测
             </button>
-            <button class="secondary-button shared-secondary-action" type="button" @click="copyShareLink">
+            <button class="secondary-button shared-secondary-action" type="button" @click="copyAssessmentInviteLink">
               复制测试链接
             </button>
           </div>
