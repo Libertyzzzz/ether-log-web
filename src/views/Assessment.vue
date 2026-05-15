@@ -317,6 +317,11 @@ interface AssessmentResult {
   radar: AssessmentRadar
   advice?: string[]
   shareId?: string
+  inputSnapshot?: {
+    annualIncome?: number
+    height?: number
+    visualHeight?: number
+  }
 }
 
 interface ApiResponse<T> {
@@ -330,6 +335,7 @@ const step = ref<AssessmentStep>(route.params.shareId || route.query.id ? 'loadi
 const loadingMsg = ref('正在校对输入指标...')
 const errorMessage = ref('')
 const result = ref<AssessmentResult | null>(null)
+const lastInputSnapshot = ref<AssessmentResult['inputSnapshot'] | null>(null)
 let chart: echarts.ECharts | null = null
 let loadingTimer: number | undefined
 
@@ -404,12 +410,34 @@ const canSubmit = computed(() => {
 })
 
 const assetPreview = computed(() => {
+  const snapshot = result.value?.inputSnapshot || lastInputSnapshot.value
+  if (result.value) {
+    return [
+      { label: 'Income', value: typeof snapshot?.annualIncome === 'number' ? formatCurrency(snapshot.annualIncome) : '已生成' },
+      {
+        label: 'Visual delta',
+        value: typeof snapshot?.height === 'number' && typeof snapshot?.visualHeight === 'number'
+          ? `${snapshot.visualHeight - snapshot.height >= 0 ? '+' : ''}${snapshot.visualHeight - snapshot.height}cm`
+          : '已生成'
+      },
+      { label: 'Mode', value: result.value.marketLevel || 'Play' }
+    ]
+  }
+
   return [
     { label: 'Income', value: formatCurrency(form.annualIncome) },
     { label: 'Visual delta', value: `${form.visualHeight - form.height >= 0 ? '+' : ''}${form.visualHeight - form.height}cm` },
     { label: 'Mode', value: 'Play' }
   ]
 })
+
+const previewPanelTitle = computed(() => 'LIVE PREVIEW')
+
+const previewPanelNote = computed(() => (
+  result.value
+    ? 'Loaded from the shared report. This snapshot follows the generated result.'
+    : 'Private by design. Sent only when you submit.'
+))
 
 const radarItems = computed(() => {
   if (!result.value) {
@@ -579,12 +607,24 @@ function normalizeScore(value: unknown, fallback = 0) {
 function normalizeResult(payload: any): AssessmentResult {
   const source = (payload || {}) as any
   const radar = (source.radar || {}) as any
+  const inputSnapshot = source.inputSnapshot || source.input || source.form || source.request || null
+  const annualIncome = inputSnapshot?.annualIncome
+  const normalizedAnnualIncome = typeof annualIncome === 'number'
+    ? annualIncome > 10000000 ? Math.round(annualIncome / 100) : annualIncome
+    : undefined
 
   return {
     score: normalizeScore(source.score),
     marketLevel: source.marketLevel || '评估完成',
     report: source.report || '暂无详细报告内容...',
     shareId: source.shareId, // [新增] 映射后端返回的 ID
+    inputSnapshot: inputSnapshot
+      ? {
+          annualIncome: normalizedAnnualIncome,
+          height: typeof inputSnapshot.height === 'number' ? inputSnapshot.height : undefined,
+          visualHeight: typeof inputSnapshot.visualHeight === 'number' ? inputSnapshot.visualHeight : undefined
+        }
+      : undefined,
     radar: {
       assets: normalizeScore(radar.assets),
       biological: normalizeScore(radar.biological),
@@ -628,6 +668,11 @@ async function startAnalysis() {
 
   errorMessage.value = ''
   result.value = null
+  lastInputSnapshot.value = {
+    annualIncome: form.annualIncome,
+    height: form.height,
+    visualHeight: form.visualHeight
+  }
   step.value = 'loading'
   startLoadingMessages()
 
@@ -663,6 +708,7 @@ async function startAnalysis() {
 
 function resetAssessment() {
   result.value = null
+  lastInputSnapshot.value = null
   errorMessage.value = ''
   step.value = 'input'
   chart?.dispose()
@@ -798,14 +844,14 @@ onUnmounted(() => {
 
       </div>
       <aside class="hero-panel" aria-label="当前输入摘要">
-        <span class="panel-kicker">LIVE PREVIEW</span>
+        <span class="panel-kicker">{{ previewPanelTitle }}</span>
         <div class="preview-grid">
           <div v-for="item in assetPreview" :key="item.label">
             <span>{{ item.label }}</span>
             <strong>{{ item.value }}</strong>
           </div>
         </div>
-        <p class="preview-note">Private by design. Sent only when you submit.</p>
+        <p class="preview-note">{{ previewPanelNote }}</p>
       </aside>
     </section>
 
