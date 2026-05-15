@@ -57,9 +57,10 @@ const copyShareLink = () => {
   })
 }
 
+// 扫码分享评估页面
 const currentShareUrl = computed(() => {
   if (!result.value?.shareId) return ''
-  return `${window.location.origin}/assessment?id=${result.value.shareId}`
+  return `${window.location.origin}/assessment`
 })
 
 // ─── 海报雷达图 SVG 辅助函数 ───
