@@ -35,7 +35,7 @@ defineEmits<{
       <div class="nav-actions">
         <button v-if="isLoggedIn" class="nav-action-button" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
         <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
-        <button v-else class="nav-action-button" type="button" @click.prevent="$emit('openLogin')">Login</button>
+        <!-- <button v-else class="nav-action-button" type="button" @click.prevent="$emit('openLogin')">Login</button> -->
       </div>
 
       <div class="status-badge-wrapper">
