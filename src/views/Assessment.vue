@@ -117,13 +117,13 @@ const savePoster = async () => {
 
     if (currentShareUrl.value) {
       const tempCanvas = document.createElement('canvas')
-      tempCanvas.width = 72
-      tempCanvas.height = 72
+      tempCanvas.width = 56
+      tempCanvas.height = 56
 
       try {
         await QRCode.toCanvas(tempCanvas, currentShareUrl.value, {
-          width: 72,
-          margin: 1,
+          width: 56,
+          margin: 2,
           color: { dark: '#0f172a', light: '#ffffff' }
         })
         const qrContainer = posterRef.value.querySelector('.qr-code')
@@ -2090,13 +2090,12 @@ onUnmounted(() => {
   flex-shrink: 0;
   width: 64px;
   height: 64px;
-  background: #f8fafc;
+  background: #ffffff;
   border: 1px solid #e2e8f0;
-  border-radius: 8px;
+  border-radius: 4px;
   display: flex;
   align-items: center;
   justify-content: center;
-  overflow: hidden;
 }
 
 .qr-code {
