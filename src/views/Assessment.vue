@@ -1,14 +1,127 @@
 <script setup lang="ts">
 import { computed, nextTick, onUnmounted, reactive, ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
+import html2canvas from 'html2canvas'
+import QRCode from 'qrcode'
 
 import { onMounted } from 'vue'
 
-onMounted(() => {
+// 分享模块
+const route = useRoute()
+
+
+
+const posterRef = ref<HTMLElement | null>(null)
+const isGenerating = ref(false) // [新增] 生成状态
+// 在其他 ref 之后添加
+const qrCodeRef = ref<HTMLElement | null>(null)
+
+
+// 检测URL中的分享ID
+onMounted(async () => {
   document.title = 'Aether Valuation | 人间估值'
+  const shareId = route.params.shareId || route.query.id
+  if (shareId) {
+    loadingMsg.value = '正在从尘埃中恢复报告...'
+    step.value = 'loading'
+    try {
+      const res = await axios.get(`/api/v2/assessment/share/${shareId}`)
+      result.value = normalizeResult(res.data.data)
+      step.value = 'result'
+      await nextTick()
+      renderRadar()
+    } catch (e) {
+      errorMessage.value = '报告已过期或不存在'
+      step.value = 'input'
+    }
+  }
 })
+
+const copyShareLink = () => {
+  if (!result.value?.shareId) return
+  const url = `${window.location.origin}/assessment?id=${result.value.shareId}`
+  navigator.clipboard.writeText(url).then(() => {
+    alert('分享链接已复制到剪贴板, 去惊艳朋友圈吧')
+  })
+}
+
+const currentShareUrl = computed(() => {
+  if (!result.value?.shareId) return ''
+  return `${window.location.origin}/assessment?id=${result.value.shareId}`
+})
+
+// 4. 生成 Apple 质感海报
+const savePoster = async () => {
+  if (!posterRef.value) return
+  isGenerating.value = true
+  
+  try {
+    // 确保DOM完全渲染后再执行截图
+    await nextTick()
+    
+    // 如果有分享链接，先生成二维码
+    if (currentShareUrl.value) {
+      // 创建一个临时的canvas元素来生成二维码
+      const tempCanvas = document.createElement('canvas')
+      tempCanvas.width = 120
+      tempCanvas.height = 120
+      
+      try {
+        // 生成二维码到临时canvas
+        await QRCode.toCanvas(
+          tempCanvas, 
+          currentShareUrl.value, 
+          {
+            width: 120,
+            height: 120,
+            margin: 2,
+            color: {
+              dark: '#111827',
+              light: '#ffffff'
+            }
+          }
+        )
+        
+        // 找到海报中的二维码容器并替换内容
+        const qrContainer = posterRef.value.querySelector('.qr-code')
+        if (qrContainer) {
+          // 清空容器
+          qrContainer.innerHTML = ''
+          // 添加生成的canvas
+          qrContainer.appendChild(tempCanvas)
+        }
+        
+        // 等待渲染完成
+        await nextTick()
+        await new Promise(resolve => setTimeout(resolve, 300))
+      } catch (error) {
+        console.error('生成二维码失败:', error)
+        // 如果生成失败，保留占位符文本
+        const qrPlaceholder = posterRef.value.querySelector('.qr-placeholder')
+        if (qrPlaceholder) {
+          qrPlaceholder.textContent = '二维码生成失败'
+        }
+      }
+    }
+    
+    const canvas = await html2canvas(posterRef.value, {
+      scale: 3, // 高清导出
+      useCORS: true,
+      backgroundColor: '#ffffff' // 改为白色背景
+    })
+    const link = document.createElement('a')
+    link.download = `Dust-Valuation-${result.value?.score}.png`
+    link.href = canvas.toDataURL('image/png')
+    link.click()
+  } finally {
+    isGenerating.value = false
+  }
+}
+
+
 
 type AssessmentStep = 'input' | 'loading' | 'result'
 type GenderModel = 'MALE' | 'FEMALE'
@@ -66,6 +179,7 @@ interface AssessmentResult {
   report: string
   radar: AssessmentRadar
   advice?: string[]
+  shareId?: string
 }
 
 interface ApiResponse<T> {
@@ -301,14 +415,15 @@ function normalizeScore(value: unknown, fallback = 0) {
   return Math.max(0, Math.min(100, Math.round(numberValue)))
 }
 
-function normalizeResult(payload: unknown): AssessmentResult {
-  const source = (payload || {}) as Partial<AssessmentResult>
-  const radar = (source.radar || {}) as Partial<AssessmentRadar>
+function normalizeResult(payload: any): AssessmentResult {
+  const source = (payload || {}) as any
+  const radar = (source.radar || {}) as any
 
   return {
     score: normalizeScore(source.score),
-    marketLevel: source.marketLevel || '估值完成',
-    report: source.report || '系统已完成评估，但未返回报告文本。',
+    marketLevel: source.marketLevel || '评估完成',
+    report: source.report || '暂无详细报告内容...',
+    shareId: source.shareId, // [新增] 映射后端返回的 ID
     radar: {
       assets: normalizeScore(radar.assets),
       biological: normalizeScore(radar.biological),
@@ -320,6 +435,8 @@ function normalizeResult(payload: unknown): AssessmentResult {
     advice: Array.isArray(source.advice) ? source.advice : []
   }
 }
+
+
 
 function startLoadingMessages() {
   let index = 0
@@ -709,10 +826,38 @@ onUnmounted(() => {
         </section>
       </div>
 
-      <div class="result-actions">
-        
-        <button type="button" class="submit-button single-action-btn" @click="resetAssessment">重新生成</button>
+      
+
+      <div class="result-actions animate-fade-in">
+        <button class="submit-button gold-action" @click="savePoster" :disabled="isGenerating">
+          {{ isGenerating ? '正在渲染...' : '生成估值海报' }}
+        </button>
+        <button class="secondary-button" @click="copyShareLink">复制分享链接</button>
+        <button class="secondary-button" @click="resetAssessment">重新评估</button>
       </div>
+
+    <div ref="posterRef" class="poster-canvas">
+      <div class="poster-inner">
+        <div class="poster-header">
+          <span class="brand">Aether Valuation</span>
+          <span class="tag">PLAYFUL DIAGNOSTIC / V2</span>
+        </div>
+        <div class="poster-main">
+          <div class="p-score">{{ result.score }}</div>
+          <div class="p-level">「{{ result.marketLevel }}」</div>
+          <div class="p-badge">{{ playfulVerdict.badge }}</div>
+          <p class="p-report">{{ result.report }}</p>
+        </div>
+        <div class="poster-footer">
+          <!-- 二维码容器 -->
+          <div class="qr-container">
+            <div v-if="currentShareUrl" class="qr-code"></div>
+            <div v-else class="qr-placeholder">扫描二维码开启估值...</div>
+          </div>
+          <p>AETHER SYSTEMM · 真正的你不被数字定义</p>
+        </div>
+      </div>
+    </div>
     </section>
   </main>
 </template>
@@ -849,7 +994,7 @@ onUnmounted(() => {
 .assessment-hero {
   display: grid;
   grid-template-columns: 1.35fr 0.65fr;
-  gap: 28x;
+  gap: 28px;
   margin-bottom: 32px;
 }
 
@@ -1511,12 +1656,206 @@ onUnmounted(() => {
 }
 
 .result-actions {
-  display: flex;
-  justify-content: center;
+  display: grid;
+  grid-template-columns: 1.5fr 1fr 1fr; /* [新增] 突出保存海报按钮 */
+  gap: 12px;
   margin-top: 32px;
-  padding: 0 20px;
 }
 
+.gold-theme {
+  background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
+  color: #000 !important;
+  border: none !important;
+  box-shadow: 0 8px 20px rgba(255, 165, 0, 0.3);
+}
+
+.poster-score {
+  font-size: 72px;
+  font-weight: 900;
+  margin: 20px 0 10px;
+}
+
+.poster-hidden-capture {
+  position: absolute;
+  left: -9999px;
+  top: 0;
+  width: 375px;
+  background: #fff;
+  color: #000;
+  padding: 40px 30px;
+  font-family: "PingFang SC", sans-serif;
+  text-align: center;
+}
+
+.poster-label {
+  font-size: 24px;
+  font-weight: 800;
+  margin-bottom: 5px;
+}
+
+.poster-badge {
+  font-size: 18px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  margin-bottom: 20px;
+}
+
+.poster-report {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  text-align: left;
+}
+
+.poster-canvas {
+  position: absolute;
+  left: -9999px;
+  width: 375px;
+  background: #fff;
+  color: #000;
+  padding: 40px 30px;
+  font-family: "PingFang SC", system-ui, -apple-system, sans-serif;
+  text-align: center;
+  border-radius: 16px;
+  box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+}
+
+.poster-inner {
+  text-align: center;
+}
+
+.poster-header {
+  margin-bottom: 30px;
+}
+
+.poster-header .brand {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  color: #111827;
+  margin-bottom: 8px;
+}
+
+.poster-header .tag {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+}
+
+.poster-main {
+  margin: 20px 0 30px;
+}
+
+.p-score {
+  font-size: 72px;
+  font-weight: 900;
+  color: #111827;
+  margin: 20px 0 10px;
+  line-height: 1;
+}
+
+.p-level {
+  font-size: 18px;
+  color: #475569;
+  margin: 10px 0 20px;
+  font-weight: 600;
+}
+
+.p-badge {
+  font-size: 20px;
+  font-weight: 900;
+  letter-spacing: 4px;
+  margin-bottom: 20px;
+  display: inline-block;
+  padding: 8px 20px;
+  border-radius: 999px;
+  background: rgba(37, 99, 235, 0.1);
+  color: #1e40af;
+}
+
+.p-report {
+  font-size: 14px;
+  line-height: 1.6;
+  color: #4b5563;
+  text-align: left;
+  margin: 0;
+  text-align: justify;
+}
+
+.poster-footer {
+  margin-top: 30px;
+  padding-top: 20px;
+  border-top: 1px solid #e2e8f0;
+}
+
+.poster-footer .qr-placeholder {
+  width: 120px;
+  height: 120px;
+  margin: 0 auto 16px;
+  background: #f8fafc;
+  border: 1px dashed #cbd5e1;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  margin-bottom: 12px;
+}
+
+.poster-footer p {
+  margin: 0;
+  font-size: 12px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+
+.qr-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  margin: 0 auto 16px;
+  width: 140px;
+  height: 140px;
+  background: #ffffff;
+  border-radius: 12px;
+  padding: 10px;
+  box-sizing: border-box;
+}
+
+.qr-code {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qr-placeholder {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  font-size: 12px;
+  background: #f8fafc;
+  border-radius: 8px;
+}
+
+.qr-error {
+  width: 120px;
+  height: 120px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ef4444;
+  font-size: 12px;
+  text-align: center;
+  padding: 8px;
+  box-sizing: border-box;
+}
 .result-actions .submit-button {
   margin-top: 0;
   min-height: 62px;
