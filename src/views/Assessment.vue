@@ -5,6 +5,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
+import { Link, MessageCircle, Share2, X } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 
 import { onMounted } from 'vue'
@@ -16,10 +17,31 @@ const route = useRoute()
 
 const posterRef = ref<HTMLElement | null>(null)
 const isGenerating = ref(false) // [新增] 生成状态
+const isShareMenuOpen = ref(false)
+const isWechatShareOpen = ref(false)
+const wechatQrCanvasRef = ref<HTMLCanvasElement | null>(null)
+const assessmentHistoryLockKey = 'assessment-history-lock'
 // 在其他 ref 之后添加
 // const qrCodeRef = ref<HTMLElement | null>(null)
 
 const isSharedReport = ref(false)
+
+const lockAssessmentHistory = () => {
+  window.history.replaceState(
+    { ...(window.history.state || {}), [assessmentHistoryLockKey]: 'base' },
+    '',
+    window.location.href
+  )
+  window.history.pushState(
+    { ...(window.history.state || {}), [assessmentHistoryLockKey]: 'locked' },
+    '',
+    window.location.href
+  )
+}
+
+const handleAssessmentBack = () => {
+  window.location.replace('about:blank')
+}
 
 // 卡片颜色自适应函数
 // const adjustColor = (color, amount) => {
@@ -30,6 +52,8 @@ const isSharedReport = ref(false)
 // 检测URL中的分享ID
 onMounted(async () => {
   document.title = 'Aether Valuation | 人间估值'
+  lockAssessmentHistory()
+  window.addEventListener('popstate', handleAssessmentBack)
   const shareId = route.params.shareId || route.query.id
   if (shareId) {
     isSharedReport.value = true 
@@ -43,18 +67,86 @@ onMounted(async () => {
       renderRadar()
     } catch (e) {
       errorMessage.value = '报告已过期或不存在'
-      step.value = 'input'
+      step.value = 'intro'
       isSharedReport.value = false
     }
   }
 })
 
-const copyShareLink = () => {
-  if (!result.value?.shareId) return
-  const url = `${window.location.origin}/assessment?id=${result.value.shareId}`
-  navigator.clipboard.writeText(url).then(() => {
+const resultShareUrl = computed(() => {
+  if (!result.value?.shareId) return ''
+  return `${window.location.origin}/assessment?id=${result.value.shareId}`
+})
+
+const isWechatBrowser = () => /micromessenger/i.test(window.navigator.userAgent)
+
+const isMobileBrowser = () => /android|iphone|ipad|ipod|mobile/i.test(window.navigator.userAgent)
+
+const closeShareMenu = () => {
+  isShareMenuOpen.value = false
+}
+
+const copyShareLink = async () => {
+  if (!resultShareUrl.value) return
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(resultShareUrl.value)
+    } else {
+      const input = document.createElement('textarea')
+      input.value = resultShareUrl.value
+      input.setAttribute('readonly', '')
+      input.style.position = 'fixed'
+      input.style.opacity = '0'
+      document.body.appendChild(input)
+      input.select()
+      document.execCommand('copy')
+      document.body.removeChild(input)
+    }
     alert('分享链接已复制到剪贴板, 去惊艳朋友圈吧')
-  })
+  } catch (error) {
+    console.error('复制分享链接失败:', error)
+    window.prompt('复制失败，请手动复制分享链接', resultShareUrl.value)
+  } finally {
+    closeShareMenu()
+    isWechatShareOpen.value = false
+  }
+}
+
+const renderWechatQrCode = async () => {
+  if (!wechatQrCanvasRef.value || !resultShareUrl.value) return
+  try {
+    await QRCode.toCanvas(wechatQrCanvasRef.value, resultShareUrl.value, {
+      width: 188,
+      margin: 2,
+      color: { dark: '#111827', light: '#ffffff' }
+    })
+  } catch (error) {
+    console.error('生成微信分享二维码失败:', error)
+  }
+}
+
+const openWechatShare = async () => {
+  if (!resultShareUrl.value) return
+
+  closeShareMenu()
+
+  if (!isWechatBrowser() && isMobileBrowser() && navigator.share) {
+    try {
+      await navigator.share({
+        title: 'Aether Valuation | 人间估值',
+        text: '看看这份人间估值报告',
+        url: resultShareUrl.value
+      })
+      return
+    } catch (error) {
+      if ((error as Error)?.name === 'AbortError') return
+      console.error('系统分享失败:', error)
+    }
+  }
+
+  isWechatShareOpen.value = true
+  await nextTick()
+  await renderWechatQrCode()
 }
 
 // 扫码分享评估页面
@@ -161,7 +253,7 @@ const savePoster = async () => {
 
 
 
-type AssessmentStep = 'input' | 'loading' | 'result'
+type AssessmentStep = 'intro' | 'input' | 'loading' | 'result'
 type GenderModel = 'MALE' | 'FEMALE'
 
 
@@ -169,7 +261,7 @@ type GenderModel = 'MALE' | 'FEMALE'
 interface AssessmentForm {
   gender: GenderModel
   height: number
-  visualHeight: number
+visualHeight: number
   weight: number
   annualIncome: number
   hairStatus: number
@@ -227,7 +319,7 @@ interface ApiResponse<T> {
 }
 
 const router = useRouter()
-const step = ref<AssessmentStep>('input')
+const step = ref<AssessmentStep>(route.params.shareId || route.query.id ? 'loading' : 'intro')
 const loadingMsg = ref('正在校对输入指标...')
 const errorMessage = ref('')
 const result = ref<AssessmentResult | null>(null)
@@ -236,8 +328,8 @@ let loadingTimer: number | undefined
 
 const form = reactive<AssessmentForm>({
   gender: 'MALE',
-  height: 175,
-  visualHeight: 178,
+  height: 170,
+  visualHeight: 170,
   weight: 68,
   annualIncome: 150000,
   hairStatus: 2,
@@ -274,7 +366,9 @@ const loadingMessages = [
   '正在整理这份不太严肃的样本...',
   '正在把输入项放进玩笑过滤器...',
   '正在校准情绪缓冲区...',
-  '正在生成一份轻拿轻放的报告...'
+  '正在生成一份轻拿轻放的报告...',
+  '都说了让你不要急, 别再点了',
+  '....'
 ]
 
 const rangeFields = [
@@ -514,6 +608,11 @@ function stopLoadingMessages() {
   }
 }
 
+function enterAssessment() {
+  errorMessage.value = ''
+  step.value = 'input'
+}
+
 async function startAnalysis() {
   if (!canSubmit.value) {
     errorMessage.value = '请确认年龄不低于 18，收入、资产和负债不能为负数。'
@@ -611,6 +710,7 @@ function resizeChart() {
 
 onUnmounted(() => {
   stopLoadingMessages()
+  window.removeEventListener('popstate', handleAssessmentBack)
   window.removeEventListener('resize', resizeChart)
   chart?.dispose()
 })
@@ -628,7 +728,62 @@ onUnmounted(() => {
       </div>
     </nav>
 
-    <section class="assessment-hero">
+    <section v-if="step === 'intro'" class="intro-stage animate-fade-in">
+      <div class="intro-copy">
+        <span class="eyebrow">FUN TEST / NOT A REAL PRICE TAG</span>
+        <h1>测测你在人间市场的离谱估值</h1>
+        <p>输入你的身高、资产、生活习惯和情绪参数，生成一份带梗报告和可分享海报。它只负责好玩，不负责定义你。</p>
+        <div class="intro-warning">
+          <strong>重要提示</strong>
+          <span>进入测试后，表单里的数据只是默认初始值。请改成你自己的情况，再生成报告。</span>
+        </div>
+        <div class="intro-actions">
+          <button class="submit-button intro-start-button" type="button" @click="enterAssessment">开始测试</button>
+          <span>大约 1 分钟完成</span>
+        </div>
+      </div>
+      <aside class="intro-preview" aria-label="报告预览">
+        <div class="intro-preview-top">
+          <span class="panel-kicker">REPORT PREVIEW</span>
+          <strong>?</strong>
+        </div>
+        <div class="intro-preview-score">
+          <span>估值指数</span>
+          <b>生成后揭晓</b>
+        </div>
+        <div class="intro-preview-bars">
+          <div style="--bar: 74%">
+            <span>生存资源</span>
+            <i></i>
+          </div>
+          <div style="--bar: 58%">
+            <span>情绪带宽</span>
+            <i></i>
+          </div>
+          <div style="--bar: 86%">
+            <span>审美溢价</span>
+            <i></i>
+          </div>
+        </div>
+        <p>报告会给出六维画像、轻松解读和保存海报入口。</p>
+      </aside>
+      <div class="intro-points" aria-label="测试亮点">
+        <div>
+          <strong>先调数据</strong>
+          <span>默认值只是起点，改成自己的才有意思。</span>
+        </div>
+        <div>
+          <strong>再看报告</strong>
+          <span>系统会把输入转成六维画像和带梗解读。</span>
+        </div>
+        <div>
+          <strong>最后分享</strong>
+          <span>生成海报或分享链接，看看朋友怎么接梗。</span>
+        </div>
+      </div>
+    </section>
+
+    <section v-else class="assessment-hero">
       <div class="hero-copy">
         <span class="eyebrow">SATIRE FIRST / DATA SECOND</span>
         <h1>人间估值</h1>
@@ -892,10 +1047,48 @@ onUnmounted(() => {
           <button class="submit-button gold-action" @click="savePoster" :disabled="isGenerating">
             {{ isGenerating ? '正在渲染...' : '生成估值海报' }}
           </button>
-          <button class="secondary-button" @click="copyShareLink">复制分享链接</button>
+          <div class="share-action-wrap">
+            <button class="secondary-button share-trigger" @click="isShareMenuOpen = !isShareMenuOpen">
+              <Share2 :size="18" />
+              <span>分享</span>
+            </button>
+            <div v-if="isShareMenuOpen" class="share-menu">
+              <button type="button" @click="copyShareLink">
+                <Link :size="18" />
+                <span>复制分享链接</span>
+              </button>
+              <button type="button" @click="openWechatShare">
+                <MessageCircle :size="18" />
+                <span>分享到微信</span>
+              </button>
+            </div>
+          </div>
           <button class="secondary-button" @click="resetAssessment">重新评估</button>
         </div>
       </template>
+
+      <Teleport to="body">
+        <div v-if="isWechatShareOpen" class="wechat-share-layer" @click.self="isWechatShareOpen = false">
+          <div class="wechat-share-dialog">
+            <button class="wechat-share-close" type="button" aria-label="关闭" @click="isWechatShareOpen = false">
+              <X :size="18" />
+            </button>
+            <div class="wechat-share-icon">
+              <MessageCircle :size="28" />
+            </div>
+            <h3>分享到微信</h3>
+            <p v-if="isWechatBrowser()">请点击微信右上角菜单，将这份报告发送给朋友或分享到朋友圈。</p>
+            <p v-else>用微信扫描二维码，打开后即可发送给朋友或分享到朋友圈。</p>
+            <div class="wechat-qr-box">
+              <canvas ref="wechatQrCanvasRef" width="188" height="188"></canvas>
+            </div>
+            <button class="secondary-button wechat-copy-link" type="button" @click="copyShareLink">
+              <Link :size="17" />
+              <span>复制链接</span>
+            </button>
+          </div>
+        </div>
+      </Teleport>
  
       <div ref="posterRef" class="poster-canvas">
 
@@ -1120,6 +1313,7 @@ onUnmounted(() => {
   font-weight: 800;
 }
 
+.intro-stage,
 .assessment-hero,
 .assessment-layout,
 .result-stage,
@@ -1130,6 +1324,13 @@ onUnmounted(() => {
   margin-right: auto;
 }
 
+.intro-stage {
+  display: grid;
+  grid-template-columns: minmax(0, 1.08fr) minmax(330px, 0.72fr);
+  gap: 18px;
+  align-items: stretch;
+}
+
 .assessment-hero {
   display: grid;
   grid-template-columns: 1.35fr 0.65fr;
@@ -1137,6 +1338,8 @@ onUnmounted(() => {
   margin-bottom: 32px;
 }
 
+.intro-copy,
+.intro-preview,
 .hero-copy,
 .hero-panel,
 .input-panel,
@@ -1152,6 +1355,212 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.82);
   border: 1px solid rgba(226, 232, 240, 0.9);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.07);
+}
+
+.intro-copy {
+  position: relative;
+  overflow: hidden;
+  min-height: 470px;
+  padding: 54px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.88)),
+    radial-gradient(circle at 86% 18%, rgba(37, 99, 235, 0.16), transparent 32%);
+}
+
+.intro-copy::after {
+  content: '';
+  position: absolute;
+  right: 42px;
+  bottom: 38px;
+  width: 150px;
+  height: 150px;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  border-radius: 28px;
+  transform: rotate(8deg);
+  background: rgba(255, 255, 255, 0.42);
+}
+
+.intro-copy h1 {
+  position: relative;
+  z-index: 1;
+  max-width: 760px;
+  margin: 18px 0;
+  color: #111827;
+  font-size: clamp(46px, 6.4vw, 86px);
+  line-height: 0.98;
+  font-weight: 950;
+  letter-spacing: 0;
+}
+
+.intro-copy p {
+  position: relative;
+  z-index: 1;
+  max-width: 660px;
+  margin: 0;
+  color: #64748b;
+  font-size: 18px;
+  line-height: 1.8;
+}
+
+.intro-warning {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  gap: 4px;
+  max-width: 620px;
+  margin-top: 24px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  background: #fff7ed;
+  border: 1px solid #fed7aa;
+}
+
+.intro-warning strong {
+  color: #9a3412;
+  font-size: 14px;
+}
+
+.intro-warning span {
+  color: #7c2d12;
+  font-size: 14px;
+  line-height: 1.6;
+  font-weight: 800;
+}
+
+.intro-actions {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 14px;
+  margin-top: 30px;
+}
+
+.intro-actions > span {
+  color: #64748b;
+  font-size: 13px;
+  font-weight: 900;
+}
+
+.intro-start-button {
+  width: auto;
+  min-width: 180px;
+  margin-top: 0;
+  padding: 0 34px;
+  border-radius: 999px;
+}
+
+.intro-preview {
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  min-height: 470px;
+  padding: 32px;
+  background: #111827;
+  color: #ffffff;
+}
+
+.intro-preview-top,
+.intro-preview-score {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+}
+
+.intro-preview-top .panel-kicker {
+  color: #93c5fd;
+}
+
+.intro-preview-top strong {
+  display: inline-grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  border-radius: 14px;
+  background: #2563eb;
+  font-size: 26px;
+}
+
+.intro-preview-score {
+  min-height: 146px;
+  padding: 22px;
+  border-radius: 16px;
+  background: #ffffff;
+  color: #111827;
+}
+
+.intro-preview-score span,
+.intro-preview-bars span {
+  color: #94a3b8;
+  font-size: 12px;
+  font-weight: 900;
+}
+
+.intro-preview-score b {
+  max-width: 150px;
+  text-align: right;
+  font-size: 34px;
+  line-height: 1.05;
+}
+
+.intro-preview-bars {
+  display: grid;
+  gap: 14px;
+}
+
+.intro-preview-bars div {
+  display: grid;
+  gap: 8px;
+}
+
+.intro-preview-bars i {
+  display: block;
+  height: 10px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #60a5fa var(--bar), rgba(255, 255, 255, 0.14) var(--bar));
+}
+
+.intro-preview p {
+  margin: 4px 0 0;
+  color: #cbd5e1;
+  line-height: 1.7;
+  font-weight: 800;
+}
+
+.intro-points {
+  grid-column: 1 / -1;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 18px;
+}
+
+.intro-points div {
+  min-height: 128px;
+  padding: 20px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid #e2e8f0;
+  box-shadow: 0 18px 44px rgba(15, 23, 42, 0.06);
+}
+
+.intro-points strong,
+.intro-points span {
+  display: block;
+}
+
+.intro-points strong {
+  color: #111827;
+  font-size: 16px;
+}
+
+.intro-points span {
+  margin-top: 6px;
+  color: #64748b;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 700;
 }
 
 .hero-copy {
@@ -2153,6 +2562,133 @@ onUnmounted(() => {
   font-weight: 900;
 }
 
+.share-action-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.share-trigger,
+.share-menu button,
+.wechat-copy-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.share-trigger svg,
+.share-menu svg,
+.wechat-copy-link svg {
+  flex: 0 0 auto;
+}
+
+.share-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(219, 227, 239, 0.95);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+}
+
+.share-menu button {
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.share-menu button:hover {
+  background: #f1f5f9;
+}
+
+.wechat-share-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.wechat-share-dialog {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid rgba(219, 227, 239, 0.98);
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  text-align: center;
+}
+
+.wechat-share-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.wechat-share-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.wechat-share-dialog h3 {
+  margin: 16px 0 8px;
+  color: #111827;
+  font-size: 22px;
+}
+
+.wechat-share-dialog p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 700;
+}
+
+.wechat-qr-box {
+  display: grid;
+  place-items: center;
+  width: 212px;
+  height: 212px;
+  margin: 20px auto;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.wechat-copy-link {
+  min-height: 48px;
+}
+
 @keyframes fadeIn {
   from {
     opacity: 0;
@@ -2187,6 +2723,8 @@ onUnmounted(() => {
   }
 
   .assessment-nav,
+  .intro-stage,
+  .intro-points,
   .assessment-hero,
   .assessment-layout,
   .result-hero-card,
@@ -2200,8 +2738,18 @@ onUnmounted(() => {
     margin: 0 auto 32px;
   }
 
+  .intro-copy,
   .hero-copy {
     padding: 28px;
+  }
+
+  .intro-copy,
+  .intro-preview {
+    min-height: auto;
+  }
+
+  .intro-copy::after {
+    display: none;
   }
 
   .score-orb {
@@ -2229,6 +2777,26 @@ onUnmounted(() => {
     font-size: 42px;
   }
 
+  .intro-copy h1 {
+    font-size: 42px;
+  }
+
+  .intro-preview {
+    padding: 22px;
+  }
+
+  .intro-preview-score {
+    min-height: 112px;
+  }
+
+  .intro-preview-score b {
+    font-size: 26px;
+  }
+
+  .intro-points div {
+    min-height: auto;
+  }
+
   .input-panel,
   .chart-card,
   .report-card {
@@ -2250,6 +2818,15 @@ onUnmounted(() => {
 
   .dimension-item b {
     text-align: left;
+  }
+
+  .share-menu {
+    position: absolute;
+    margin-top: 0;
+  }
+
+  .wechat-share-dialog {
+    padding: 24px;
   }
 }
 </style>
