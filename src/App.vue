@@ -581,6 +581,7 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 onMounted(() => {
+  document.title = 'ETHERLOG'
   const storedUser = localStorage.getItem('authUser')
   const storedToken = localStorage.getItem('authToken')
   if (storedUser && storedToken) {
