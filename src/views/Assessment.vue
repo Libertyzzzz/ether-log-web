@@ -315,6 +315,7 @@ interface AssessmentResult {
   marketLevel: string
   report: string
   radar: AssessmentRadar
+  lieFactor?: number
   advice?: string[]
   shareId?: string
   inputSnapshot?: {
@@ -412,6 +413,14 @@ const canSubmit = computed(() => {
 const assetPreview = computed(() => {
   const snapshot = result.value?.inputSnapshot || lastInputSnapshot.value
   if (result.value) {
+    if (!snapshot && isSharedReport.value) {
+      return [
+        { label: 'Asset', value: result.value.radar.assets },
+        { label: 'Lie factor', value: typeof result.value.lieFactor === 'number' ? result.value.lieFactor : '已生成' },
+        { label: 'Mode', value: result.value.marketLevel || 'Play' }
+      ]
+    }
+
     return [
       { label: 'Income', value: typeof snapshot?.annualIncome === 'number' ? formatCurrency(snapshot.annualIncome) : '已生成' },
       {
@@ -617,6 +626,7 @@ function normalizeResult(payload: any): AssessmentResult {
     score: normalizeScore(source.score),
     marketLevel: source.marketLevel || '评估完成',
     report: source.report || '暂无详细报告内容...',
+    lieFactor: typeof source.lieFactor === 'number' ? source.lieFactor : undefined,
     shareId: source.shareId, // [新增] 映射后端返回的 ID
     inputSnapshot: inputSnapshot
       ? {
@@ -658,6 +668,15 @@ function stopLoadingMessages() {
 function enterAssessment() {
   errorMessage.value = ''
   step.value = 'input'
+}
+
+function startOwnAssessmentFromShare() {
+  result.value = null
+  lastInputSnapshot.value = null
+  errorMessage.value = ''
+  isSharedReport.value = false
+  step.value = 'intro'
+  router.replace({ name: 'assessment' })
 }
 
 async function startAnalysis() {
@@ -1117,6 +1136,23 @@ onUnmounted(() => {
             </div>
           </div>
           <button class="secondary-button" @click="resetAssessment">重新评估</button>
+        </div>
+      </template>
+      <template v-else>
+        <div class="shared-report-actions animate-fade-in">
+          <div class="shared-action-copy">
+            <span class="panel-kicker">YOUR TURN</span>
+            <strong>看完这份报告，也给自己跑一次估值</strong>
+            <p>这是一份娱乐测试，进入后记得把默认初始值改成自己的情况。</p>
+          </div>
+          <div class="shared-action-buttons">
+            <button class="submit-button shared-primary-action" type="button" @click="startOwnAssessmentFromShare">
+              我也测测
+            </button>
+            <button class="secondary-button shared-secondary-action" type="button" @click="copyShareLink">
+              复制测试链接
+            </button>
+          </div>
         </div>
       </template>
 
@@ -2601,6 +2637,63 @@ onUnmounted(() => {
   box-shadow: 0 16px 40px rgba(17, 24, 39, 0.2);
 }
 
+.shared-report-actions {
+  width: min(1140px, 100%);
+  margin: 32px auto 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: center;
+  padding: 24px;
+  border-radius: 18px;
+  border: 1px solid rgba(191, 219, 254, 0.95);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.92)),
+    radial-gradient(circle at 90% 20%, rgba(37, 99, 235, 0.14), transparent 34%);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.09);
+}
+
+.shared-action-copy strong {
+  display: block;
+  margin-top: 8px;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.25;
+}
+
+.shared-action-copy p {
+  max-width: 620px;
+  margin: 8px 0 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 800;
+}
+
+.shared-action-buttons {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.shared-primary-action,
+.shared-secondary-action {
+  width: auto;
+  min-width: 148px;
+  margin-top: 0;
+  padding: 0 28px;
+}
+
+.shared-primary-action {
+  border-radius: 999px;
+  box-shadow: 0 14px 34px rgba(17, 24, 39, 0.16);
+}
+
+.shared-secondary-action {
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.86);
+}
+
 /* 单按钮专属样式 */
 .single-action-btn {
   max-width: 380px;
@@ -2795,7 +2888,8 @@ onUnmounted(() => {
   .assessment-layout,
   .result-hero-card,
   .result-grid,
-  .result-actions {
+  .result-actions,
+  .shared-report-actions {
     grid-template-columns: 1fr;
   }
 
@@ -2821,6 +2915,16 @@ onUnmounted(() => {
   .score-orb {
     width: min(280px, 100%);
     justify-self: center;
+  }
+
+  .shared-action-buttons {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+
+  .shared-primary-action,
+  .shared-secondary-action {
+    width: 100%;
   }
 }
 
