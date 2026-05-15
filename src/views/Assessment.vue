@@ -79,6 +79,12 @@ const resultShareUrl = computed(() => {
   return `${window.location.origin}/assessment?id=${result.value.shareId}`
 })
 
+const assessmentShareUrl = computed(() => resultShareUrl.value || `${window.location.origin}/assessment`)
+
+const assessmentShareTitle = computed(() => (result.value?.shareId ? '我刚生成了一份人间估值报告' : '人间估值'))
+
+const assessmentShareText = computed(() => `${assessmentShareTitle.value}｜快来市场测试一下吧\n${assessmentShareUrl.value}`)
+
 const isWechatBrowser = () => /micromessenger/i.test(window.navigator.userAgent)
 
 const isMobileBrowser = () => /android|iphone|ipad|ipod|mobile/i.test(window.navigator.userAgent)
@@ -88,13 +94,13 @@ const closeShareMenu = () => {
 }
 
 const copyShareLink = async () => {
-  if (!resultShareUrl.value) return
+  if (!assessmentShareUrl.value) return
   try {
     if (navigator.clipboard?.writeText) {
-      await navigator.clipboard.writeText(resultShareUrl.value)
+      await navigator.clipboard.writeText(assessmentShareText.value)
     } else {
       const input = document.createElement('textarea')
-      input.value = resultShareUrl.value
+      input.value = assessmentShareText.value
       input.setAttribute('readonly', '')
       input.style.position = 'fixed'
       input.style.opacity = '0'
@@ -103,10 +109,10 @@ const copyShareLink = async () => {
       document.execCommand('copy')
       document.body.removeChild(input)
     }
-    alert('分享链接已复制到剪贴板, 去惊艳朋友圈吧')
+    alert('分享文案已复制到剪贴板, 去惊艳朋友圈吧')
   } catch (error) {
     console.error('复制分享链接失败:', error)
-    window.prompt('复制失败，请手动复制分享链接', resultShareUrl.value)
+    window.prompt('复制失败，请手动复制分享文案', assessmentShareText.value)
   } finally {
     closeShareMenu()
     isWechatShareOpen.value = false
@@ -114,9 +120,9 @@ const copyShareLink = async () => {
 }
 
 const renderWechatQrCode = async () => {
-  if (!wechatQrCanvasRef.value || !resultShareUrl.value) return
+  if (!wechatQrCanvasRef.value || !assessmentShareUrl.value) return
   try {
-    await QRCode.toCanvas(wechatQrCanvasRef.value, resultShareUrl.value, {
+    await QRCode.toCanvas(wechatQrCanvasRef.value, assessmentShareUrl.value, {
       width: 188,
       margin: 2,
       color: { dark: '#111827', light: '#ffffff' }
@@ -127,16 +133,16 @@ const renderWechatQrCode = async () => {
 }
 
 const openWechatShare = async () => {
-  if (!resultShareUrl.value) return
+  if (!assessmentShareUrl.value) return
 
   closeShareMenu()
 
   if (!isWechatBrowser() && isMobileBrowser() && navigator.share) {
     try {
       await navigator.share({
-        title: 'Aether Valuation | 人间估值',
-        text: '看看这份人间估值报告',
-        url: resultShareUrl.value
+        title: assessmentShareTitle.value,
+        text: '快来市场测试一下吧',
+        url: assessmentShareUrl.value
       })
       return
     } catch (error) {
@@ -732,7 +738,7 @@ onUnmounted(() => {
     <section v-if="step === 'intro'" class="intro-stage animate-fade-in">
       <div class="intro-copy">
         <span class="eyebrow">FUN TEST / NOT A REAL PRICE TAG</span>
-        <h1>测测你在人间市场的离谱估值</h1>
+        <h1>测测你在人间市场的估值啦</h1>
         <p>输入你的身高、资产、生活习惯和情绪参数，生成一份带梗报告和可分享海报。它只负责好玩，不负责定义你。</p>
         <div class="intro-warning">
           <strong>重要提示</strong>
@@ -1078,6 +1084,7 @@ onUnmounted(() => {
               <MessageCircle :size="28" />
             </div>
             <h3>分享到微信</h3>
+            <div class="wechat-share-copy">{{ assessmentShareTitle }}｜快来市场测试一下吧</div>
             <p v-if="isWechatBrowser()">请点击微信右上角菜单，将这份报告发送给朋友或分享到朋友圈。</p>
             <p v-else>用微信扫描二维码，打开后即可发送给朋友或分享到朋友圈。</p>
             <div class="wechat-qr-box">
@@ -1412,17 +1419,18 @@ onUnmounted(() => {
   margin-top: 24px;
   padding: 16px 18px;
   border-radius: 12px;
-  background: #fff7ed;
-  border: 1px solid #fed7aa;
+  background: rgba(239, 246, 255, 0.78);
+  border: 1px solid rgba(191, 219, 254, 0.96);
+  box-shadow: inset 3px 0 0 #2563eb;
 }
 
 .intro-warning strong {
-  color: #9a3412;
+  color: #1d4ed8;
   font-size: 14px;
 }
 
 .intro-warning span {
-  color: #7c2d12;
+  color: #334155;
   font-size: 14px;
   line-height: 1.6;
   font-weight: 800;
@@ -2665,6 +2673,17 @@ onUnmounted(() => {
   margin: 16px 0 8px;
   color: #111827;
   font-size: 22px;
+}
+
+.wechat-share-copy {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
 }
 
 .wechat-share-dialog p {
