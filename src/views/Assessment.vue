@@ -26,6 +26,7 @@ const assessmentHistoryLockKey = 'assessment-history-lock'
 
 const isSharedReport = ref(false)
 
+// 评估页面锁定
 const lockAssessmentHistory = () => {
   window.history.replaceState(
     { ...(window.history.state || {}), [assessmentHistoryLockKey]: 'base' },

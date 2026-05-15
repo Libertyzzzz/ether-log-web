@@ -69,6 +69,11 @@ const imageInput = ref<HTMLInputElement | null>(null)
 const isPreviewingMarkdown = ref(false)
 const isUploadingImage = ref(false)
 const showUserMenu = ref(false)
+const accessCodeInput = ref('')
+const accessCodeError = ref('')
+const accessGranted = ref(sessionStorage.getItem('mainSiteAccessGranted') === 'true')
+const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
+const isVerifyingAccessCode = ref(false)
 const publishForm = reactive<ArticlePublishRequest>({
   title: '',
   subtitle: '',
@@ -106,6 +111,48 @@ const recentArticles = computed(() => articles.value.slice(0, 5))
 const totalViews = computed(() => articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0))
 const commentCount = computed(() => myComments.value.length)
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
+
+async function validateMainAccessCode(code: string) {
+  const configuredEndpoint = import.meta.env.VITE_MAIN_ACCESS_ENDPOINT
+
+  if (configuredEndpoint) {
+    const response = await axios.post<ResultResponse<{ valid: boolean }>>(configuredEndpoint, { code })
+    if (response.data.code !== 200) {
+      throw new Error(response.data.message || 'Access code 校验失败')
+    }
+    return Boolean(response.data.data?.valid)
+  }
+
+  return code === mainAccessCode
+}
+
+async function verifyMainAccess() {
+  accessCodeError.value = ''
+  const code = accessCodeInput.value.trim()
+
+  if (!code) {
+    accessCodeError.value = '请输入 access code。'
+    return
+  }
+
+  isVerifyingAccessCode.value = true
+
+  try {
+    const isValid = await validateMainAccessCode(code)
+    if (!isValid) {
+      accessCodeError.value = 'Access code 不正确，请重新输入。'
+      return
+    }
+
+    accessGranted.value = true
+    accessCodeInput.value = ''
+    sessionStorage.setItem('mainSiteAccessGranted', 'true')
+  } catch (error) {
+    accessCodeError.value = error instanceof Error ? error.message : 'Access code 校验失败，请稍后重试。'
+  } finally {
+    isVerifyingAccessCode.value = false
+  }
+}
 
 function toggleCategory(categoryId: number) {
   activeCategoryId.value = activeCategoryId.value === categoryId ? null : categoryId
@@ -555,102 +602,124 @@ onUnmounted(() => {
 
 <template>
   <div class="app-container">
-    <AppNavbar
-      :is-logged-in="isLoggedIn"
-      :login-user="loginUser"
-      :show-user-menu="showUserMenu"
-      @navigate="navigateToSection"
-      @open-profile="openProfile"
-      @open-dashboard="openDashboard"
-      @open-login="openLoginModal"
-      @toggle-status="handleStatusClick"
-      @logout="handleLogout"
-    />
+    <div class="main-site-shell" :class="{ locked: !accessGranted }" :aria-hidden="!accessGranted">
+      <AppNavbar
+        :is-logged-in="isLoggedIn"
+        :login-user="loginUser"
+        :show-user-menu="showUserMenu"
+        @navigate="navigateToSection"
+        @open-profile="openProfile"
+        @open-dashboard="openDashboard"
+        @open-login="openLoginModal"
+        @toggle-status="handleStatusClick"
+        @logout="handleLogout"
+      />
 
-    <ArticleDetailView
-      v-if="articleForDetail"
-      :article="articleForDetail"
-      :selected-article="selectedArticle"
-      :is-loading="isLoadingArticleDetail"
-      :show-actions="showActionsInCurrentView"
-      @close="closeArticleDetail"
-      @edit="openPublishModal"
-      @delete="deleteArticle"
-    />
+      <ArticleDetailView
+        v-if="articleForDetail"
+        :article="articleForDetail"
+        :selected-article="selectedArticle"
+        :is-loading="isLoadingArticleDetail"
+        :show-actions="showActionsInCurrentView"
+        @close="closeArticleDetail"
+        @edit="openPublishModal"
+        @delete="deleteArticle"
+      />
 
-    <LoginModal
-      v-if="showLoginModal"
-      v-model:email="loginForm.email"
-      v-model:password="loginForm.password"
-      :login-error="loginError"
-      :is-logged-in="isLoggedIn"
-      :is-logging-in="isLoggingIn"
-      :login-user="loginUser"
-      @close="closeLoginModal"
-      @login="login"
-      @logout="logout"
-    />
+      <LoginModal
+        v-if="showLoginModal"
+        v-model:email="loginForm.email"
+        v-model:password="loginForm.password"
+        :login-error="loginError"
+        :is-logged-in="isLoggedIn"
+        :is-logging-in="isLoggingIn"
+        :login-user="loginUser"
+        @close="closeLoginModal"
+        @login="login"
+        @logout="logout"
+      />
 
-    <HomePage
-      v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
-      :categories="categories"
-      :active-category-id="activeCategoryId"
-      :filtered-articles="filteredArticles"
-      :article-error="articleError"
-      :is-loading-articles="isLoadingArticles"
-      :show-actions="showActionsInCurrentView"
-      @toggle-category="toggleCategory"
-      @open-article="openArticleDetail"
-      @edit-article="openPublishModal"
-      @delete-article="deleteArticle"
-    />
+      <HomePage
+        v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
+        :categories="categories"
+        :active-category-id="activeCategoryId"
+        :filtered-articles="filteredArticles"
+        :article-error="articleError"
+        :is-loading-articles="isLoadingArticles"
+        :show-actions="showActionsInCurrentView"
+        @toggle-category="toggleCategory"
+        @open-article="openArticleDetail"
+        @edit-article="openPublishModal"
+        @delete-article="deleteArticle"
+      />
 
-    <ProfilePage
-      v-if="currentPage === 'profile'"
-      :login-user="loginUser"
-      :articles="articles"
-      :recent-articles="recentArticles"
-      :my-comments="myComments"
-      :comment-count="commentCount"
-      :total-views="totalViews"
-      @open-article="openArticleDetail"
-      @edit-article="openPublishModal"
-      @new-article="openPublishModal"
-    />
+      <ProfilePage
+        v-if="currentPage === 'profile'"
+        :login-user="loginUser"
+        :articles="articles"
+        :recent-articles="recentArticles"
+        :my-comments="myComments"
+        :comment-count="commentCount"
+        :total-views="totalViews"
+        @open-article="openArticleDetail"
+        @edit-article="openPublishModal"
+        @new-article="openPublishModal"
+      />
 
-    <DashboardPage
-      v-if="currentPage === 'dashboard'"
-      :articles="articles"
-      :my-comments="myComments"
-      :comment-count="commentCount"
-      :total-views="totalViews"
-      @new-article="openPublishModal"
-      @edit-article="openPublishModal"
-      @delete-article="deleteArticle"
-      @open-article="openArticleDetail"
-    />
+      <DashboardPage
+        v-if="currentPage === 'dashboard'"
+        :articles="articles"
+        :my-comments="myComments"
+        :comment-count="commentCount"
+        :total-views="totalViews"
+        @new-article="openPublishModal"
+        @edit-article="openPublishModal"
+        @delete-article="deleteArticle"
+        @open-article="openArticleDetail"
+      />
 
-    <PublishModal
-      v-if="showPublishModal"
-      v-model:is-previewing-markdown="isPreviewingMarkdown"
-      :publish-form="publishForm"
-      :categories="categories"
-      :publish-error="publishError"
-      :is-publishing="isPublishing"
-      :is-edit-mode="isEditMode"
-      :is-uploading-image="isUploadingImage"
-      :markdown-preview-html="markdownPreviewHtml"
-      @close="closePublishModal"
-      @publish="publishArticle"
-      @insert-markdown="insertMarkdown"
-      @trigger-image-upload="triggerImageUpload"
-      @upload-markdown-image="uploadMarkdownImage"
-      @content-textarea-ready="contentTextarea = $event"
-      @image-input-ready="imageInput = $event"
-    />
+      <PublishModal
+        v-if="showPublishModal"
+        v-model:is-previewing-markdown="isPreviewingMarkdown"
+        :publish-form="publishForm"
+        :categories="categories"
+        :publish-error="publishError"
+        :is-publishing="isPublishing"
+        :is-edit-mode="isEditMode"
+        :is-uploading-image="isUploadingImage"
+        :markdown-preview-html="markdownPreviewHtml"
+        @close="closePublishModal"
+        @publish="publishArticle"
+        @insert-markdown="insertMarkdown"
+        @trigger-image-upload="triggerImageUpload"
+        @upload-markdown-image="uploadMarkdownImage"
+        @content-textarea-ready="contentTextarea = $event"
+        @image-input-ready="imageInput = $event"
+      />
 
-    <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
-    <ContactSection v-if="currentPage === 'home'" />
-    <AppFooter v-if="currentPage === 'home'" />
+      <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
+      <ContactSection v-if="currentPage === 'home'" />
+      <AppFooter v-if="currentPage === 'home'" />
+    </div>
+
+    <div v-if="!accessGranted" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
+      <form class="access-card" @submit.prevent="verifyMainAccess">
+        <span>PRIVATE AREA</span>
+        <h1>Access Code</h1>
+        <p>主站内容已被临时遮罩。输入 access code 后继续访问。</p>
+        <input
+          v-model="accessCodeInput"
+          type="password"
+          autocomplete="off"
+          placeholder="Enter access code"
+          :disabled="isVerifyingAccessCode"
+          autofocus
+        />
+        <button type="submit" :disabled="isVerifyingAccessCode">
+          {{ isVerifyingAccessCode ? '校验中...' : '进入主站' }}
+        </button>
+        <small v-if="accessCodeError">{{ accessCodeError }}</small>
+      </form>
+    </div>
   </div>
 </template>
