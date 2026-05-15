@@ -17,14 +17,14 @@ const route = useRoute()
 const posterRef = ref<HTMLElement | null>(null)
 const isGenerating = ref(false) // [新增] 生成状态
 // 在其他 ref 之后添加
-const qrCodeRef = ref<HTMLElement | null>(null)
+// const qrCodeRef = ref<HTMLElement | null>(null)
 
 const isSharedReport = ref(false)
 
 // 卡片颜色自适应函数
-const adjustColor = (color, amount) => {
-  return color;
-};
+// const adjustColor = (color, amount) => {
+//   return color;
+// };
 
 
 // 检测URL中的分享ID
