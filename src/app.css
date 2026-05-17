@@ -1656,6 +1656,13 @@
   color: #6b7280;
   font-weight: 500;
 }
+
+<!-- 让图片显示 而不超出容器宽度-->
+.grid-container img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+}
 @media (min-width: 768px) {
   .footer {
     flex-direction: row;
