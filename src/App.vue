@@ -72,7 +72,7 @@ const showUserMenu = ref(false)
 const accessCodeInput = ref('')
 const accessCodeError = ref('')
 const accessGranted = ref(sessionStorage.getItem('mainSiteAccessGranted') === 'true')
-const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
+// const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
 const isVerifyingAccessCode = ref(false)
 const publishForm = reactive<ArticlePublishRequest>({
   title: '',
@@ -113,17 +113,15 @@ const commentCount = computed(() => myComments.value.length)
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
 
 async function validateMainAccessCode(code: string) {
-  const configuredEndpoint = import.meta.env.VITE_MAIN_ACCESS_ENDPOINT
-
-  if (configuredEndpoint) {
-    const response = await axios.post<ResultResponse<{ valid: boolean }>>(configuredEndpoint, { code })
-    if (response.data.code !== 200) {
-      throw new Error(response.data.message || 'Access code 校验失败')
-    }
-    return Boolean(response.data.data?.valid)
-  }
-
-  return code === mainAccessCode
+  const response = await axios.get<ResultResponse<boolean>>('/api/access-code/verify', { 
+    params: { 
+      id: 1,
+      accessCode: code
+    } 
+  })
+  if(response.data.code !== 200)
+    throw new Error(response.data.message || "access code 验证失败")
+  return response.data.data == true
 }
 
 async function verifyMainAccess() {
@@ -140,7 +138,7 @@ async function verifyMainAccess() {
   try {
     const isValid = await validateMainAccessCode(code)
     if (!isValid) {
-      accessCodeError.value = 'Access code 不正确，请重新输入。'
+      accessCodeError.value = 'access code 不正确，请重新输入。'
       return
     }
 
