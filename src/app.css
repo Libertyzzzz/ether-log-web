@@ -1577,8 +1577,9 @@
   flex-direction: column;
   justify-content: space-between;
   border-width: 1px;
+  overflow: hidden;
 }
-@media (min-width: 768px) { .card-large { grid-column: span 2; } }
+@media (min-width: 768px) { .card-large { grid-column: span 1; overflow: hidden;} }
 
 .card-small {
   grid-column: span 1;
@@ -1604,7 +1605,7 @@
   position: relative;
   overflow: hidden;
 }
-@media (min-width: 768px) { .card-full { grid-column: span 4; } }
+@media (min-width: 768px) { .card-full { grid-column: span 2; } }
 
 .card-header { display: flex; justify-content: space-between; align-items: start; }
 .avatar-box { width: 4rem; height: 4rem; border-radius: 1rem; background: #f5f5f7; overflow: hidden; }
@@ -1655,6 +1656,13 @@
 .footer-meta span {
   color: #6b7280;
   font-weight: 500;
+}
+
+<!-- 让图片显示 而不超出容器宽度-->
+.grid-container img {
+  max-width: 100%;
+  height: auto;
+  display: block;
 }
 @media (min-width: 768px) {
   .footer {
