@@ -101,6 +101,36 @@ const writeClipboardText = async (text: string) => {
   document.body.removeChild(input)
 }
 
+// 打赏功能
+// 打赏弹窗状态 
+const isDonateOpen = ref(false)
+const donateQrCanvasRef = ref<HTMLCanvasElement | null>(null)
+
+// 你的支付宝收款链接（替换成你自己的）
+const ALIPAY_URL = 'https://qr.alipay.com/fkx15570bli95fl5zczgq60'
+
+// 检测是否手机端
+const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+
+// 点击打赏按钮
+const openDonate = async () => {
+  if (isMobile()) {
+    // 手机端直接跳转支付宝
+    window.location.href = ALIPAY_URL
+  } else {
+    // 网页端弹出二维码
+    isDonateOpen.value = true
+    await nextTick()
+    if (donateQrCanvasRef.value) {
+      await QRCode.toCanvas(donateQrCanvasRef.value, ALIPAY_URL, {
+        width: 188,
+        margin: 2,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      })
+    }
+  }
+}
+
 const copyShareLink = async () => {
   if (!assessmentShareUrl.value) return
   try {
@@ -1239,6 +1269,9 @@ onUnmounted(() => {
               </button>
             </div>
           </div>
+          <button class="secondary-button donate-button" @click="openDonate">
+             ☕ 请作者喝杯咖啡
+          </button>
           <button class="secondary-button" @click="resetAssessment">重新评估</button>
         </div>
       </template>
@@ -1261,6 +1294,20 @@ onUnmounted(() => {
       </template>
 
       <Teleport to="body">
+          <div v-if="isDonateOpen" class="wechat-share-layer" @click.self="isDonateOpen = false">
+            <div class="wechat-share-dialog">
+              <button class="wechat-share-close" type="button" @click="isDonateOpen = false">
+                <X :size="18" />
+              </button>
+              <div class="wechat-share-icon">☕</div>
+              <h3>请作者喝杯咖啡</h3>
+              <p>扫码支付宝转账，感谢支持 🙏</p>
+              <div class="wechat-qr-box">
+                <canvas ref="donateQrCanvasRef" width="188" height="188"></canvas>
+              </div>
+              <p style="font-size:12px;color:#94a3b8;margin-top:8px;">手机端点击按钮可直接跳转支付宝</p>
+            </div>
+        </div>
         <div v-if="isWechatShareOpen" class="wechat-share-layer" @click.self="isWechatShareOpen = false">
           <div class="wechat-share-dialog">
             <button class="wechat-share-close" type="button" aria-label="关闭" @click="isWechatShareOpen = false">
