@@ -20,6 +20,7 @@ const isWechatShareOpen = ref(false)
 const wechatQrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const assessmentHistoryLockKey = 'assessment-history-lock'
 const assessmentEntryPath = '/assessment'
+const userLocation = ref<{ latitude: number; longitude: number } | null>(null)
 let activeShareId = ''
 // 在其他 ref 之后添加
 // const qrCodeRef = ref<HTMLElement | null>(null)
@@ -59,10 +60,48 @@ const handleAssessmentBack = () => {
 // };
 
 
+async function getUserLocation() {
+  // 自定义体术
+  const confirmLocationAccess = confirm('为了提供更准确的评估结果，我们需要获取您的大致位置信息（经度和纬度）。这将帮助我们分析地区相关因素。是否同意（如果拒绝，结果将会有较大偏差）？')
+  
+  if (!confirmLocationAccess) {
+    console.log('用户拒绝了位置访问请求')
+    return
+  }
+  try {
+    // 检查浏览器是否支持地理定位API
+    if (!navigator.geolocation) {
+      return
+    }
+
+    // 获取位置
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        const { latitude, longitude } = position.coords
+        // 存储经纬度
+        userLocation.value = { latitude, longitude }
+      },
+      (error) => {
+        // 忽略错误，用户可能拒绝了位置权限
+        console.log('无法获取位置:', error.message)
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 10000,
+        maximumAge: 60000
+      }
+    )
+  } catch (error) {
+    console.log('获取位置时发生错误:', error)
+  }
+}
+
 onMounted(() => {
   document.title = 'Aether Valuation | 人间估值'
   lockAssessmentHistory()
   window.addEventListener('popstate', handleAssessmentBack)
+  getUserLocation()
+
 })
 
 const resultShareUrl = computed(() => {
@@ -598,8 +637,9 @@ const resultChips = computed(() => {
   ]
 })
 
+
 function buildAssessmentPayload() {
-  return {
+  const payload = {   
     gender: form.gender,
     height: form.height,
     visualHeight: form.visualHeight,
@@ -634,6 +674,13 @@ function buildAssessmentPayload() {
     coldViolenceProb: form.coldViolenceProb,
     empathyLevel: form.empathyLevel
   }
+  if (userLocation.value) {
+    Object.assign(payload, {
+      latitude: userLocation.value.latitude,
+      longitude: userLocation.value.longitude
+    })
+  }
+  return payload
 }
 
 function formatCurrency(value: number) {
