@@ -52,6 +52,16 @@ const questionFlow: QuestionConfig[] = [
       { label: '♀️ 女性模型', value: 'FEMALE' }
     ],
     stage: 1,
+    nextQuestion: 'age'
+  },
+  {
+    id: 'age',
+    text: '先记录一下年龄。放心，这只是基础建模参数，不是人生进度条。',
+    field: 'age',
+    inputType: 'slider',
+    range: { min: 18, max: 80, step: 1 },
+    hint: '单位：岁',
+    stage: 1,
     nextQuestion: 'height'
   },
   {
