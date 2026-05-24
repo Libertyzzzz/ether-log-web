@@ -382,8 +382,9 @@ type GenderModel = 'MALE' | 'FEMALE'
 
 interface AssessmentForm {
   gender: GenderModel
+  age: number
   height: number
-visualHeight: number
+  visualHeight: number
   weight: number
   annualIncome: number
   hairStatus: number
@@ -434,6 +435,7 @@ interface AssessmentResult {
   advice?: string[]
   shareId?: string
   inputSnapshot?: {
+    age?: number
     annualIncome?: number
     height?: number
     visualHeight?: number
@@ -458,6 +460,7 @@ let loadingTimer: number | undefined
 
 const form = reactive<AssessmentForm>({
   gender: 'MALE',
+  age: 28,
   height: 170,
   visualHeight: 170,
   weight: 68,
@@ -580,7 +583,7 @@ watch(chatCurrentQuestionId, () => {
 })
 
 const canSubmit = computed(() => {
-  return form.height > 0 && form.visualHeight > 0 && form.weight > 0 && form.annualIncome >= 0
+  return form.age >= 18 && form.height > 0 && form.visualHeight > 0 && form.weight > 0 && form.annualIncome >= 0
 })
 
 const assetPreview = computed(() => {
@@ -595,6 +598,7 @@ const assetPreview = computed(() => {
     }
 
     return [
+      { label: 'Age', value: typeof snapshot?.age === 'number' ? snapshot.age : '已生成' },
       { label: 'Income', value: typeof snapshot?.annualIncome === 'number' ? formatCurrency(snapshot.annualIncome) : '已生成' },
       {
         label: 'Visual delta',
@@ -602,14 +606,13 @@ const assetPreview = computed(() => {
           ? `${snapshot.visualHeight - snapshot.height >= 0 ? '+' : ''}${snapshot.visualHeight - snapshot.height}cm`
           : '已生成'
       },
-      { label: 'Mode', value: result.value.marketLevel || 'Play' }
     ]
   }
 
   return [
+    { label: 'Age', value: form.age },
     { label: 'Income', value: formatCurrency(form.annualIncome) },
-    { label: 'Visual delta', value: `${form.visualHeight - form.height >= 0 ? '+' : ''}${form.visualHeight - form.height}cm` },
-    { label: 'Mode', value: 'Play' }
+    { label: 'Visual delta', value: `${form.visualHeight - form.height >= 0 ? '+' : ''}${form.visualHeight - form.height}cm` }
   ]
 })
 
@@ -737,6 +740,7 @@ const resultChips = computed(() => {
 function buildAssessmentPayload() {
   const payload = {   
     gender: form.gender,
+    age: form.age,
     height: form.height,
     visualHeight: form.visualHeight,
     weight: form.weight,
@@ -812,6 +816,7 @@ function normalizeResult(payload: any): AssessmentResult {
     inputSnapshot: inputSnapshot
       ? {
           annualIncome: normalizedAnnualIncome,
+          age: typeof inputSnapshot.age === 'number' ? inputSnapshot.age : undefined,
           height: typeof inputSnapshot.height === 'number' ? inputSnapshot.height : undefined,
           visualHeight: typeof inputSnapshot.visualHeight === 'number' ? inputSnapshot.visualHeight : undefined
         }
@@ -960,6 +965,7 @@ async function startAnalysis() {
   errorMessage.value = ''
   result.value = null
   lastInputSnapshot.value = {
+    age: form.age,
     annualIncome: form.annualIncome,
     height: form.height,
     visualHeight: form.visualHeight
@@ -1344,6 +1350,11 @@ onUnmounted(() => {
               <button type="button" @click="form.gender = 'FEMALE'" :class="{ active: form.gender === 'FEMALE' }">女性模型</button>
             </div>
           </div>
+
+          <label class="field">
+            <span>年龄</span>
+            <input v-model.number="form.age" type="number" min="18" max="100" />
+          </label>
 
           <label class="field">
             <span>净身高 cm</span>
