@@ -5,13 +5,32 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
-import { Link, MessageCircle, Share2, X } from 'lucide-vue-next'
+import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck } from 'lucide-vue-next'
 import QRCode from 'qrcode'
+import { useAssessmentChat } from '../composables/useAssessmentChat'
+
 
 // 分享模块
 const route = useRoute()
 
-
+// [新增] 使用聊天 composable
+const {
+  chatMessages,
+  currentQuestionId: chatCurrentQuestionId,
+  getCurrentQuestion,
+  currentStage,
+  stageProgress,
+  totalQuestions,
+  currentQuestionNumber,
+  stageNames,
+  isTyping,
+  chatContainerRef,
+  userInput,
+  sliderValue,
+  initChat: chatInitChat,
+  handleAnswer: chatHandleAnswer,
+  initSliderValue
+} = useAssessmentChat()
 
 const posterRef = ref<HTMLElement | null>(null)
 const isGenerating = ref(false) // [新增] 生成状态
@@ -21,11 +40,20 @@ const wechatQrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const assessmentHistoryLockKey = 'assessment-history-lock'
 const assessmentEntryPath = '/assessment'
 const userLocation = ref<{ latitude: number; longitude: number } | null>(null)
+const isLocationPromptOpen = ref(false)
+let locationPromptResolver: ((allowed: boolean) => void) | null = null
 let activeShareId = ''
 // 在其他 ref 之后添加
 // const qrCodeRef = ref<HTMLElement | null>(null)
 
 const isSharedReport = ref(false)
+
+type AssessmentStep = 'intro' | 'chat' | 'input' | 'loading' | 'result'
+
+// [新增] 用于控制 Hero 区域在聊天模式下不显示
+const shouldShowHero = computed(() => {
+  return (step.value === 'input' || step.value === 'loading') 
+})
 
 // 评估页面锁定：允许 /assessment 域内前进后退，但不退回主站。
 const lockAssessmentHistory = () => {
@@ -60,20 +88,35 @@ const handleAssessmentBack = () => {
 // };
 
 
+function requestLocationConsent() {
+  if (locationPromptResolver) {
+    locationPromptResolver(false)
+  }
+
+  isLocationPromptOpen.value = true
+  return new Promise<boolean>((resolve) => {
+    locationPromptResolver = resolve
+  })
+}
+
+function resolveLocationPrompt(allowed: boolean) {
+  isLocationPromptOpen.value = false
+  locationPromptResolver?.(allowed)
+  locationPromptResolver = null
+}
+
 async function getUserLocation() {
-  // 自定义体术
-  const confirmLocationAccess = confirm('为了提供更准确的评估结果，我们需要获取您的大致位置信息（经度和纬度）。这将帮助我们分析地区相关因素。是否同意（如果拒绝，结果将会有较大偏差）？')
-  
+  if (!navigator.geolocation) {
+    return
+  }
+
+  const confirmLocationAccess = await requestLocationConsent()
+
   if (!confirmLocationAccess) {
     console.log('用户拒绝了位置访问请求')
     return
   }
   try {
-    // 检查浏览器是否支持地理定位API
-    if (!navigator.geolocation) {
-      return
-    }
-
     // 获取位置
     navigator.geolocation.getCurrentPosition(
       (position) => {
@@ -101,7 +144,6 @@ onMounted(() => {
   lockAssessmentHistory()
   window.addEventListener('popstate', handleAssessmentBack)
   getUserLocation()
-
 })
 
 const resultShareUrl = computed(() => {
@@ -154,10 +196,8 @@ const isMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
 // 点击打赏按钮
 const openDonate = async () => {
   if (isMobile()) {
-    // 手机端直接跳转支付宝
-    window.location.href = ALIPAY_URL
+    window.open(ALIPAY_URL, '_blank')
   } else {
-    // 网页端弹出二维码
     isDonateOpen.value = true
     await nextTick()
     if (donateQrCanvasRef.value) {
@@ -336,7 +376,6 @@ const savePoster = async () => {
 
 
 
-type AssessmentStep = 'intro' | 'input' | 'loading' | 'result'
 type GenderModel = 'MALE' | 'FEMALE'
 
 
@@ -482,6 +521,63 @@ const rangeFields = [
   { key: 'coldViolenceProb', label: '冷暴力倾向', hint: '1 到 5，静音模式触发概率', min: 1, max: 5 },
   { key: 'empathyLevel', label: '同理心', hint: '1 到 5， 共情力递增', min: 1, max: 5 }
 ] as const
+
+// [新增] 双模式支持
+type InputMode = 'chat' | 'form'
+const inputMode = ref<InputMode>('chat')
+
+const selectMode = async (mode: InputMode) => {
+  inputMode.value = mode
+  errorMessage.value = ''
+  if (route.name !== 'assessment-evaluate') {
+    await router.push({ name: 'assessment-evaluate' })
+    return
+  }
+  if (mode === 'chat') {
+    step.value = 'chat'
+    initChatWithForm()
+  } else {
+    step.value = 'input'
+  }
+}
+
+// [新增] 包装 composable 中的函数
+// [修复] 补全语法并移除冗余函数
+const handleChatAnswer = async (value: any) => {
+  const currentQ = getCurrentQuestion.value
+  if (!currentQ) return
+  
+  let val = value
+  if (currentQ.field) {
+    const field = currentQ.field as keyof AssessmentForm
+    if (typeof form[field] === 'number') {
+      val = Number(value)
+    } else if (typeof form[field] === 'boolean') {
+      val = value === 'true' || value === true
+    }
+    // @ts-ignore
+    form[field] = val
+  }
+  await chatHandleAnswer(val, form, startAnalysis)    
+}
+
+const initChatWithForm = async () => {
+  await chatInitChat(form)
+}
+
+const returnToIntroFromChat = () => {
+  step.value = 'intro'
+  router.push({ name: 'assessment-home' })
+}
+
+const bindChatContainerRef = (el: unknown) => {
+  chatContainerRef.value = el instanceof HTMLElement ? el : null
+}
+
+// 监听当前问题，初始化滑块值
+watch(chatCurrentQuestionId, () => {
+  initSliderValue(form)
+})
 
 const canSubmit = computed(() => {
   return form.height > 0 && form.visualHeight > 0 && form.weight > 0 && form.annualIncome >= 0
@@ -802,7 +898,15 @@ async function syncAssessmentRoute() {
   if (route.name === 'assessment-evaluate') {
     isSharedReport.value = false
     errorMessage.value = ''
-    step.value = 'input'
+    
+    // 👇 根据当前的 inputMode 决定给 step 赋予 'chat' 还是 'input' 
+    // 即区分是对话模式还是快速模式
+    if (inputMode.value === 'chat') {
+      step.value = 'chat'
+      initChatWithForm()
+    } else {
+      step.value = 'input'
+    }
     return
   }
 
@@ -837,11 +941,6 @@ async function syncAssessmentRoute() {
 watch(() => route.fullPath, () => {
   void syncAssessmentRoute()
 }, { immediate: true })
-
-function enterAssessment() {
-  errorMessage.value = ''
-  router.push({ name: 'assessment-evaluate' })
-}
 
 function startOwnAssessmentFromShare() {
   result.value = null
@@ -884,11 +983,6 @@ async function startAnalysis() {
     }
 
     result.value = normalizeResult(payload)
-    step.value = 'result'
-    await router.push({ name: 'assessment-result' })
-
-    await nextTick()
-    renderRadar()
   } catch (error) {
     step.value = 'input'
     if (route.name !== 'assessment-evaluate') {
@@ -899,9 +993,22 @@ async function startAnalysis() {
       : error instanceof Error
         ? error.message
         : '访问人数太多啦，评估功能暂不可用呢，WWWW'
+    return
   } finally {
     isAnalysisRunning.value = false
     stopLoadingMessages()
+  }
+
+  step.value = 'result'
+  if (route.name !== 'assessment-result') {
+    await router.push({ name: 'assessment-result' })
+  }
+
+  await nextTick()
+  try {
+    renderRadar()
+  } catch (error) {
+    console.warn('雷达图渲染失败:', error)
   }
 }
 
@@ -970,8 +1077,8 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <main class="assessment-root">
-    <nav class="assessment-nav">
+  <main class="assessment-root" :class="{ 'is-chat-root': step === 'chat' }">
+    <nav v-if="step !== 'chat'" class="assessment-nav">
       <button class="brand-button" type="button" @click="router.push({ name: 'assessment-home' })">
         <span class="brand-mark">V</span>
         <span>Aether Valuation | 人间估值</span>
@@ -990,9 +1097,48 @@ onUnmounted(() => {
           <strong>重要提示</strong>
           <span>进入测试后，表单里的数据只是默认初始值。请改成你自己的情况，再生成报告。</span>
         </div>
-        <div class="intro-actions">
-          <button class="submit-button intro-start-button" type="button" @click="enterAssessment">开始测试</button>
-          <span>大约 1 分钟完成</span>
+        
+        <!-- [新增] 模式选择 -->
+        <div class="mode-selection">
+          <h3 class="mode-title">选择你的体验方式：</h3>
+          <div class="mode-cards">
+            <!-- 正式填写（聊天模式） -->
+            <div class="mode-card recommended" @click="selectMode('chat')">
+              <div class="mode-badge">推荐</div>
+              <div class="mode-icon">
+                <Sparkles :size="32" />
+              </div>
+              <h4 class="mode-name">🤖 正式填写</h4>
+              <ul class="mode-features">
+                <li>• 与估值助手对话互动</li>
+                <li>• 趣味问答，轻松有趣</li>
+                <li>• 个性化问题路径</li>
+                <li>• 预计耗时 3-4 分钟</li>
+              </ul>
+              <button class="mode-button primary">
+                <Sparkles :size="18" />
+                <span>✨ 开始探索</span>
+              </button>
+            </div>
+            
+            <!-- 快速模式（表单） -->
+            <div class="mode-card" @click="selectMode('form')">
+              <div class="mode-icon">
+                <Zap :size="32" />
+              </div>
+              <h4 class="mode-name">⚡ 快速模式</h4>
+              <ul class="mode-features">
+                <li>• 传统表单填写</li>
+                <li>• 高效直接，一目了然</li>
+                <li>• 适合老用户或赶时间</li>
+                <li>• 预计耗时 1-2 分钟</li>
+              </ul>
+              <button class="mode-button secondary">
+                <Zap :size="18" />
+                <span>🚀 快速开始</span>
+              </button>
+            </div>
+          </div>
         </div>
       </div>
       <aside class="intro-preview" aria-label="报告预览">
@@ -1036,8 +1182,7 @@ onUnmounted(() => {
       </div>
     </section>
 
-    <section v-else class="assessment-hero">
-      <div class="hero-copy">
+    <section v-if="shouldShowHero" class="assessment-hero">      <div class="hero-copy">
         <span class="eyebrow">SATIRE FIRST / DATA SECOND</span>
         <h1>人间估值</h1>
         <p>轻松填写，静静欣赏。这会是一份有趣的报告，但它永远不会定义真实的你。</p>
@@ -1053,6 +1198,126 @@ onUnmounted(() => {
         </div>
         <p class="preview-note">{{ previewPanelNote }}</p>
       </aside>
+    </section>
+
+    <!-- [新增] 聊天式填写界面 -->
+    <section v-if="step === 'chat'" class="chat-stage animate-fade-in">
+      <div class="chat-ambient chat-ambient-left" aria-hidden="true">
+        <span>01</span>
+        <strong>PROFILE SCAN</strong>
+        <i></i>
+        <i></i>
+        <i></i>
+      </div>
+      <div class="chat-container">
+        <!-- 顶部进度条 -->
+        <div class="chat-header">
+          <button class="chat-back-btn" type="button" @click="returnToIntroFromChat" aria-label="返回">
+            <ChevronLeft :size="20" />
+          </button>
+          <div class="chat-progress-info">
+            <span class="chat-stage-name">{{ stageNames[currentStage] }}</span>
+            <span class="chat-step-indicator">
+              {{ currentQuestionNumber ? `Question ${currentQuestionNumber}/${totalQuestions}` : `Ready / ${totalQuestions}` }}
+            </span>
+          </div>
+          <div class="chat-progress-bar">
+            <div class="chat-progress-fill" :style="{ width: stageProgress + '%' }"></div>
+          </div>
+        </div>
+        
+        <!-- 对话区域 -->
+        <div :ref="bindChatContainerRef" class="chat-messages">
+          <div 
+            v-for="msg in chatMessages" 
+            :key="msg.id"
+            class="chat-message"
+            :class="[msg.type, { 'is-active-question': msg.questionId === chatCurrentQuestionId }]"
+          >
+            <div class="chat-avatar" v-if="msg.type === 'bot'">
+              <div class="avatar-robot">🤖</div>
+            </div>
+            <div class="chat-bubble">
+              <div class="bubble-content">{{ msg.content }}</div>
+              
+              <!-- 选项按钮 -->
+              <div v-if="msg.options && msg.type === 'bot' && msg.questionId === chatCurrentQuestionId" class="bubble-options">
+                <button 
+                  v-for="opt in msg.options" 
+                  :key="opt.label"
+                  class="option-btn"
+                  type="button"
+                  @click="handleChatAnswer(opt.value)"
+                >
+                  {{ opt.label }}
+                </button>
+              </div>
+              
+              <!-- 滑块输入 -->
+              <div v-if="msg.questionId === chatCurrentQuestionId && getCurrentQuestion?.inputType === 'slider'">
+                <div class="bubble-control">
+                  <div class="slider-display">
+                    <span class="slider-value">{{ sliderValue }}</span>
+                    <span class="slider-unit">{{ getCurrentQuestion.hint }}</span>
+                  </div>
+                  <input 
+                    type="range" 
+                    :min="getCurrentQuestion.range?.min" 
+                    :max="getCurrentQuestion.range?.max" 
+                    :step="getCurrentQuestion.range?.step || 1"
+                    v-model.number="sliderValue"
+                    class="slider-input"
+                  />
+                  <button class="slider-confirm" type="button" @click="handleChatAnswer(sliderValue)">
+                    <Send :size="16" />
+                    <span>确认</span>
+                  </button>
+                </div>
+              </div>
+              
+              <!-- 数字输入 -->
+              <div v-if="msg.questionId === chatCurrentQuestionId && getCurrentQuestion?.inputType === 'number'">
+                <div class="bubble-input">
+                  <input 
+                    type="number" 
+                    v-model.number="userInput"
+                    :placeholder="getCurrentQuestion.hint"
+                    class="text-input"
+                    @keyup.enter="handleChatAnswer(userInput)"
+                  />
+                  <button class="input-confirm" type="button" @click="handleChatAnswer(userInput)">
+                    <Send :size="16" />
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div class="chat-avatar" v-if="msg.type === 'user'">
+              <div class="avatar-user">👤</div>
+            </div>
+          </div>
+          
+          <!-- 正在输入指示器 -->
+          <div v-if="isTyping" class="chat-message bot">
+            <div class="chat-avatar">
+              <div class="avatar-robot">🤖</div>
+            </div>
+            <div class="chat-bubble typing">
+              <div class="typing-dots">
+                <span></span>
+                <span></span>
+                <span></span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="chat-ambient chat-ambient-right" aria-hidden="true">
+        <span>33</span>
+        <strong>MARKET SIGNALS</strong>
+        <i></i>
+        <i></i>
+        <i></i>
+      </div>
     </section>
 
     <section v-if="step === 'input'" class="assessment-layout animate-fade-in">
@@ -1212,9 +1477,13 @@ onUnmounted(() => {
     </section>
 
     <section v-else-if="result" class="result-stage animate-zoom-in">
-      <div class="result-hero-card">
+      <div class="result-hero-card" :style="{ '--verdict-color': playfulVerdict.color }">
         <div class="result-copy">
-          <span class="eyebrow">REPORT READY / LOW STAKES ONLY</span>
+          <div class="result-meta-rail">
+            <span>REPORT READY</span>
+            <span>LOW STAKES ONLY</span>
+            <span>{{ result.marketLevel }}</span>
+          </div>
           <h2>{{ playfulVerdict.title }}</h2>
           <p>{{ playfulVerdict.subtitle }}</p>
           <div class="result-chip-row">
@@ -1227,6 +1496,7 @@ onUnmounted(() => {
         </div>
 
         <div class="score-orb">
+            <div class="score-ring-label">AETHER SCORE</div>
             <span class="badge-highlight">{{ playfulVerdict.badge }}</span>
             <strong>{{ result.score }}</strong>
             <em>{{ result.marketLevel }}</em>
@@ -1295,7 +1565,7 @@ onUnmounted(() => {
       </div>
 
       
-      <template v-if="!isSharedReport">
+       <template v-if="!isSharedReport">
         <div class="result-actions animate-fade-in">
           <button class="submit-button gold-action" @click="savePoster" :disabled="isGenerating">
             {{ isGenerating ? '正在渲染...' : '生成估值海报' }}
@@ -1340,7 +1610,7 @@ onUnmounted(() => {
         </div>
       </template>
 
-      <Teleport to="body">
+       <Teleport to="body">
           <div v-if="isDonateOpen" class="wechat-share-layer" @click.self="isDonateOpen = false">
             <div class="wechat-share-dialog">
               <button class="wechat-share-close" type="button" @click="isDonateOpen = false">
@@ -1479,6 +1749,30 @@ onUnmounted(() => {
         </div>
       </div>
     </section>
+
+    <Teleport to="body">
+      <div v-if="isLocationPromptOpen" class="location-permission-layer" @click.self="resolveLocationPrompt(false)">
+        <section class="location-permission-dialog" role="dialog" aria-modal="true" aria-labelledby="location-permission-title">
+          <button class="location-permission-close" type="button" aria-label="关闭" @click="resolveLocationPrompt(false)">
+            <X :size="18" />
+          </button>
+          <div class="location-permission-icon">
+            <MapPin :size="28" />
+          </div>
+          <span class="panel-kicker">OPTIONAL SIGNAL</span>
+          <h3 id="location-permission-title">允许使用大致位置？</h3>
+          <p>用于给报告增加一点地区参数。不会展示精确地址，拒绝结果偏差会较大。</p>
+          <div class="location-permission-note">
+            <ShieldCheck :size="16" />
+            <span>该信息有助于精确评估您的个体特征，不会泄露您的真实位置。</span>
+          </div>
+          <div class="location-permission-actions">
+            <button class="secondary-button" type="button" @click="resolveLocationPrompt(false)">暂时不用</button>
+            <button class="submit-button" type="button" @click="resolveLocationPrompt(true)">允许定位</button>
+          </div>
+        </section>
+      </div>
+    </Teleport>
   </main>
 </template>
 
@@ -1516,10 +1810,21 @@ onUnmounted(() => {
 
 .assessment-root {
   min-height: 100vh;
-  background: #f5f5f7;
+  background:
+    linear-gradient(180deg, #f8fafc 0%, #f3f6fb 48%, #eef4f8 100%);
   color: #111827;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 24px 20px;
+}
+
+.assessment-root.is-chat-root {
+  display: grid;
+  align-items: center;
+  padding: 28px;
+  background:
+    linear-gradient(115deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.98) 48%, rgba(236, 253, 245, 0.88)),
+    #f8fafc;
+  overflow: hidden;
 }
 
 .assessment-nav {
@@ -1529,9 +1834,9 @@ onUnmounted(() => {
   padding: 0 32px;
   height: 78px;
   border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.98);
+  background: rgba(255, 255, 255, 0.9);
   border: 1px solid rgba(226, 232, 240, 0.95);
-  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.08);
+  box-shadow: 0 22px 70px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.92);
   backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
@@ -1640,9 +1945,9 @@ onUnmounted(() => {
 .advice-card,
 .loading-panel {
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.82);
-  border: 1px solid rgba(226, 232, 240, 0.9);
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.07);
+  background: rgba(255, 255, 255, 0.88);
+  border: 1px solid rgba(226, 232, 240, 0.86);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.78);
 }
 
 .intro-copy {
@@ -1651,8 +1956,8 @@ onUnmounted(() => {
   min-height: 470px;
   padding: 54px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.96), rgba(239, 246, 255, 0.88)),
-    radial-gradient(circle at 86% 18%, rgba(37, 99, 235, 0.16), transparent 32%);
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.9)),
+    linear-gradient(90deg, rgba(37, 99, 235, 0.08), transparent 42%);
 }
 
 .intro-copy::after {
@@ -1663,9 +1968,12 @@ onUnmounted(() => {
   width: 150px;
   height: 150px;
   border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 28px;
+  border-radius: 8px;
   transform: rotate(8deg);
-  background: rgba(255, 255, 255, 0.42);
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.28));
+  z-index: 0;
+  pointer-events: none;
 }
 
 .intro-copy h1 {
@@ -1698,10 +2006,10 @@ onUnmounted(() => {
   max-width: 620px;
   margin-top: 24px;
   padding: 16px 18px;
-  border-radius: 12px;
-  background: rgba(239, 246, 255, 0.78);
-  border: 1px solid rgba(191, 219, 254, 0.96);
-  box-shadow: inset 3px 0 0 #2563eb;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.82);
+  border: 1px solid rgba(191, 219, 254, 0.76);
+  box-shadow: inset 3px 0 0 #2563eb, 0 12px 28px rgba(37, 99, 235, 0.06);
 }
 
 .intro-warning strong {
@@ -2108,43 +2416,43 @@ onUnmounted(() => {
 
 .result-stage {
   display: grid;
-  gap: 24px;
+  gap: 20px;
 }
 
 .result-hero-card {
-  min-height: 420px;
+  min-height: 430px;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 360px;
-  gap: 34px;
-  padding: 42px;
+  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
+  gap: 30px;
+  padding: clamp(34px, 4vw, 56px);
   align-items: center;
   overflow: hidden;
   position: relative;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.94), rgba(239, 246, 255, 0.82)),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.9) 54%, rgba(239, 246, 255, 0.82)),
+    linear-gradient(90deg, color-mix(in srgb, var(--verdict-color, #2563eb) 12%, transparent), transparent 42%),
     #ffffff;
 }
 
 .result-hero-card::after {
   content: "";
   position: absolute;
-  width: 360px;
-  height: 360px;
-  right: -100px;
-  top: -120px;
-  border-radius: 50%;
-  background: rgba(37, 99, 235, 0.08);
+  width: 520px;
+  height: 520px;
+  right: -180px;
+  top: -210px;
+  border-radius: 999px;
+  background: radial-gradient(circle, color-mix(in srgb, var(--verdict-color, #2563eb) 18%, transparent), transparent 68%);
+  pointer-events: none;
 }
 
 .result-hero-card::before {
   content: "";
   position: absolute;
-  width: 520px;
-  height: 520px;
-  right: 160px;
-  bottom: -420px;
-  border-radius: 50%;
-  border: 1px dashed rgba(37, 99, 235, 0.18);
+  inset: 18px;
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.68);
+  pointer-events: none;
 }
 
 .result-copy {
@@ -2152,21 +2460,50 @@ onUnmounted(() => {
   z-index: 1;
 }
 
+.result-meta-rail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 22px;
+}
+
+.result-meta-rail span {
+  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 11px;
+  border-radius: 999px;
+  background: rgba(248, 250, 252, 0.82);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+  color: #64748b;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.result-meta-rail span:first-child {
+  color: color-mix(in srgb, var(--verdict-color, #2563eb) 82%, #0f172a);
+  background: color-mix(in srgb, var(--verdict-color, #2563eb) 10%, #ffffff);
+  border-color: color-mix(in srgb, var(--verdict-color, #2563eb) 22%, #e2e8f0);
+}
+
 .result-copy h2 {
   max-width: 760px;
-  margin: 16px 0;
-  font-size: clamp(40px, 6vw, 82px);
-  line-height: 0.98;
+  margin: 0;
+  font-size: clamp(48px, 6.2vw, 92px);
+  line-height: 0.94;
   font-weight: 950;
   letter-spacing: 0;
+  color: #0f172a;
 }
 
 .result-copy p {
-  max-width: 680px;
-  margin: 0;
+  max-width: 700px;
+  margin: 22px 0 0;
   color: #64748b;
-  font-size: 18px;
+  font-size: 19px;
   line-height: 1.75;
+  font-weight: 760;
 }
 
 .result-chip-row {
@@ -2174,14 +2511,15 @@ onUnmounted(() => {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 12px;
   max-width: 760px;
-  margin-top: 24px;
+  margin-top: 30px;
 }
 
 .result-chip-row div {
-  padding: 14px;
+  padding: 16px;
   border-radius: 8px;
-  background: rgba(255, 255, 255, 0.78);
-  border: 1px solid rgba(219, 227, 239, 0.9);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(226, 232, 240, 0.88);
+  box-shadow: 0 14px 30px rgba(15, 23, 42, 0.05);
 }
 
 .result-chip-row span {
@@ -2195,71 +2533,96 @@ onUnmounted(() => {
   display: block;
   margin-top: 6px;
   color: #111827;
-  font-size: 18px;
+  font-size: 20px;
+  line-height: 1.2;
 }
 
 .soft-warning {
   display: inline-flex;
   max-width: 720px;
-  margin-top: 22px;
-  padding: 12px 14px;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  margin-top: 24px;
+  padding: 13px 15px;
+  border-radius: 8px;
+  background: rgba(248, 250, 252, 0.9);
+  border: 1px solid rgba(226, 232, 240, 0.9);
   color: #475569;
   font-size: 13px;
   font-weight: 800;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--verdict-color, #2563eb) 72%, #94a3b8);
 }
 
 .score-orb {
   position: relative;
   z-index: 1;
-  aspect-ratio: 1;
+  justify-self: stretch;
+  min-height: 360px;
   width: 100%;
-  max-width: 380px;
-  border-radius: 50%;
-  background: radial-gradient(circle at 38% 32%, rgba(255,255,255,0.98), #ffffff);
-  border: 1px solid #dbe3ef;
+  max-width: 390px;
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)),
+    #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.92);
   box-shadow: 
-    inset 0 0 0 18px rgba(37, 99, 235, 0.08),
-    0 30px 80px rgba(37, 99, 235, 0.22),
-    0 0 0 12px rgba(255,255,255,0.6);
+    0 30px 80px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
   display: grid;
   place-items: center;
   align-content: center;
   text-align: center;
-  padding: 20px;
+  padding: 30px;
+  overflow: hidden;
+}
+
+.score-orb::before {
+  content: "";
+  position: absolute;
+  inset: 26px;
+  border-radius: 999px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: radial-gradient(circle, color-mix(in srgb, var(--verdict-color, #2563eb) 24%, transparent), transparent 62%);
+}
+
+.score-orb::after {
+  content: "";
+  position: absolute;
+  left: 28px;
+  right: 28px;
+  bottom: 28px;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+}
+
+.score-ring-label {
+  position: relative;
+  z-index: 1;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.22em;
+  margin-bottom: 18px;
 }
 
 .badge-highlight {
-  display: inline-block;
-  color: #2563eb;
-  font-size: 42px;
-  font-weight: 900;
-  letter-spacing: 0.25em;
-  text-transform: uppercase;
-  background: linear-gradient(90deg, #2563eb, #3b82f6);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  margin-bottom: 8px;
-  text-shadow: 0 2px 8px rgba(37, 99, 235, 0.3);
   position: relative;
+  z-index: 1;
+  display: inline-block;
+  color: #ffffff;
+  font-size: 15px;
+  font-weight: 900;
+  letter-spacing: 0.12em;
+  padding: 8px 13px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--verdict-color, #2563eb) 72%, #0f172a);
+  box-shadow: 0 12px 28px color-mix(in srgb, var(--verdict-color, #2563eb) 28%, transparent);
 }
 
 .badge-highlight::after {
-  content: '';
-  position: absolute;
-  bottom: -6px;
-  left: 50%;
-  transform: translateX(-50%);
-  width: 48px;
-  height: 3px;
-  background: linear-gradient(90deg, transparent, #60a5fa, transparent);
-  border-radius: 999px;
+  display: none;
 }
 
 .score-orb span {
-  color: #2563eb;
+  color: #ffffff;
   font-size: 13px;
   font-weight: 950;
   letter-spacing: 0.18em;
@@ -2267,36 +2630,44 @@ onUnmounted(() => {
 
 /* 强化分数数字 */
 .score-orb strong {
-  font-size: 128px;
+  position: relative;
+  z-index: 1;
+  font-size: clamp(104px, 8vw, 148px);
   line-height: 0.85;
   font-weight: 950;
-  color: #0f172a;
-  margin: 8px 0 4px;
-  text-shadow: 0 4px 20px rgba(15, 23, 42, 0.15);
+  color: #f8fafc;
+  margin: 16px 0 12px;
+  text-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
 }
 
 .score-orb em {
+  position: relative;
+  z-index: 1;
   font-size: 17px;
   font-style: normal;
-  font-weight: 800;
-  color: #475569;
+  font-weight: 900;
+  color: #cbd5e1;
   letter-spacing: 0.02em;
 }
 
 .result-grid {
   display: grid;
-  grid-template-columns: minmax(0, 0.95fr) minmax(360px, 0.65fr);
-  gap: 24px;
+  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.72fr);
+  gap: 20px;
 }
 
 .dimension-card,
 .fun-card,
 .advice-card {
-  padding: 28px;
+  padding: 30px;
 }
 
 .chart-card {
   min-height: 500px;
+  padding: 30px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.88)),
+    #ffffff;
 }
 
 .compact-heading {
@@ -2306,7 +2677,7 @@ onUnmounted(() => {
 .dimension-list,
 .fun-list {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .dimension-item {
@@ -2314,10 +2685,10 @@ onUnmounted(() => {
   grid-template-columns: 1fr 110px 42px;
   align-items: center;
   gap: 12px;
-  padding: 14px;
+  padding: 14px 16px;
   border-radius: 8px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(248, 250, 252, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.9);
 }
 
 .dimension-item strong,
@@ -2362,9 +2733,11 @@ onUnmounted(() => {
 }
 
 .report-card {
-  padding: 28px;
-  background: #111827;
+  padding: 30px;
+  background:
+    linear-gradient(145deg, #0f172a, #111827 60%, #1e293b);
   color: #f8fafc;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.14);
 }
 
 .report-card .panel-kicker,
@@ -2379,7 +2752,7 @@ onUnmounted(() => {
   margin-top: 14px;
   padding: 12px 14px;
   border-radius: 8px 8px 0 0;
-  background: #1f2937;
+  background: rgba(31, 41, 55, 0.86);
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-bottom: 0;
 }
@@ -2412,9 +2785,9 @@ onUnmounted(() => {
 
 .report-card p {
   margin: 0;
-  padding: 20px;
+  padding: 22px;
   color: #e5e7eb;
-  background: #0f172a;
+  background: rgba(2, 6, 23, 0.42);
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 0 0 8px 8px;
   line-height: 1.9;
@@ -2425,7 +2798,7 @@ onUnmounted(() => {
   display: grid;
   align-content: start;
   background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(248, 250, 252, 0.86)),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.95), rgba(248, 250, 252, 0.88)),
     #ffffff;
 }
 
@@ -2437,10 +2810,10 @@ onUnmounted(() => {
 }
 
 .fun-list div {
-  padding: 18px;
+  padding: 18px 20px;
   border-radius: 8px;
-  background: #f8fafc;
-  border: 1px solid #e2e8f0;
+  background: rgba(248, 250, 252, 0.84);
+  border: 1px solid rgba(226, 232, 240, 0.88);
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -2471,7 +2844,7 @@ onUnmounted(() => {
 .advice-card {
   grid-column: 1 / -1;
   background:
-    linear-gradient(135deg, rgba(239, 246, 255, 0.9), rgba(255, 255, 255, 0.9)),
+    linear-gradient(135deg, rgba(239, 246, 255, 0.84), rgba(255, 255, 255, 0.94)),
     #ffffff;
 }
 
@@ -2494,10 +2867,284 @@ onUnmounted(() => {
 
 .result-actions {
   display: grid;
-  grid-template-columns: 1.5fr 1fr 1fr; /* [新增] 突出保存海报按钮 */
+  grid-template-columns: 1.5fr 1fr 1fr;
+  grid-template-rows: auto auto;
   gap: 12px;
   margin-top: 32px;
 }
+
+.result-actions .submit-button.gold-action {
+  grid-column: 1;
+  grid-row: 1 / 3;
+  align-self: stretch;
+}
+
+.result-actions .share-action-wrap {
+  grid-column: 2;
+  grid-row: 1;
+}
+
+.result-actions .donate-button {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.result-actions > .secondary-button:last-of-type {
+  grid-column: 2 / 4;
+  grid-row: 2;
+}
+
+/* ── 分享下拉菜单 ── */
+.share-action-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.secondary-button {
+  min-height: 56px;
+  border-radius: 8px;
+  border: 1px solid #dbe3ef;
+  background: rgba(255, 255, 255, 0.86);
+  color: #111827;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.share-action-wrap {
+  position: relative;
+  min-width: 0;
+}
+
+.share-trigger,
+.share-menu button,
+.wechat-copy-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: 100%;
+}
+
+.share-trigger svg,
+.share-menu svg,
+.wechat-copy-link svg {
+  flex: 0 0 auto;
+}
+
+.share-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: calc(100% + 10px);
+  z-index: 20;
+  display: grid;
+  gap: 6px;
+  padding: 8px;
+  border-radius: 12px;
+  border: 1px solid rgba(219, 227, 239, 0.95);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
+}
+
+.share-menu button {
+  min-height: 46px;
+  padding: 0 12px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #111827;
+  cursor: pointer;
+  font-weight: 900;
+}
+
+.share-menu button:hover {
+  background: #f1f5f9;
+}
+
+
+/* ── 弹窗遮罩 ── */
+.wechat-share-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.42);
+  backdrop-filter: blur(8px);
+}
+
+.wechat-share-dialog {
+  position: relative;
+  width: min(360px, 100%);
+  padding: 28px;
+  border-radius: 18px;
+  border: 1px solid rgba(219, 227, 239, 0.98);
+  background: #ffffff;
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+  text-align: center;
+}
+
+.wechat-share-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.wechat-share-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 18px;
+  background: #dcfce7;
+  color: #16a34a;
+}
+
+.wechat-share-dialog h3 {
+  margin: 16px 0 8px;
+  color: #111827;
+  font-size: 22px;
+}
+
+.wechat-share-copy {
+  margin: 0 0 12px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #111827;
+  font-size: 14px;
+  font-weight: 900;
+}
+
+.wechat-share-dialog p {
+  margin: 0;
+  color: #64748b;
+  font-size: 14px;
+  line-height: 1.65;
+  font-weight: 700;
+}
+
+.wechat-qr-box {
+  display: grid;
+  place-items: center;
+  width: 212px;
+  height: 212px;
+  margin: 20px auto;
+  border-radius: 16px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+
+.wechat-copy-link {
+  min-height: 48px;
+}
+
+.location-permission-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 90;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgba(15, 23, 42, 0.46);
+  backdrop-filter: blur(10px);
+}
+
+.location-permission-dialog {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 28px;
+  border-radius: 8px;
+  border: 1px solid rgba(226, 232, 240, 0.96);
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 28px 80px rgba(15, 23, 42, 0.22);
+}
+
+.location-permission-close {
+  position: absolute;
+  top: 14px;
+  right: 14px;
+  display: inline-grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px;
+  background: #ffffff;
+  color: #475569;
+  cursor: pointer;
+}
+
+.location-permission-icon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 18px;
+  border-radius: 8px;
+  background: #eff6ff;
+  color: #2563eb;
+}
+
+.location-permission-dialog h3 {
+  margin: 10px 0 10px;
+  color: #111827;
+  font-size: 24px;
+  line-height: 1.2;
+}
+
+.location-permission-dialog p {
+  margin: 0;
+  color: #64748b;
+  font-size: 15px;
+  line-height: 1.7;
+  font-weight: 700;
+}
+
+.location-permission-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 18px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #f8fafc;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 800;
+}
+
+.location-permission-note svg {
+  flex: 0 0 auto;
+  margin-top: 2px;
+  color: #059669;
+}
+
+.location-permission-actions {
+  display: grid;
+  grid-template-columns: 1fr 1.25fr;
+  gap: 12px;
+  margin-top: 22px;
+}
+
+.location-permission-actions .submit-button,
+.location-permission-actions .secondary-button {
+  min-height: 50px;
+  margin-top: 0;
+}
+
 
 .gold-theme {
   background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;
@@ -2892,118 +3539,692 @@ onUnmounted(() => {
   background: rgba(255, 255, 255, 0.86);
 }
 
-/* 单按钮专属样式 */
-.single-action-btn {
-  max-width: 380px;
-  width: 100%;
-}
-
-.secondary-button {
-  min-height: 56px;
-  border-radius: 8px;
-  border: 1px solid #dbe3ef;
-  background: rgba(255, 255, 255, 0.86);
-  color: #111827;
-  cursor: pointer;
-  font-weight: 900;
-}
-
-.share-action-wrap {
+/* [新增] 模式选择卡片样式 - Apple 设计风格 */
+.mode-selection {
   position: relative;
-  min-width: 0;
+  z-index: 1;
+  margin-top: 40px;
 }
 
-.share-trigger,
-.share-menu button,
-.wechat-copy-link {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  width: 100%;
-}
-
-.share-trigger svg,
-.share-menu svg,
-.wechat-copy-link svg {
-  flex: 0 0 auto;
-}
-
-.share-menu {
-  position: absolute;
-  left: 0;
-  right: 0;
-  bottom: calc(100% + 10px);
-  z-index: 20;
-  display: grid;
-  gap: 6px;
-  padding: 8px;
-  border-radius: 12px;
-  border: 1px solid rgba(219, 227, 239, 0.95);
-  background: rgba(255, 255, 255, 0.98);
-  box-shadow: 0 18px 48px rgba(15, 23, 42, 0.16);
-}
-
-.share-menu button {
-  min-height: 46px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: #111827;
-  cursor: pointer;
-  font-weight: 900;
-}
-
-.share-menu button:hover {
-  background: #f1f5f9;
-}
-
-.wechat-share-layer {
-  position: fixed;
-  inset: 0;
-  z-index: 80;
-  display: grid;
-  place-items: center;
-  padding: 20px;
-  background: rgba(15, 23, 42, 0.42);
-  backdrop-filter: blur(8px);
-}
-
-.wechat-share-dialog {
-  position: relative;
-  width: min(360px, 100%);
-  padding: 28px;
-  border-radius: 18px;
-  border: 1px solid rgba(219, 227, 239, 0.98);
-  background: #ffffff;
-  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.22);
+.mode-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1f2937;
+  margin-bottom: 24px;
   text-align: center;
 }
 
-.wechat-share-close {
-  position: absolute;
-  top: 14px;
-  right: 14px;
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid #e2e8f0;
-  border-radius: 999px;
-  background: #ffffff;
-  color: #475569;
-  cursor: pointer;
+.mode-cards {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 16px;
+  max-width: 760px;
+  margin: 0 auto;
 }
 
-.wechat-share-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 18px;
-  background: #dcfce7;
-  color: #16a34a;
+.mode-card {
+  position: relative;
+  display: grid;
+  grid-template-rows: auto auto 1fr auto;
+  min-height: 292px;
+  padding: 24px;
+  background: rgba(255, 255, 255, 0.94);
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.06);
+  overflow: visible;
+}
+
+.mode-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(180deg, rgba(37, 99, 235, 0.06), rgba(255, 255, 255, 0));
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+
+.mode-card > * {
+  position: relative;
+  z-index: 1;
+}
+
+.mode-card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.1);
+  border-color: rgba(37, 99, 235, 0.36);
+}
+
+.mode-card:hover::before {
+  opacity: 1;
+}
+
+.mode-card.recommended {
+  border-color: rgba(16, 185, 129, 0.42);
+  background:
+    linear-gradient(180deg, rgba(236, 253, 245, 0.88), rgba(255, 255, 255, 0.96));
+}
+
+.mode-card.recommended:hover {
+  border-color: rgba(16, 185, 129, 0.64);
+  box-shadow: 0 18px 42px rgba(16, 185, 129, 0.14);
+}
+
+.mode-badge {
+  position: absolute;
+  top: -12px;
+  right: 18px;
+  padding: 5px 12px;
+  background: #059669;
+  color: white;
+  font-size: 12px;
+  font-weight: 800;
+  border-radius: 999px;
+  box-shadow: 0 4px 12px rgba(16, 185, 129, 0.3);
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.mode-icon {
+  width: 48px;
+  height: 48px;
+  margin: 0 0 18px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #f0f9ff, #e0f2fe);
+  border-radius: 8px;
+  color: #2563eb;
+  transition: all 0.3s ease;
+}
+
+.mode-card.recommended .mode-icon {
+  background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+  color: #10b981;
+}
+
+.mode-card:hover .mode-icon {
+  transform: translateY(-1px);
+}
+
+.mode-name {
+  font-size: 20px;
+  font-weight: 800;
+  color: #1f2937;
+  margin: 0 0 12px;
+  text-align: left;
+  letter-spacing: 0;
+}
+
+.mode-features {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 22px;
+  color: #6b7280;
+  font-size: 14px;
+  line-height: 1.65;
+}
+
+.mode-features li {
+  padding: 3px 0;
+}
+
+.mode-button {
+  width: 100%;
+  min-height: 48px;
+  padding: 0 16px;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  z-index: 1;
+}
+
+.mode-button.primary {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  box-shadow: 0 4px 16px rgba(37, 99, 235, 0.3);
+}
+
+.mode-button.primary:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 8px 24px rgba(37, 99, 235, 0.4);
+}
+
+.mode-button.secondary {
+  background: linear-gradient(135deg, #f3f4f6, #e5e7eb);
+  color: #374151;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.mode-button.secondary:hover {
+  background: linear-gradient(135deg, #e5e7eb, #d1d5db);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+/* [新增] 聊天界面样式 - Apple 设计风格 */
+.chat-stage {
+  width: 100%;
+  max-width: 1440px;
+  margin: 0 auto;
+  display: grid;
+  grid-template-columns: minmax(150px, 0.82fr) minmax(720px, 900px) minmax(150px, 0.82fr);
+  gap: clamp(18px, 3vw, 42px);
+  align-items: center;
+}
+
+.chat-container {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.96));
+  border-radius: 8px;
+  box-shadow:
+    0 28px 80px rgba(15, 23, 42, 0.14),
+    0 2px 10px rgba(15, 23, 42, 0.04),
+    inset 0 1px 0 rgba(255, 255, 255, 0.92);
+  overflow: hidden;
+  backdrop-filter: blur(20px);
+  border: 1px solid rgba(203, 213, 225, 0.86);
+  min-height: min(760px, calc(100vh - 56px));
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  z-index: 2;
+}
+
+.chat-container::before {
+  content: '';
+  position: absolute;
+  inset: 0 0 auto;
+  height: 4px;
+  background: linear-gradient(90deg, #2563eb, #10b981, #f59e0b);
+  opacity: 0.92;
+  z-index: 12;
+}
+
+.chat-header {
+  padding: 28px 32px 24px 92px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.84));
+  border-bottom: 1px solid rgba(226, 232, 240, 0.78);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+
+.chat-back-btn {
+  position: absolute;
+  left: 24px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 40px;
+  height: 40px;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  background: rgba(255, 255, 255, 0.92);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6b7280;
+  transition: all 0.2s ease;
+  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.08);
+}
+
+.chat-back-btn:hover {
+  background: white;
+  color: #2563eb;
+  transform: translateY(-50%) scale(1.05);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+}
+
+.chat-progress-info {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 14px;
+  gap: 16px;
+}
+
+.chat-stage-name {
+  font-size: 20px;
+  font-weight: 850;
+  color: #1f2937;
+  letter-spacing: 0;
+}
+
+.chat-step-indicator {
+  font-size: 14px;
+  font-weight: 800;
+  color: #334155;
+  background: rgba(241, 245, 249, 0.92);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 7px 14px;
+  border-radius: 8px;
+  white-space: nowrap;
+}
+
+.chat-progress-bar {
+  height: 8px;
+  background: rgba(226, 232, 240, 0.78);
+  border-radius: 999px;
+  overflow: hidden;
+  box-shadow: inset 0 1px 2px rgba(15, 23, 42, 0.08);
+}
+
+.chat-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2563eb, #3b82f6);
+  border-radius: 999px;
+  transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 0 18px rgba(37, 99, 235, 0.28);
+}
+
+.chat-messages {
+  flex: 1;
+  padding: 34px 36px;
+  overflow-y: auto;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+  max-height: calc(100vh - 210px);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(248, 250, 252, 0.78)),
+    linear-gradient(90deg, rgba(226, 232, 240, 0.36) 1px, transparent 1px),
+    linear-gradient(180deg, rgba(226, 232, 240, 0.28) 1px, transparent 1px);
+  background-size: auto, 44px 44px, 44px 44px;
+}
+
+.chat-message {
+  display: flex;
+  gap: 14px;
+  margin-bottom: 26px;
+  animation: messageSlideIn 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@keyframes messageSlideIn {
+  from {
+    opacity: 0;
+    transform: translateY(12px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.chat-message.user {
+  flex-direction: row-reverse;
+}
+
+.chat-avatar {
+  flex-shrink: 0;
+}
+
+.avatar-robot,
+.avatar-user {
+  width: 46px;
+  height: 46px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 24px;
+  border: 1px solid rgba(255, 255, 255, 0.72);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.1);
+}
+
+.avatar-robot {
+  background: linear-gradient(135deg, #dbeafe, #bfdbfe 52%, #ecfdf5);
+}
+
+.avatar-user {
+  background: linear-gradient(135deg, #d1fae5, #a7f3d0 54%, #dbeafe);
+}
+
+.chat-bubble {
+  max-width: min(72%, 680px);
+  padding: 20px 22px;
+  background: rgba(255, 255, 255, 0.96);
+  border-radius: 8px;
+  box-shadow: 0 18px 42px rgba(15, 23, 42, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(203, 213, 225, 0.72);
+  position: relative;
+}
+
+.chat-message.bot.is-active-question .chat-bubble {
+  border-color: rgba(37, 99, 235, 0.26);
+  box-shadow:
+    0 22px 50px rgba(37, 99, 235, 0.11),
+    0 8px 24px rgba(15, 23, 42, 0.06),
+    inset 3px 0 0 rgba(37, 99, 235, 0.78);
+}
+
+.chat-message.user .chat-bubble {
+  background: linear-gradient(135deg, #2563eb, #1d4ed8 62%, #1e40af);
+  color: white;
+  border: none;
+  box-shadow: 0 18px 42px rgba(37, 99, 235, 0.22);
+}
+
+.bubble-content {
+  font-size: 16px;
+  line-height: 1.82;
+  color: #334155;
+  white-space: pre-line;
+  font-weight: 760;
+}
+
+.chat-message.user .bubble-content {
+  color: white;
+}
+
+.bubble-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.option-btn {
+  min-height: 44px;
+  padding: 0 18px;
+  background: rgba(239, 246, 255, 0.86);
+  border: 1px solid rgba(147, 197, 253, 0.7);
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 850;
+  color: #1d4ed8;
+  cursor: pointer;
+  transition: transform 0.18s ease, box-shadow 0.18s ease, background 0.18s ease, border-color 0.18s ease;
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.08);
+}
+
+.option-btn:hover {
+  background: #ffffff;
+  border-color: rgba(37, 99, 235, 0.48);
+  transform: translateY(-2px);
+  box-shadow: 0 14px 30px rgba(37, 99, 235, 0.16);
+}
+
+.bubble-control {
+  margin-top: 20px;
+  padding: 18px;
+  background: rgba(248, 250, 252, 0.86);
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  border-radius: 8px;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.slider-display {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.slider-value {
+  font-size: 36px;
+  font-weight: 900;
+  color: #2563eb;
+  line-height: 1;
+}
+
+.slider-unit {
+  font-size: 14px;
+  color: #6b7280;
+}
+
+.slider-input {
+  width: 100%;
+  height: 8px;
+  -webkit-appearance: none;
+  appearance: none;
+  background: linear-gradient(90deg, #bfdbfe, #dbeafe 48%, #e5e7eb);
+  border-radius: 999px;
+  outline: none;
+  margin-bottom: 18px;
+}
+
+.slider-input::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 24px;
+  height: 24px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  border-radius: 50%;
+  cursor: pointer;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.3);
+  transition: all 0.2s ease;
+}
+
+.slider-input::-webkit-slider-thumb:hover {
+  transform: scale(1.15);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.4);
+}
+
+.slider-confirm {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8 58%, #1e40af);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  font-size: 15px;
+  font-weight: 850;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  transition: all 0.2s ease;
+  box-shadow: 0 12px 28px rgba(37, 99, 235, 0.22);
+}
+
+.slider-confirm:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(37, 99, 235, 0.35);
+}
+
+.bubble-input {
+  margin-top: 20px;
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(203, 213, 225, 0.78);
+  background: rgba(248, 250, 252, 0.88);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.82);
+}
+
+.text-input {
+  flex: 1;
+  min-width: 0;
+  padding: 13px 16px;
+  background: white;
+  border: 1.5px solid rgba(226, 232, 240, 0.8);
+  border-radius: 8px;
+  font-size: 15px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+
+.text-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.input-confirm {
+  min-width: 48px;
+  padding: 0 16px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.25);
+}
+
+.input-confirm:hover {
+  transform: scale(1.05);
+  box-shadow: 0 6px 16px rgba(37, 99, 235, 0.35);
+}
+
+.typing-dots {
+  display: flex;
+  gap: 6px;
+}
+
+.typing-dots span {
+  width: 8px;
+  height: 8px;
+  background: linear-gradient(135deg, #9ca3af, #6b7280);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out;
+}
+
+.typing-dots span:nth-child(1) {
+  animation-delay: 0s;
+}
+
+.typing-dots span:nth-child(2) {
+  animation-delay: 0.2s;
+}
+
+.typing-dots span:nth-child(3) {
+  animation-delay: 0.4s;
+}
+
+@keyframes typingBounce {
+  0%, 60%, 100% {
+    transform: translateY(0);
+    opacity: 0.5;
+  }
+  30% {
+    transform: translateY(-8px);
+    opacity: 1;
+  }
+}
+
+.chat-ambient {
+  position: relative;
+  min-height: min(680px, calc(100vh - 96px));
+  padding: 28px;
+  border: 1px solid rgba(226, 232, 240, 0.72);
+  border-radius: 8px;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.72), rgba(255, 255, 255, 0.32)),
+    repeating-linear-gradient(90deg, rgba(148, 163, 184, 0.12) 0 1px, transparent 1px 42px);
+  box-shadow: 0 24px 70px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.chat-ambient::before,
+.chat-ambient::after {
+  content: '';
+  position: absolute;
+  border-radius: 999px;
+  filter: blur(1px);
+  opacity: 0.76;
+  animation: ambientFloat 8s ease-in-out infinite alternate;
+}
+
+.chat-ambient::before {
+  width: 170px;
+  height: 170px;
+  left: -70px;
+  top: 18%;
+  background: rgba(37, 99, 235, 0.12);
+}
+
+.chat-ambient::after {
+  width: 210px;
+  height: 210px;
+  right: -94px;
+  bottom: 12%;
+  background: rgba(16, 185, 129, 0.14);
+  animation-delay: -2s;
+}
+
+.chat-ambient span,
+.chat-ambient strong {
+  position: relative;
+  z-index: 1;
+  display: block;
+}
+
+.chat-ambient span {
+  color: #2563eb;
+  font-size: clamp(42px, 5vw, 72px);
+  line-height: 1;
+  font-weight: 950;
+}
+
+.chat-ambient strong {
+  margin-top: 12px;
+  color: #475569;
+  font-size: 12px;
+  letter-spacing: 0.18em;
+}
+
+.chat-ambient i {
+  position: relative;
+  z-index: 1;
+  display: block;
+  height: 8px;
+  margin-top: 22px;
+  border-radius: 999px;
+  background: linear-gradient(90deg, rgba(37, 99, 235, 0.55), rgba(16, 185, 129, 0.18));
+  animation: ambientPulse 2.8s ease-in-out infinite;
+}
+
+.chat-ambient i:nth-of-type(2) {
+  width: 72%;
+  animation-delay: -0.8s;
+}
+
+.chat-ambient i:nth-of-type(3) {
+  width: 48%;
+  animation-delay: -1.6s;
+}
+
+.chat-ambient-right {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.28)),
+    repeating-linear-gradient(0deg, rgba(148, 163, 184, 0.12) 0 1px, transparent 1px 44px);
+}
+
+@keyframes ambientFloat {
+  to {
+    transform: translate3d(18px, -22px, 0) scale(1.05);
+  }
+}
+
+@keyframes ambientPulse {
+  0%, 100% {
+    opacity: 0.38;
+    transform: scaleX(0.72);
+    transform-origin: left center;
+  }
+  50% {
+    opacity: 0.9;
+    transform: scaleX(1);
+  }
 }
 
 .wechat-share-dialog h3 {
@@ -3079,6 +4300,10 @@ onUnmounted(() => {
     padding: 14px;
   }
 
+  .assessment-root.is-chat-root {
+    padding: 14px;
+  }
+
   .assessment-nav,
   .intro-stage,
   .intro-points,
@@ -3123,6 +4348,41 @@ onUnmounted(() => {
   .shared-primary-action,
   .shared-secondary-action {
     width: 100%;
+  }
+  
+  /* [新增] 聊天界面响应式 */
+  .mode-cards {
+    grid-template-columns: 1fr;
+  }
+
+  .mode-card {
+    min-height: auto;
+    padding: 22px;
+  }
+  
+  .chat-container {
+    max-height: calc(100vh - 120px);
+    border-radius: 8px;
+  }
+
+  .chat-stage {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-ambient {
+    display: none;
+  }
+
+  .chat-header {
+    padding: 18px 18px 18px 68px;
+  }
+  
+  .chat-messages {
+    padding: 18px;
+  }
+  
+  .chat-bubble {
+    max-width: 85%;
   }
 }
 
@@ -3189,8 +4449,23 @@ onUnmounted(() => {
   }
 
   .share-menu {
-    position: absolute;
-    margin-top: 0;
+    left: 0;
+    right: 0;
+    bottom: calc(100% + 8px);
+  }
+
+  .result-actions {
+    grid-template-columns: 1fr;
+    grid-template-rows: auto;
+  }
+
+  .result-actions .submit-button.gold-action,
+  .result-actions .share-action-wrap,
+  .result-actions .donate-button,
+  .result-actions > .secondary-button:last-of-type {
+    grid-column: 1;
+    grid-row: auto;
+    align-self: auto;
   }
 
   .wechat-share-dialog {
