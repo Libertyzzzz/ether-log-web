@@ -18,6 +18,7 @@ defineEmits<{
 
 <template>
   <section class="dashboard-page">
+    <div class="dashboard-inner">
     <div class="stats-grid">
       <div class="stat-card">
         <span>文章总数</span>
@@ -82,6 +83,20 @@ defineEmits<{
           </div>
         </div>
       </div>
-    </div>
+    </div><!-- /dashboard-table -->
+    </div><!-- /dashboard-inner -->
   </section>
 </template>
+
+<style scoped>
+.dashboard-page {
+  padding-top: 5rem;
+  background: #f5f5f7;
+  min-height: 100vh;
+}
+.dashboard-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 5rem;
+}
+</style>

@@ -20,6 +20,7 @@ defineEmits<{
 
 <template>
   <section class="profile-page">
+    <div class="profile-inner">
     <div class="profile-grid">
       <div class="profile-card profile-summary">
         <div class="profile-card-header">
@@ -84,6 +85,20 @@ defineEmits<{
           </div>
         </div>
       </div>
-    </div>
+    </div><!-- /profile-grid -->
+    </div><!-- /profile-inner -->
   </section>
 </template>
+
+<style scoped>
+.profile-page {
+  padding-top: 5rem;
+  background: #f5f5f7;
+  min-height: 100vh;
+}
+.profile-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 2rem 1.5rem 5rem;
+}
+</style>

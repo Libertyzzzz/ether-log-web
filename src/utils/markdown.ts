@@ -16,6 +16,51 @@ function renderInlineMarkdown(value: string) {
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
 }
 
+function renderCodeBlock(code: string, language = '') {
+  const langLabel = language.trim() || 'code'
+  return `<figure class="code-block"><figcaption><span>${langLabel}</span></figcaption><pre><code class="language-${langLabel}">${code.replace(/\n$/, '')}</code></pre></figure>`
+}
+
+function renderBlock(block: string) {
+  if (/^###\s+/.test(block)) {
+    return `<h3>${renderInlineMarkdown(block.replace(/^###\s+/, ''))}</h3>`
+  }
+
+  if (/^##\s+/.test(block)) {
+    return `<h2>${renderInlineMarkdown(block.replace(/^##\s+/, ''))}</h2>`
+  }
+
+  if (/^#\s+/.test(block)) {
+    return `<h1>${renderInlineMarkdown(block.replace(/^#\s+/, ''))}</h1>`
+  }
+
+  if (/^&gt;\s+/m.test(block)) {
+    return `<blockquote>${renderInlineMarkdown(block.replace(/^&gt;\s+/gm, '').replace(/\n/g, '<br />'))}</blockquote>`
+  }
+
+  if (/^[-*]\s+/m.test(block)) {
+    const items = block
+      .split('\n')
+      .filter(line => /^[-*]\s+/.test(line))
+      .map(line => `<li>${renderInlineMarkdown(line.replace(/^[-*]\s+/, ''))}</li>`)
+      .join('')
+
+    return `<ul>${items}</ul>`
+  }
+
+  if (/^\d+\.\s+/m.test(block)) {
+    const items = block
+      .split('\n')
+      .filter(line => /^\d+\.\s+/.test(line))
+      .map(line => `<li>${renderInlineMarkdown(line.replace(/^\d+\.\s+/, ''))}</li>`)
+      .join('')
+
+    return `<ol>${items}</ol>`
+  }
+
+  return `<p>${renderInlineMarkdown(block).replace(/\n/g, '<br />')}</p>`
+}
+
 export function renderMarkdown(markdown: string) {
   const escaped = escapeHtml(markdown.trim())
 
@@ -23,41 +68,28 @@ export function renderMarkdown(markdown: string) {
     return '<p class="markdown-empty">开始输入 Markdown 内容后，这里会显示预览。</p>'
   }
 
-  return escaped
-    .replace(/```([\s\S]*?)```/g, (_, code) => `<pre><code>${code.trim()}</code></pre>`)
-    .split(/\n{2,}/)
-    .map(block => {
-      if (/^###\s+/.test(block)) {
-        return `<h3>${renderInlineMarkdown(block.replace(/^###\s+/, ''))}</h3>`
-      }
+  const chunks: string[] = []
+  const codeBlocks: string[] = []
+  let source = escaped
 
-      if (/^##\s+/.test(block)) {
-        return `<h2>${renderInlineMarkdown(block.replace(/^##\s+/, ''))}</h2>`
-      }
+  source = source.replace(/```([a-zA-Z0-9_-]*)\n?([\s\S]*?)```/g, (_, language, code) => {
+    const token = `@@CODE_BLOCK_${codeBlocks.length}@@`
+    codeBlocks.push(renderCodeBlock(code, language))
+    return token
+  })
 
-      if (/^#\s+/.test(block)) {
-        return `<h1>${renderInlineMarkdown(block.replace(/^#\s+/, ''))}</h1>`
-      }
+  source.split(/\n{2,}/).forEach(block => {
+    const trimmed = block.trim()
+    if (!trimmed) return
 
-      if (/^&gt;\s+/m.test(block)) {
-        return `<blockquote>${renderInlineMarkdown(block.replace(/^&gt;\s+/gm, '').replace(/\n/g, '<br />'))}</blockquote>`
-      }
+    const codeMatch = trimmed.match(/^@@CODE_BLOCK_(\d+)@@$/)
+    if (codeMatch) {
+      chunks.push(codeBlocks[Number(codeMatch[1])] || '')
+      return
+    }
 
-      if (block.startsWith('<pre><code>')) {
-        return block
-      }
+    chunks.push(renderBlock(trimmed))
+  })
 
-      if (/^[-*]\s+/m.test(block)) {
-        const items = block
-          .split('\n')
-          .filter(line => /^[-*]\s+/.test(line))
-          .map(line => `<li>${renderInlineMarkdown(line.replace(/^[-*]\s+/, ''))}</li>`)
-          .join('')
-
-        return `<ul>${items}</ul>`
-      }
-
-      return `<p>${renderInlineMarkdown(block).replace(/\n/g, '<br />')}</p>`
-    })
-    .join('')
+  return chunks.join('')
 }
