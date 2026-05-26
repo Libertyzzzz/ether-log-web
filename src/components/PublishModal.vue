@@ -1,9 +1,10 @@
 <script setup lang="ts">
-import { Bold, Code2, Eye, Heading, Image, Italic, List, Quote } from 'lucide-vue-next'
+import { ref, computed } from 'vue'
+import { Bold, Code2, Eye, Heading, Image, Italic, List, Quote, X, PenLine, Settings2, EyeOff } from 'lucide-vue-next'
 import type { ComponentPublicInstance } from 'vue'
 import type { ArticlePublishRequest, Category } from '../types/blog'
 
-defineProps<{
+const props = defineProps<{
   publishForm: ArticlePublishRequest
   categories: Category[]
   publishError: string
@@ -32,97 +33,499 @@ function setContentTextarea(element: Element | ComponentPublicInstance | null) {
 function setImageInput(element: Element | ComponentPublicInstance | null) {
   emit('imageInputReady', element instanceof HTMLInputElement ? element : null)
 }
+
+const sidebarCollapsed = ref(false)
+
+const wordCount = computed(() => {
+  const text = props.publishForm.content || ''
+  return text.replace(/\s+/g, '').length
+})
 </script>
 
 <template>
-  <div class="modal-overlay" @click.self="$emit('close')">
-    <div class="modal-card publish-modal">
-      <button class="modal-close" type="button" @click="$emit('close')">×</button>
-      <div class="login-intro publish-header">
-        <span class="section-label">发布</span>
-        <h2>{{ isEditMode ? '编辑文章' : '新建文章' }}</h2>
-        <p>
-          {{ isEditMode ? '保存后会更新当前文章内容。' : '发布后状态为公开，会出现在首页文章列表中。' }}
-        </p>
+  <!-- 和文章详情页一样：普通文档流，padding-top 避开 navbar -->
+  <div class="publish-layout">
+
+    <!-- 面包屑导航行（和文章详情页风格一致） -->
+    <div class="publish-breadcrumb-row">
+      <div class="publish-breadcrumb">
+        <button class="breadcrumb-back" type="button" @click="$emit('close')">
+          <X :size="13" />
+          <span>关闭</span>
+        </button>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-site">ETHERLOG</span>
+        <span class="breadcrumb-sep">/</span>
+        <span class="breadcrumb-action">
+          <PenLine :size="12" />
+          {{ isEditMode ? '编辑文章' : '新建文章' }}
+        </span>
+        <div class="breadcrumb-spacer"></div>
+        <!-- Markdown 工具栏 -->
+        <div class="breadcrumb-toolbar">
+          <button type="button" title="标题" @click="$emit('insertMarkdown', '## ', '', '标题')"><Heading :size="14" /></button>
+          <button type="button" title="加粗" @click="$emit('insertMarkdown', '**', '**', '加粗文本')"><Bold :size="14" /></button>
+          <button type="button" title="斜体" @click="$emit('insertMarkdown', '*', '*', '斜体文本')"><Italic :size="14" /></button>
+          <button type="button" title="引用" @click="$emit('insertMarkdown', '> ', '', '引用内容')"><Quote :size="14" /></button>
+          <button type="button" title="列表" @click="$emit('insertMarkdown', '- ', '', '列表项')"><List :size="14" /></button>
+          <button
+            class="toolbar-code-btn"
+            type="button"
+            title="代码块"
+            @click="$emit('insertMarkdown', '```ts\n', '\n```', 'const value = await nextify.run()')"
+          >
+            <Code2 :size="14" /><span>Code</span>
+          </button>
+          <button type="button" title="插入图片" :disabled="isUploadingImage" @click="$emit('triggerImageUpload')">
+            <Image :size="14" />
+          </button>
+          <input :ref="setImageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden @change="$emit('uploadMarkdownImage', $event)" />
+          <div class="toolbar-divider"></div>
+          <button
+            class="toolbar-preview-btn"
+            :class="{ active: isPreviewingMarkdown }"
+            type="button"
+            @click="$emit('update:isPreviewingMarkdown', !isPreviewingMarkdown)"
+          >
+            <Eye v-if="!isPreviewingMarkdown" :size="14" />
+            <EyeOff v-else :size="14" />
+            <span>{{ isPreviewingMarkdown ? '编辑' : '预览' }}</span>
+          </button>
+        </div>
+        <div class="breadcrumb-actions">
+          <span class="word-count">{{ wordCount }} 字</span>
+          <button class="btn-cancel" type="button" @click="$emit('close')">取消</button>
+          <button class="btn-publish" type="button" :disabled="isPublishing" @click="$emit('publish')">
+            {{ isPublishing
+              ? (isEditMode ? '保存中...' : '发布中...')
+              : (isEditMode ? '保存文章' : '发布文章') }}
+          </button>
+        </div>
       </div>
+    </div>
 
-      <form class="login-form publish-form" @submit.prevent="$emit('publish')">
-        <div class="publish-body">
-          <div class="publish-grid">
-            <label class="login-field">
-              <span>{{ isEditMode ? '标题（编辑）' : '标题' }}</span>
-              <input class="form-input" v-model="publishForm.title" placeholder="文章标题" />
-            </label>
+    <!-- 主体：和文章详情页完全相同的双栏结构 -->
+    <div class="publish-layout-inner">
 
-            <label class="login-field">
-              <span>副标题</span>
-              <input class="form-input" v-model="publishForm.subtitle" placeholder="可选" />
-            </label>
-          </div>
+      <!-- 左侧设置面板（对应文章详情的 sidebar） -->
+      <aside class="publish-sidebar" :class="{ collapsed: sidebarCollapsed }">
+        <button
+          class="sidebar-collapse-btn"
+          type="button"
+          :title="sidebarCollapsed ? '展开设置' : '收起设置'"
+          @click="sidebarCollapsed = !sidebarCollapsed"
+        >
+          <Settings2 :size="13" />
+          <span>{{ sidebarCollapsed ? '设置' : '收起' }}</span>
+        </button>
 
-          <label class="login-field">
+        <template v-if="!sidebarCollapsed">
+          <p class="sidebar-section-label">基本信息</p>
+
+          <label class="sidebar-field">
+            <span>{{ isEditMode ? '标题（编辑）' : '标题' }}</span>
+            <input class="sidebar-input" v-model="publishForm.title" placeholder="文章标题" />
+          </label>
+
+          <label class="sidebar-field">
+            <span>副标题</span>
+            <input class="sidebar-input" v-model="publishForm.subtitle" placeholder="可选" />
+          </label>
+
+          <label class="sidebar-field">
             <span>摘要</span>
-            <textarea class="form-input form-textarea summary-textarea" v-model="publishForm.summary" placeholder="首页卡片摘要"></textarea>
+            <textarea class="sidebar-input sidebar-textarea" v-model="publishForm.summary" placeholder="首页卡片摘要"></textarea>
           </label>
 
-          <div class="publish-meta-row">
-            <label class="login-field">
-              <span>分类</span>
-              <select class="form-input" v-model.number="publishForm.categoryId">
-                <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
-              </select>
-            </label>
+          <div class="sidebar-divider"></div>
+          <p class="sidebar-section-label">发布设置</p>
 
-            <label class="checkbox-field">
-              <input type="checkbox" v-model="publishForm.isTop" :true-value="1" :false-value="0" />
-              <span>置顶文章</span>
-            </label>
-          </div>
-
-          <label class="login-field">
-            <span>正文</span>
-            <div class="markdown-editor">
-              <div class="markdown-toolbar">
-                <div class="markdown-tool-group">
-                  <button type="button" title="标题" @click="$emit('insertMarkdown', '## ', '', '标题')"><Heading :size="16" /></button>
-                  <button type="button" title="加粗" @click="$emit('insertMarkdown', '**', '**', '加粗文本')"><Bold :size="16" /></button>
-                  <button type="button" title="斜体" @click="$emit('insertMarkdown', '*', '*', '斜体文本')"><Italic :size="16" /></button>
-                  <button type="button" title="引用" @click="$emit('insertMarkdown', '> ', '', '引用内容')"><Quote :size="16" /></button>
-                  <button type="button" title="列表" @click="$emit('insertMarkdown', '- ', '', '列表项')"><List :size="16" /></button>
-                  <button class="code-tool-button" type="button" title="代码块" @click="$emit('insertMarkdown', '```ts\\n', '\\n```', 'const value = await nextify.run()')">
-                    <Code2 :size="16" />
-                    <span>代码块</span>
-                  </button>
-                  <button type="button" title="插入图片" :disabled="isUploadingImage" @click="$emit('triggerImageUpload')"><Image :size="16" /></button>
-                </div>
-                <button class="preview-toggle" type="button" @click="$emit('update:isPreviewingMarkdown', !isPreviewingMarkdown)">
-                  <Eye :size="16" />
-                  <span>{{ isPreviewingMarkdown ? '编辑' : '预览' }}</span>
-                </button>
-                <input :ref="setImageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden @change="$emit('uploadMarkdownImage', $event)" />
-              </div>
-              <textarea
-                v-if="!isPreviewingMarkdown"
-                :ref="setContentTextarea"
-                class="form-input form-textarea content-textarea markdown-textarea"
-                v-model="publishForm.content"
-                placeholder="支持 Markdown：标题、列表、引用、代码块，以及图片上传。"
-              ></textarea>
-              <div v-else class="markdown-preview markdown-body" v-html="markdownPreviewHtml"></div>
-            </div>
+          <label class="sidebar-field">
+            <span>分类</span>
+            <select class="sidebar-input" v-model.number="publishForm.categoryId">
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
+            </select>
           </label>
+
+          <label class="sidebar-checkbox">
+            <input type="checkbox" v-model="publishForm.isTop" :true-value="1" :false-value="0" />
+            <span>置顶文章</span>
+          </label>
+
+          <div v-if="publishError" class="sidebar-error">{{ publishError }}</div>
+        </template>
+      </aside>
+
+      <!-- 右侧编辑区（对应文章详情的 article-main） -->
+      <main class="publish-main">
+        <!-- 标题输入区 -->
+        <div class="publish-title-block">
+          <input
+            class="publish-title-input"
+            v-model="publishForm.title"
+            placeholder="文章标题..."
+          />
+          <input
+            class="publish-subtitle-input"
+            v-model="publishForm.subtitle"
+            placeholder="副标题（可选）"
+          />
         </div>
 
-        <div class="publish-actions">
-          <p v-if="publishError" class="form-error">{{ publishError }}</p>
-          <div class="publish-action-buttons">
-            <button class="action-pill secondary" type="button" @click="$emit('close')">取消</button>
-            <button class="contact-button login-submit" type="submit" :disabled="isPublishing">
-              {{ isPublishing ? (isEditMode ? '保存中...' : '发布中...') : (isEditMode ? '保存文章' : '发布文章') }}
-            </button>
-          </div>
-        </div>
-      </form>
+        <hr class="publish-divider" />
+
+        <!-- 编辑 / 预览区 -->
+        <textarea
+          v-if="!isPreviewingMarkdown"
+          :ref="setContentTextarea"
+          class="publish-textarea"
+          v-model="publishForm.content"
+          placeholder="开始写作... 支持 Markdown 语法"
+        ></textarea>
+        <div
+          v-else
+          class="publish-preview markdown-body"
+          v-html="markdownPreviewHtml"
+        ></div>
+      </main>
+
     </div>
   </div>
 </template>
+
+<style scoped>
+/* ── 整体：和文章详情页完全一致的结构 ── */
+.publish-layout {
+  min-height: 100vh;
+  background: #f5f5f7;
+  padding-top: 6.5rem; /* navbar top(1.5) + padding(1) + 内容(2.5) + padding(1) + 间距(0.5) */
+}
+
+/* 面包屑行 */
+.publish-breadcrumb-row {
+  position: sticky;
+  top: 6.5rem; /* 紧贴 navbar 底部 */
+  z-index: 100;
+  border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background: #f5f5f7;
+}
+.publish-breadcrumb {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.breadcrumb-back {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.3rem 0.55rem;
+  border-radius: 9999px;
+  transition: background 0.2s, color 0.2s;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  flex-shrink: 0;
+}
+.breadcrumb-back:hover { background: rgba(239, 68, 68, 0.08); color: #dc2626; }
+.breadcrumb-sep   { color: #e2e8f0; font-size: 0.72rem; }
+.breadcrumb-site  { color: #cbd5e1; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; }
+.breadcrumb-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+.breadcrumb-spacer { flex: 1; }
+
+/* 工具栏 */
+.breadcrumb-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+.breadcrumb-toolbar button {
+  width: 1.85rem;
+  height: 1.85rem;
+  border: none;
+  border-radius: 0.45rem;
+  background: transparent;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.breadcrumb-toolbar button:hover { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
+.breadcrumb-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.toolbar-code-btn {
+  width: auto !important;
+  padding: 0 0.55rem !important;
+  gap: 0.25rem;
+  background: #0f172a !important;
+  color: #f8fafc !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+.toolbar-code-btn:hover { background: #1e293b !important; color: #fff !important; }
+.toolbar-divider {
+  width: 1px;
+  height: 1.1rem;
+  background: rgba(226, 232, 240, 0.9);
+  margin: 0 0.25rem;
+}
+.toolbar-preview-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border: none;
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s;
+  width: auto !important;
+}
+.toolbar-preview-btn.active { background: #2563eb; color: #fff; }
+.toolbar-preview-btn:hover:not(.active) { background: rgba(37, 99, 235, 0.14); }
+
+/* 右侧操作按钮 */
+.breadcrumb-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+.word-count { font-size: 0.72rem; color: #94a3b8; font-weight: 600; }
+.btn-cancel {
+  padding: 0.35rem 0.8rem;
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  border-radius: 9999px;
+  background: white;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: border-color 0.2s, color 0.2s;
+}
+.btn-cancel:hover { border-color: #94a3b8; color: #334155; }
+.btn-publish {
+  padding: 0.35rem 1rem;
+  border: none;
+  border-radius: 9999px;
+  background: #2563eb;
+  color: white;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-publish:hover:not(:disabled) { background: #1d4ed8; transform: translateY(-1px); }
+.btn-publish:disabled { opacity: 0.55; cursor: not-allowed; }
+
+/* ── 主体双栏（和文章详情页完全一致） ── */
+.publish-layout-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: flex;
+  align-items: flex-start;
+}
+
+/* 左侧设置面板 */
+.publish-sidebar {
+  position: sticky;
+  top: 9.5rem; /* navbar(6.5rem) + 面包屑行(2.75rem) + 间距(0.25rem) */
+  width: 210px;
+  flex-shrink: 0;
+  max-height: calc(100vh - 9.5rem);
+  overflow-y: auto;
+  padding: 2rem 1.25rem 2rem 0;
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  border-right: 1px solid rgba(226, 232, 240, 0.7);
+  scrollbar-width: none;
+  transition: width 0.2s ease;
+}
+.publish-sidebar::-webkit-scrollbar { display: none; }
+.publish-sidebar.collapsed {
+  width: 48px;
+  overflow: hidden;
+}
+
+.sidebar-collapse-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 9999px;
+  transition: background 0.2s, color 0.2s;
+  align-self: flex-start;
+  margin-left: -0.35rem;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.sidebar-collapse-btn:hover { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
+
+.sidebar-section-label {
+  margin: 0;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  color: #94a3b8;
+}
+.sidebar-divider {
+  height: 1px;
+  background: rgba(226, 232, 240, 0.9);
+}
+.sidebar-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: #475569;
+}
+.sidebar-input {
+  width: 100%;
+  padding: 0.55rem 0.8rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  background: white;
+  color: #0f172a;
+  font-size: 0.85rem;
+  outline: none;
+  transition: border-color 0.2s, box-shadow 0.2s;
+  box-sizing: border-box;
+}
+.sidebar-input:focus {
+  border-color: #2563eb;
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+.sidebar-textarea { min-height: 4.5rem; resize: vertical; line-height: 1.6; }
+.sidebar-checkbox {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  cursor: pointer;
+}
+.sidebar-error {
+  padding: 0.6rem 0.8rem;
+  border-radius: 0.75rem;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  color: #dc2626;
+  font-size: 0.8rem;
+  line-height: 1.5;
+}
+
+/* 右侧编辑区（和 article-main 完全对应） */
+.publish-main {
+  flex: 1;
+  min-width: 0;
+  padding: 2rem 0 6rem 2.5rem;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+.publish-title-block {
+  margin-bottom: 0;
+}
+.publish-title-input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  background: transparent;
+  padding: 0 0 0.5rem;
+}
+.publish-title-input::placeholder { color: #cbd5e1; }
+.publish-subtitle-input {
+  display: block;
+  width: 100%;
+  border: none;
+  outline: none;
+  font-size: 1.05rem;
+  color: #64748b;
+  background: transparent;
+  padding: 0 0 0.5rem;
+  line-height: 1.5;
+}
+.publish-subtitle-input::placeholder { color: #e2e8f0; }
+
+.publish-divider {
+  border: none;
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  margin: 1.25rem 0 1.75rem;
+}
+
+.publish-textarea {
+  display: block;
+  width: 100%;
+  min-height: calc(100vh - 22rem);
+  border: none;
+  outline: none;
+  resize: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.95rem;
+  line-height: 1.85;
+  color: #1e293b;
+  background: transparent;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+.publish-textarea::placeholder { color: #cbd5e1; }
+
+.publish-preview {
+  min-height: calc(100vh - 22rem);
+  color: #1f2937;
+  font-size: 1.05rem;
+  line-height: 1.9;
+  overflow-wrap: break-word;
+  word-break: break-word;
+}
+
+/* 响应式 */
+@media (max-width: 768px) {
+  .publish-layout { padding-top: 4.5rem; }
+  .publish-layout-inner { padding: 0 1rem; }
+  .publish-sidebar { display: none; }
+  .publish-main { padding: 1.5rem 0 4rem; }
+  .breadcrumb-toolbar { display: none; }
+  .breadcrumb-site,
+  .breadcrumb-sep { display: none; }
+  .word-count { display: none; }
+}
+</style>

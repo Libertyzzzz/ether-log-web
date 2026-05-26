@@ -744,9 +744,9 @@
 }
 .profile-page,
 .dashboard-page {
-  max-width: 64rem;
-  margin: 10rem auto;
-  padding: 0 1.5rem;
+  max-width: 100%;
+  margin: 0;
+  padding: 0;
 }
 .section-header {
   max-width: 64rem;

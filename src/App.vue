@@ -250,6 +250,7 @@ function openPublishModal(article?: ArticleListItem | ArticleDetail) {
 function closePublishModal() {
   showPublishModal.value = false
   publishError.value = ''
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function resetPublishForm() {
@@ -616,7 +617,7 @@ onUnmounted(() => {
       />
 
       <ArticleDetailView
-        v-if="articleForDetail"
+        v-if="articleForDetail && !showPublishModal"
         :article="articleForDetail"
         :selected-article="selectedArticle"
         :is-loading="isLoadingArticleDetail"
@@ -640,7 +641,7 @@ onUnmounted(() => {
       />
 
       <HomePage
-        v-if="!isArticleDetailOpen && (currentPage === 'home' || currentPage === 'posts' || currentPage === 'about')"
+        v-if="!isArticleDetailOpen && !showPublishModal && (currentPage === 'home' || currentPage === 'posts' || currentPage === 'about')"
         :categories="categories"
         :active-category-id="activeCategoryId"
         :filtered-articles="filteredArticles"
@@ -654,7 +655,7 @@ onUnmounted(() => {
       />
 
       <ProfilePage
-        v-if="!isArticleDetailOpen && currentPage === 'profile'"
+        v-if="!isArticleDetailOpen && !showPublishModal && currentPage === 'profile'"
         :login-user="loginUser"
         :articles="articles"
         :recent-articles="recentArticles"
@@ -667,7 +668,7 @@ onUnmounted(() => {
       />
 
       <DashboardPage
-        v-if="!isArticleDetailOpen && currentPage === 'dashboard'"
+        v-if="!isArticleDetailOpen && !showPublishModal && currentPage === 'dashboard'"
         :articles="articles"
         :my-comments="myComments"
         :comment-count="commentCount"
