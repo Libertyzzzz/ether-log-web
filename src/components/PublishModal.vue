@@ -89,7 +89,10 @@ function setImageInput(element: Element | ComponentPublicInstance | null) {
                   <button type="button" title="斜体" @click="$emit('insertMarkdown', '*', '*', '斜体文本')"><Italic :size="16" /></button>
                   <button type="button" title="引用" @click="$emit('insertMarkdown', '> ', '', '引用内容')"><Quote :size="16" /></button>
                   <button type="button" title="列表" @click="$emit('insertMarkdown', '- ', '', '列表项')"><List :size="16" /></button>
-                  <button type="button" title="代码块" @click="$emit('insertMarkdown', '```\\n', '\\n```', 'code')"><Code2 :size="16" /></button>
+                  <button class="code-tool-button" type="button" title="代码块" @click="$emit('insertMarkdown', '```ts\\n', '\\n```', 'const value = await nextify.run()')">
+                    <Code2 :size="16" />
+                    <span>代码块</span>
+                  </button>
                   <button type="button" title="插入图片" :disabled="isUploadingImage" @click="$emit('triggerImageUpload')"><Image :size="16" /></button>
                 </div>
                 <button class="preview-toggle" type="button" @click="$emit('update:isPreviewingMarkdown', !isPreviewingMarkdown)">

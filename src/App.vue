@@ -104,6 +104,7 @@ const filteredArticles = computed(() => {
 })
 
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
+const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const isEditMode = computed(() => editingArticleId.value !== null)
 const currentPage = computed(() => (route.meta.page as string) || 'home')
 const showActionsInCurrentView = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
@@ -639,7 +640,7 @@ onUnmounted(() => {
       />
 
       <HomePage
-        v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
+        v-if="!isArticleDetailOpen && (currentPage === 'home' || currentPage === 'posts' || currentPage === 'about')"
         :categories="categories"
         :active-category-id="activeCategoryId"
         :filtered-articles="filteredArticles"
@@ -653,7 +654,7 @@ onUnmounted(() => {
       />
 
       <ProfilePage
-        v-if="currentPage === 'profile'"
+        v-if="!isArticleDetailOpen && currentPage === 'profile'"
         :login-user="loginUser"
         :articles="articles"
         :recent-articles="recentArticles"
@@ -666,7 +667,7 @@ onUnmounted(() => {
       />
 
       <DashboardPage
-        v-if="currentPage === 'dashboard'"
+        v-if="!isArticleDetailOpen && currentPage === 'dashboard'"
         :articles="articles"
         :my-comments="myComments"
         :comment-count="commentCount"
@@ -696,9 +697,9 @@ onUnmounted(() => {
         @image-input-ready="imageInput = $event"
       />
 
-      <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
-      <ContactSection v-if="currentPage === 'home'" />
-      <AppFooter v-if="currentPage === 'home'" />
+      <AboutSection v-if="!isArticleDetailOpen && (currentPage === 'home' || currentPage === 'about')" />
+      <ContactSection v-if="!isArticleDetailOpen && currentPage === 'home'" />
+      <AppFooter v-if="!isArticleDetailOpen && currentPage === 'home'" />
     </div>
 
     <div v-if="!accessGranted" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
