@@ -30,7 +30,6 @@ const headings = computed(() => {
 })
 
 const activeHeadingId = ref('')
-const sidebarRef = ref<HTMLElement | null>(null)
 
 // 注入锚点 id 到正文标题
 const processedContent = computed(() => {
@@ -100,7 +99,7 @@ onUnmounted(() => {
     <div class="article-layout-inner">
 
       <!-- 左侧导航栏 -->
-      <aside ref="sidebarRef" class="article-sidebar">
+      <aside class="article-sidebar">
 
         <!-- 返回按钮 -->
         <button class="sidebar-back" type="button" @click="$emit('close')">
