@@ -728,7 +728,7 @@ onUnmounted(() => {
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView
           v-if="isArticleDetailOpen && !showPublishModal"
-          :article="articleForDetail"
+          :article="articleForDetail!"
           :selected-article="selectedArticle"
           :is-loading="isLoadingArticleDetail"
           :show-actions="showActionsInCurrentView"
