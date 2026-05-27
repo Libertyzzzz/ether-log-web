@@ -1,16 +1,16 @@
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted, watch } from 'vue'
+import { ref, onMounted, onUnmounted } from 'vue'
 import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
-defineProps<{
+const props = defineProps<{
   isLoggedIn: boolean
   loginUser: Partial<LoginUser>
   showUserMenu: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   navigate: [sectionId: string]
   openProfile: []
   openDashboard: []
