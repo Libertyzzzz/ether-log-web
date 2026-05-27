@@ -207,7 +207,7 @@ async function fetchUserProfile() {
 
   try {
     // 根据用户提供的最新接口定义，获取用户信息的接口为 /api/user/{id}
-    const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${loginUser.value.id}`, {
+    const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${loginUser.value.id || 0}`, {
       headers: getAuthHeaders()
     })
 
@@ -663,11 +663,7 @@ function logout() {
 }
 
 function handleStatusClick() {
-  if (!isLoggedIn.value) {
-    openLoginModal()
-    return
-  }
-
+  // 无论是否登录，点击都先打开/关闭菜单，由 Navbar 内部渲染具体内容
   showUserMenu.value = !showUserMenu.value
 }
 
