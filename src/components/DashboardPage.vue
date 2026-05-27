@@ -167,11 +167,11 @@ function getCover(post: ArticleListItem, i: number) {
 </template>
 
 <style scoped>
-.db-page { background:#f5f5f7; min-height:100vh; padding-top:6.5rem; }
-.db-body { max-width:64rem; margin:0 auto; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:1.5rem; }
+.db-page { background:#f5f5f7; min-height:100vh; padding-top: 6rem; }
+.db-body { max-width:64rem; margin: 1.5rem auto 0; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:2rem; }
 
 /* ── Hero Banner ── */
-.db-hero { max-width:64rem; margin:0 auto; padding:0 1rem; }
+.db-hero { max-width:64rem; margin:0 auto; padding:0 1.5rem; }
 .db-hero-bg-wrap {
   position:relative; overflow:hidden; border-radius:1.75rem;
   background:linear-gradient(160deg,#0a0e1a 0%,#0f172a 40%,#1e1b4b 100%);
@@ -186,11 +186,11 @@ function getCover(post: ArticleListItem, i: number) {
 .db-orb-2 { width:180px;height:180px;bottom:-60px;right:180px;background:radial-gradient(circle,rgba(129,140,248,0.15),transparent 70%); }
 .db-hero-inner {
   position:relative; z-index:1;
-  padding:2rem 1.75rem;
+  padding: 2.5rem 2.5rem;
   display:flex; align-items:center; gap:1.25rem;
 }
 .db-hero-icon {
-  width:52px; height:52px; border-radius:1rem; flex-shrink:0;
+  width:56px; height:56px; border-radius:1.1rem; flex-shrink:0;
   background:rgba(129,140,248,0.15); border:1px solid rgba(129,140,248,0.25);
   display:flex; align-items:center; justify-content:center; color:#a5b4fc;
 }
@@ -242,12 +242,12 @@ function getCover(post: ArticleListItem, i: number) {
 /* 表格 */
 .db-table-head {
   display:grid;grid-template-columns:2fr 1fr 0.7fr 1.4fr;
-  padding:0.5rem;border-bottom:1px solid #f1f5f9;
+  padding: 0.75rem 0.5rem; border-bottom:1px solid #f1f5f9;
   font-size:0.7rem;font-weight:700;color:#94a3b8;text-transform:uppercase;letter-spacing:0.08em;margin-bottom:0.25rem;
 }
 .db-table-row {
   display:grid;grid-template-columns:2fr 1fr 0.7fr 1.4fr;
-  align-items:center;padding:0.65rem 0.5rem;
+  align-items:center; padding: 0.85rem 0.5rem;
   border-bottom:1px solid #f8fafc;gap:0.5rem;
   transition:background 0.15s;border-radius:0.75rem;
 }

@@ -10,6 +10,7 @@ defineProps<{
   articleError: string
   isLoadingArticles: boolean
   showActions: boolean
+  showFeaturedOnly: boolean
 }>()
 
 defineEmits<{
@@ -17,6 +18,8 @@ defineEmits<{
   openArticle: [article: ArticleListItem]
   editArticle: [article: ArticleListItem]
   deleteArticle: [articleId: number]
+  scrollToPosts: []
+  toggleFeatured: [val: boolean]
 }>()
 
 // 分类图标映射（固定静态，和后端 label 对应）
@@ -75,12 +78,12 @@ function formatDate(dateStr: string) {
             固化永恒的逻辑。
           </p>
           <div class="hp-hero-actions">
-            <button class="hp-btn-primary" type="button">
+            <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')">
               <BookOpen :size="15" />
               开始阅读
             </button>
-            <button class="hp-btn-ghost" type="button">
-              ☆ 精选文章
+            <button class="hp-btn-ghost" :class="{ active: showFeaturedOnly }" type="button" @click="$emit('toggleFeatured', !showFeaturedOnly)">
+              {{ showFeaturedOnly ? '查看全部' : '☆ 精选文章' }}
             </button>
           </div>
         </div>
@@ -146,16 +149,28 @@ function formatDate(dateStr: string) {
         </div>
         <div v-else-if="isLoadingArticles" class="hp-posts-grid">
           <div v-for="i in 3" :key="i" class="hp-article-card hp-skeleton">
-            <div class="hp-card-cover hp-skeleton-cover"></div>
-            <div class="hp-card-body">
-              <div class="hp-skeleton-line"></div>
-              <div class="hp-skeleton-line short"></div>
+            <div class="hp-skeleton-cover"></div>
+            <div class="hp-skeleton-body">
+              <div class="hp-skeleton-line title"></div>
+              <div class="hp-skeleton-line summary"></div>
+              <div class="hp-skeleton-line meta"></div>
             </div>
           </div>
         </div>
         <div v-else-if="!filteredArticles.length" class="hp-state-card">
           <span class="hp-state-tag">Empty</span>
           <p>暂无文章，换个分类看看。</p>
+          <div class="hp-empty-illustration">
+            <!-- Placeholder for a simple SVG or icon for empty state -->
+            <svg width="64" height="64" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" class="lucide lucide-file-text">
+              <path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/>
+              <path d="M14 2v4a2 2 0 0 0 2 2h4"/>
+              <path d="M10 9H8"/>
+              <path d="M16 13H8"/>
+              <path d="M16 17H8"/>
+            </svg>
+            <p>这里空空如也，不如去写点什么？</p>
+          </div>
         </div>
 
         <!-- 文章卡片列表（3 列） -->
@@ -227,29 +242,31 @@ function formatDate(dateStr: string) {
    HERO
 ════════════════════════════════ */
 .hp-hero {
-  padding-top: 6.5rem; /* navbar 高度 */
-  background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
-  overflow: hidden;
-  position: relative;
+  padding-top: 6.5rem; 
+  max-width: 64rem;
+  margin: 0 auto;
+  padding-left: 1.5rem;
+  padding-right: 1.5rem;
 }
-.hp-hero::after {
+
+.hp-hero-inner {
+  position: relative;
+  background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+  border-radius: 2rem;
+  overflow: hidden;
+  padding: 3rem 3.5rem;
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 2rem;
+  align-items: center;
+  z-index: 1;
+}
+.hp-hero-inner::after {
   content: '';
   position: absolute;
   inset: 0;
   background: radial-gradient(ellipse 80% 60% at 70% 40%, rgba(99,102,241,0.18) 0%, transparent 70%);
   pointer-events: none;
-}
-
-.hp-hero-inner {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: 4rem 1.5rem 5rem;
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 3rem;
-  align-items: center;
-  position: relative;
-  z-index: 1;
 }
 
 /* 左侧文案 */
@@ -275,9 +292,9 @@ function formatDate(dateStr: string) {
 
 .hp-hero-title {
   margin: 0 0 1.5rem;
-  font-size: clamp(2.4rem, 4.5vw, 3.8rem);
+  font-size: clamp(1.8rem, 3.2vw, 2.6rem);
   font-weight: 900;
-  line-height: 1.08;
+  line-height: 1.15;
   letter-spacing: -0.03em;
   color: #f8fafc;
 }
@@ -287,7 +304,7 @@ function formatDate(dateStr: string) {
 }
 
 .hp-hero-sub {
-  margin: 0 0 2.5rem;
+  margin: 0 0 2rem;
   font-size: 1rem;
   color: #94a3b8;
   line-height: 1.85;
@@ -333,7 +350,7 @@ function formatDate(dateStr: string) {
 /* 右侧装饰 */
 .hp-hero-visual {
   position: relative;
-  height: 360px;
+  height: 280px;
 }
 .hp-glass-orb {
   position: absolute;
@@ -341,13 +358,13 @@ function formatDate(dateStr: string) {
   filter: blur(1px);
 }
 .hp-orb-1 {
-  width: 260px; height: 260px;
-  top: 20px; right: 20px;
+  width: 220px; height: 220px;
+  top: 20px; right: 10px;
   background: radial-gradient(circle at 35% 35%, rgba(129,140,248,0.35), rgba(79,70,229,0.1) 60%, transparent);
   border: 1px solid rgba(129,140,248,0.2);
 }
 .hp-orb-2 {
-  width: 160px; height: 160px;
+  width: 140px; height: 140px;
   top: 60px; right: 80px;
   background: radial-gradient(circle at 40% 30%, rgba(196,181,253,0.25), transparent 70%);
   border: 1px solid rgba(196,181,253,0.15);
@@ -361,7 +378,7 @@ function formatDate(dateStr: string) {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 140px; height: 140px;
+  width: 120px; height: 120px;
   border-radius: 2rem;
   background: rgba(255,255,255,0.06);
   border: 1px solid rgba(255,255,255,0.12);
@@ -395,6 +412,372 @@ function formatDate(dateStr: string) {
 .hp-chip-1 { top: 30px; left: 10px; }
 .hp-chip-2 { bottom: 100px; left: 0; }
 .hp-chip-3 { bottom: 40px; right: 10px; }
+
+/* ════════════════════════════════
+   分类卡片
+════════════════════════════════ */
+.hp-categories {
+  background: #f5f5f7;
+  padding: 2.5rem 0;
+}
+.hp-categories-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1rem;
+}
+.hp-cat-card {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem 1.1rem;
+  border-radius: 1.25rem;
+  background: white;
+  border: 1px solid rgba(226,232,240,0.8);
+  cursor: pointer;
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+}
+.hp-cat-card:hover {
+  box-shadow: 0 8px 24px rgba(79,70,229,0.1);
+  border-color: rgba(79,70,229,0.25);
+  transform: translateY(-2px);
+}
+.hp-cat-card.active {
+  background: #4f46e5;
+  border-color: #4f46e5;
+  box-shadow: 0 12px 32px rgba(79,70,229,0.3);
+}
+.hp-cat-card.active .hp-cat-icon { background: rgba(255,255,255,0.15); color: white; }
+.hp-cat-card.active .hp-cat-info strong { color: white; }
+.hp-cat-card.active .hp-cat-info span { color: rgba(255,255,255,0.7); }
+.hp-cat-card.active .hp-cat-arrow { color: rgba(255,255,255,0.6); }
+
+.hp-cat-icon {
+  width: 2.5rem;
+  height: 2.5rem;
+  border-radius: 0.75rem;
+  background: #eff6ff;
+  color: #4f46e5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+.hp-cat-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  min-width: 0;
+}
+.hp-cat-info strong {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hp-cat-info span {
+  font-size: 0.7rem;
+  color: #94a3b8;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hp-cat-arrow { color: #cbd5e1; flex-shrink: 0; }
+
+/* ════════════════════════════════
+   最新文章
+════════════════════════════════ */
+.hp-posts {
+  padding: 1rem 0 3rem;
+}
+.hp-posts-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.hp-section-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 1.5rem;
+}
+.hp-section-title {
+  margin: 0;
+  font-size: 1.1rem;
+  font-weight: 900;
+  color: #0f172a;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.hp-section-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4f46e5;
+  box-shadow: 0 0 6px #4f46e5;
+}
+.hp-view-all {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  border: none;
+  background: transparent;
+  color: #4f46e5;
+  font-size: 0.78rem;
+  font-weight: 700;
+  cursor: pointer;
+  letter-spacing: 0.04em;
+  transition: gap 0.2s;
+}
+.hp-view-all:hover { gap: 0.5rem; }
+
+/* 文章网格 */
+.hp-posts-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 1.25rem;
+}
+
+/* 文章卡片 */
+.hp-article-card {
+  border-radius: 1.5rem;
+  background: white;
+  border: 1px solid rgba(226,232,240,0.8);
+  overflow: hidden;
+  cursor: pointer;
+  transition: box-shadow 0.2s, transform 0.2s;
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+}
+.hp-article-card:hover {
+  box-shadow: 0 16px 40px rgba(15,23,42,0.1);
+  transform: translateY(-3px);
+}
+
+/* 封面图区域 */
+.hp-card-cover {
+  position: relative;
+  height: 180px;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+.hp-card-category-badge {
+  position: absolute;
+  top: 0.75rem;
+  left: 0.75rem;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(8px);
+  color: white;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
+.hp-card-admin-actions {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  display: flex;
+  gap: 0.4rem;
+}
+.hp-admin-btn {
+  padding: 0.25rem 0.65rem;
+  border-radius: 9999px;
+  border: none;
+  background: rgba(255,255,255,0.85);
+  color: #334155;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  backdrop-filter: blur(8px);
+  transition: background 0.2s;
+}
+.hp-admin-btn:hover { background: white; }
+.hp-admin-btn.danger { color: #dc2626; }
+.hp-admin-btn.danger:hover { background: #fee2e2; }
+
+/* 卡片文字区 */
+.hp-card-body {
+  padding: 1.1rem 1.25rem 1.25rem;
+}
+.hp-card-title {
+  margin: 0 0 0.5rem;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #0f172a;
+  line-height: 1.4;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hp-card-summary {
+  margin: 0 0 0.85rem;
+  font-size: 0.8rem;
+  color: #64748b;
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.hp-card-meta {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+.hp-card-author { color: #475569; font-weight: 700; }
+.hp-card-date::before,
+.hp-card-views::before { content: '·'; margin-right: 0.6rem; }
+
+/* 状态卡片 */
+.hp-state-card {
+  padding: 2.5rem;
+  border-radius: 1.5rem;
+  background: white;
+  border: 1px solid rgba(226,232,240,0.8);
+  text-align: center;
+  color: #64748b;
+}
+.hp-state-tag {
+  display: inline-block;
+  padding: 0.2rem 0.65rem;
+  border-radius: 9999px;
+  background: #f1f5f9;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  margin-bottom: 0.75rem;
+}
+
+/* 骨架屏 */
+.hp-skeleton {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.hp-skeleton-cover {
+  height: 180px;
+  border-radius: 1.25rem 1.25rem 0 0;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+.hp-skeleton-body {
+  padding: 1.1rem 1.25rem 1.25rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+.hp-skeleton-line {
+  height: 0.9rem;
+  border-radius: 0.4rem;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: shimmer 1.4s infinite;
+}
+.hp-skeleton-line.title { width: 90%; }
+.hp-skeleton-line.summary { width: 80%; }
+.hp-skeleton-line.meta { width: 50%; height: 0.7rem; margin-top: 0.5rem; }
+
+@keyframes shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+
+/* Empty State Illustration */
+.hp-empty-illustration {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1rem;
+  margin-top: 1.5rem;
+}
+.hp-empty-illustration svg {
+  width: 48px;
+  height: 48px;
+  color: #cbd5e1;
+}
+.hp-empty-illustration p {
+  font-size: 1rem;
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════
+   引言 Banner（固定静态）
+════════════════════════════════ */
+.hp-quote {
+  padding: 0 0 3rem;
+}
+.hp-quote-inner {
+  max-width: 64rem;
+  margin: 0 auto;
+  padding: 0 1.5rem;
+}
+.hp-quote-inner > * {
+  border-radius: 1.75rem;
+  overflow: hidden;
+}
+.hp-quote-content {
+  position: relative;
+  background: #0f172a;
+  padding: 3rem 3.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+  border-radius: 1.75rem;
+}
+.hp-quote-mark {
+  font-size: 5rem;
+  line-height: 0.8;
+  color: #4f46e5;
+  font-family: Georgia, serif;
+  font-weight: 900;
+  opacity: 0.8;
+}
+.hp-quote-text {
+  margin: 0;
+  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+  font-weight: 700;
+  color: #f1f5f9;
+  line-height: 1.65;
+  font-style: normal;
+}
+.hp-quote-author {
+  font-size: 0.88rem;
+  color: #64748b;
+  font-style: normal;
+  font-weight: 600;
+}
+
+/* ════════════════════════════════
+   响应式
+════════════════════════════════ */
+@media (max-width: 1024px) {
+  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
+  .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
+}
+@media (max-width: 768px) {
+  .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
+  .hp-hero-visual { display: none; }
+  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
+  .hp-posts-grid { grid-template-columns: 1fr; }
+  .hp-quote-content { padding: 2rem 1.5rem; }
+}
 
 /* ════════════════════════════════
    分类卡片
@@ -721,7 +1104,8 @@ function formatDate(dateStr: string) {
   .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .hp-hero-inner { grid-template-columns: 1fr; }
+  .hp-hero { padding-left: 1rem; padding-right: 1rem; }
+  .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
   .hp-hero-visual { display: none; }
   .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
   .hp-posts-grid { grid-template-columns: 1fr; }

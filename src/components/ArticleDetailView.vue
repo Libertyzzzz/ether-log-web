@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, onMounted, onUnmounted, ref } from 'vue'
+import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 import { ArrowLeft, Edit3, Trash2, Clock, Eye, Tag, BookOpen } from 'lucide-vue-next'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
@@ -62,14 +62,15 @@ function setupObserver() {
   targets.forEach(el => observer!.observe(el))
 }
 
+// 当内容加载或切换时重新初始化观察者
+watch(() => props.selectedArticle?.id, () => {
+  nextTick(setupObserver)
+})
+
 function scrollToHeading(id: string) {
   const el = document.getElementById(id)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
-
-onMounted(() => {
-  setTimeout(setupObserver, 300)
-})
 
 onUnmounted(() => {
   observer?.disconnect()
@@ -216,11 +217,16 @@ onUnmounted(() => {
 
         <!-- 正文 -->
         <div v-if="isLoading" class="article-body article-loading">
-          <div class="loading-skeleton"></div>
-          <div class="loading-skeleton short"></div>
-          <div class="loading-skeleton"></div>
-          <div class="loading-skeleton"></div>
-          <div class="loading-skeleton short"></div>
+          <div class="loading-skeleton title"></div>
+          <div class="loading-skeleton subtitle"></div>
+          <div class="loading-skeleton meta"></div>
+          <div class="loading-skeleton tags"></div>
+          <div class="loading-skeleton divider"></div>
+          <div class="loading-skeleton paragraph"></div>
+          <div class="loading-skeleton paragraph short"></div>
+          <div class="loading-skeleton paragraph"></div>
+          <div class="loading-skeleton paragraph"></div>
+          <div class="loading-skeleton paragraph short"></div>
         </div>
         <div
           v-else-if="processedContent"
@@ -241,12 +247,12 @@ onUnmounted(() => {
 .article-layout {
   min-height: 100vh;
   background: #f5f5f7;
-  padding-top: 5rem; /* navbar fixed 高度 */
+  padding-top: 5rem;
 }
 
 /* ── 主体布局 ── */
 .article-layout-inner {
-  max-width: 64rem;
+  max-width: 60rem;
   margin: 0 auto;
   padding: 0 1.5rem;
   display: flex;
@@ -256,10 +262,10 @@ onUnmounted(() => {
 /* ── 左侧导航栏 ── */
 .article-sidebar {
   position: sticky;
-  top: 8rem; /* navbar(5rem) + 面包屑行(2.75rem) + 间距 */
-  width: 210px;
+  top: 2rem; 
+  width: 200px;
   flex-shrink: 0;
-  max-height: calc(100vh - 8rem);
+  max-height: calc(100vh - 4rem);
   overflow-y: auto;
   padding: 2rem 1.25rem 2rem 0;
   display: flex;
@@ -457,7 +463,7 @@ onUnmounted(() => {
 .article-main {
   flex: 1;
   min-width: 0;
-  padding: 2rem 0 6rem 2.5rem;
+  padding: 2rem 0 6rem 2rem;
   overflow-wrap: break-word;
   word-break: break-word;
 }
@@ -530,14 +536,14 @@ onUnmounted(() => {
 .article-progress-bar {
   height: 2px;
   background: #f1f5f9;
-  border-radius: 9999px;
+  border-radius: 2px;
   overflow: hidden;
-  margin-bottom: 2rem;
+  margin-bottom: 2.5rem;
 }
 .article-progress-fill {
   height: 100%;
   background: linear-gradient(90deg, #2563eb, #10b981);
-  border-radius: 9999px;
+  border-radius: 2px;
   transition: width 0.2s ease;
 }
 
@@ -547,7 +553,7 @@ onUnmounted(() => {
 }
 .article-main-title {
   margin: 0 0 0.65rem;
-  font-size: clamp(1.8rem, 3.5vw, 2.8rem);
+  font-size: clamp(1.8rem, 3vw, 2.4rem);
   font-weight: 900;
   color: #0f172a;
   line-height: 1.1;
@@ -612,14 +618,20 @@ onUnmounted(() => {
   flex-direction: column;
   gap: 0.85rem;
 }
-.loading-skeleton {
-  height: 0.9rem;
+.loading-skeleton.title { height: 2.5rem; width: 80%; margin-bottom: 1rem; }
+.loading-skeleton.subtitle { height: 1.2rem; width: 60%; margin-bottom: 1rem; }
+.loading-skeleton.meta { height: 1rem; width: 40%; margin-bottom: 0.5rem; }
+.loading-skeleton.tags { height: 1rem; width: 30%; margin-bottom: 2rem; }
+.loading-skeleton.divider { height: 1px; width: 100%; background: #e2e8f0; margin: 1.75rem 0 2.25rem; }
+.loading-skeleton.paragraph {
+  height: 1rem;
   border-radius: 0.4rem;
   background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
   background-size: 200% 100%;
   animation: shimmer 1.4s infinite;
+  margin-bottom: 0.85rem;
 }
-.loading-skeleton.short { width: 55%; }
+.loading-skeleton.paragraph.short { width: 55%; }
 @keyframes shimmer {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }

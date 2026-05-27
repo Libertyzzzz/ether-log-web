@@ -1,36 +1,66 @@
 <script setup lang="ts">
-import { MessageSquare, FileText, Eye, BookOpen, Edit3, ArrowUpRight, Github, Twitter, Linkedin, Rss } from 'lucide-vue-next'
-import type { ArticleListItem, CommentItem, LoginUser } from '../types/blog'
+import { Github, Twitter, Linkedin, Rss, User, Shield, Globe, Camera, Save, Settings, Lock, Bell, Palette } from 'lucide-vue-next'
+import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
+import { ref, watch } from 'vue'
 
-defineProps<{
+const props = defineProps<{
   loginUser: Partial<LoginUser>
-  articles: ArticleListItem[]
-  recentArticles: ArticleListItem[]
-  myComments: CommentItem[]
-  commentCount: number
-  totalViews: number
 }>()
 
-defineEmits<{
-  openArticle: [article: ArticleListItem]
-  editArticle: [article: ArticleListItem]
-  newArticle: []
+const emit = defineEmits<{
+  updateProfile: [data: { nickname: string; motto: string; email: string; avatar: string; position: string }]
+  uploadAvatar: [event: Event]
 }>()
 
-const coverGradients = [
-  'linear-gradient(135deg,#1e1b4b,#4338ca)',
-  'linear-gradient(135deg,#0f172a,#1d4ed8)',
-  'linear-gradient(135deg,#1a1a2e,#0f3460)',
-  'linear-gradient(135deg,#0d1117,#21262d)',
-  'linear-gradient(135deg,#1e293b,#334155)',
-]
-function getCover(post: ArticleListItem, i: number) {
-  return post.coverImg
-    ? `background-image:url('${post.coverImg}')`
-    : `background:${coverGradients[i % coverGradients.length]}`
+const nickname = ref(props.loginUser.nickname || '')
+const motto = ref(props.loginUser.motto || '')
+const email = ref(props.loginUser.email || '')
+const avatar = ref(props.loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ether')
+const position = ref('Blogger & Developer') // Placeholder for now
+
+const avatarInput = ref<HTMLInputElement | null>(null)
+
+function triggerAvatarUpload() {
+  avatarInput.value?.click()
 }
-function fmtDate(d: string) { return d?.slice(0, 10) || '' }
+
+function handleAvatarChange(event: Event) {
+  emit('uploadAvatar', event)
+}
+
+// 增加 immediate 确保第一次加载时也能正确赋值
+watch(() => props.loginUser, (newVal) => {
+  if (newVal) {
+    nickname.value = newVal.nickname || newVal.username || ''
+    motto.value = newVal.motto || ''
+    email.value = newVal.email || ''
+    avatar.value = newVal.avatar || avatar.value
+  }
+}, { deep: true, immediate: true })
+
+const saveProfile = () => {
+  emit('updateProfile', {
+    nickname: nickname.value,
+    motto: motto.value,
+    email: email.value,
+    avatar: avatar.value,
+    position: position.value,
+  })
+}
+
+const toggleDarkMode = (event: Event) => {
+  const isChecked = (event.target as HTMLInputElement).checked
+  console.log('深色模式:', isChecked ? '开启' : '关闭')
+  // Implement actual dark mode toggle logic here
+}
+
+const toggleEmailNotifications = (event: Event) => {
+  const isChecked = (event.target as HTMLInputElement).checked
+  console.log('邮件通知:', isChecked ? '开启' : '关闭')
+  // Implement actual email notification toggle logic here
+}
+
 </script>
 
 <template>
@@ -42,14 +72,24 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
         <div class="pp-hero-bg" aria-hidden="true">
           <div class="pp-hero-orb pp-orb-1"></div>
           <div class="pp-hero-orb pp-orb-2"></div>
-          <div class="pp-hero-figure"></div>
         </div>
         <div class="pp-hero-inner">
-          <div class="pp-avatar-wrap">
+          <div class="pp-avatar-wrap" @click="triggerAvatarUpload">
             <img
               class="pp-avatar"
               :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ether'"
               alt="avatar"
+            />
+            <button class="pp-avatar-edit" title="Change Avatar" type="button">
+              <Camera :size="14" />
+            </button>
+            <input 
+              ref="avatarInput" 
+              type="file" 
+              accept="image/*" 
+              hidden 
+              @change="handleAvatarChange"
+              @click.stop
             />
           </div>
           <div class="pp-hero-info">
@@ -57,7 +97,7 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
               <h1 class="pp-hero-name">{{ getLoginUserName(loginUser) }}</h1>
               <span class="pp-verified">✦</span>
             </div>
-            <p class="pp-hero-role">Blogger &amp; Developer</p>
+            <p class="pp-hero-role">Profile & Site Settings</p>
             <p class="pp-hero-motto">{{ loginUser.motto || '探索世界，记录思考，创造价值。' }}</p>
             <div class="pp-social">
               <a class="pp-social-btn" href="https://github.com" target="_blank" aria-label="GitHub"><Github :size="15"/></a>
@@ -71,149 +111,132 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
     </div>
 
     <div class="pp-body">
-      <div class="pp-stats-grid">
-        <div class="pp-stat-card">
-          <div class="pp-stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1"><FileText :size="18"/></div>
-          <span class="pp-stat-label">文章总数</span>
-          <strong class="pp-stat-value">{{ articles.length }}</strong>
-          <div class="pp-stat-wave pp-wave-blue"></div>
-        </div>
-        <div class="pp-stat-card">
-          <div class="pp-stat-icon" style="background:rgba(34,197,94,0.1);color:#22c55e"><MessageSquare :size="18"/></div>
-          <span class="pp-stat-label">评论总数</span>
-          <strong class="pp-stat-value">{{ commentCount }}</strong>
-          <div class="pp-stat-wave pp-wave-green"></div>
-        </div>
-        <div class="pp-stat-card">
-          <div class="pp-stat-icon" style="background:rgba(249,115,22,0.1);color:#f97316"><Eye :size="18"/></div>
-          <span class="pp-stat-label">总浏览</span>
-          <strong class="pp-stat-value">{{ totalViews }}</strong>
-          <div class="pp-stat-wave pp-wave-orange"></div>
-        </div>
-        <div class="pp-stat-card">
-          <div class="pp-stat-icon" style="background:rgba(168,85,247,0.1);color:#a855f7"><BookOpen :size="18"/></div>
-          <span class="pp-stat-label">草稿</span>
-          <strong class="pp-stat-value">0</strong>
-          <div class="pp-stat-wave pp-wave-purple"></div>
-        </div>
-      </div>
-
-      <!-- ── 文章列表 + 评论管理 ── -->
-      <div class="pp-main-grid">
-
-        <!-- 我的文章 -->
-        <div class="pp-card">
-          <div class="pp-card-header">
-            <div class="pp-card-title-row">
-              <FileText :size="15" class="pp-card-icon"/>
-              <h2 class="pp-card-title">我的文章</h2>
+      <div class="pp-settings-grid">
+        <!-- ── 左侧：主要设置 ── -->
+        <div class="pp-settings-main">
+          <!-- 基本资料卡片 -->
+          <div class="pp-card">
+            <div class="pp-card-header">
+              <div class="pp-card-title-row">
+                <User :size="18" class="pp-card-icon"/>
+                <h2 class="pp-card-title">基本资料</h2>
+              </div>
             </div>
-            <button class="pp-btn-new" type="button" @click="$emit('newArticle')">
-              + 新建文章
-            </button>
-          </div>
-          <div class="pp-table-head">
-            <span>标题</span><span>分类</span><span>状态</span><span>操作</span>
-          </div>
-          <div v-if="!articles.length" class="pp-empty">暂无文章</div>
-          <div v-for="(post, i) in articles" :key="post.id" class="pp-table-row">
-            <div class="pp-row-title">
-              <div class="pp-row-cover" :style="getCover(post, i)"></div>
-              <span>{{ post.title }}</span>
+            <div class="pp-settings-form">
+              <div class="pp-form-row">
+                <div class="pp-form-item">
+                  <label>公开昵称</label>
+                  <input type="text" v-model="nickname" placeholder="Your nickname" />
+                </div>
+                <div class="pp-form-item">
+                  <label>职位 / 标签</label>
+                  <input type="text" v-model="position" placeholder="e.g. Designer / Architect" />
+                </div>
+              </div>
+              <div class="pp-form-item">
+                <label>个人签名 (Motto)</label>
+                <textarea rows="3" v-model="motto" placeholder="Write something about yourself..."></textarea>
+              </div>
+              <div class="pp-form-item">
+                <label>电子邮箱</label>
+                <input type="email" v-model="email" placeholder="email@example.com" />
+              </div>
             </div>
-            <span class="pp-row-cat">{{ post.categoryName || '—' }}</span>
-            <span class="pp-row-status" :class="post.isTop ? 'top' : 'pub'">
-              {{ post.isTop ? '置顶' : '公开' }}
-            </span>
-            <div class="pp-row-actions">
-              <button type="button" class="pp-action-btn edit" @click="$emit('editArticle', post)">
-                <Edit3 :size="12"/> 编辑
-              </button>
-              <button type="button" class="pp-action-btn view" @click="$emit('openArticle', post)">
-                <ArrowUpRight :size="12"/> 查看
+            <!-- 将保存按钮移入“基本资料”卡片内部 -->
+            <div class="pp-card-actions-footer">
+              <button class="pp-btn-save" @click="saveProfile">
+                <Save :size="16" />
+                保存资料更改
               </button>
             </div>
           </div>
+
+          <!-- 社交链接卡片 -->
+          <div class="pp-card">
+            <div class="pp-card-header">
+              <div class="pp-card-title-row">
+                <Globe :size="18" class="pp-card-icon"/>
+                <h2 class="pp-card-title">社交链接</h2>
+              </div>
+            </div>
+            <div class="pp-settings-form">
+              <div class="pp-social-input-grid">
+                <div class="pp-form-item">
+                  <label><Github :size="14" /> GitHub</label>
+                  <input type="text" placeholder="https://github.com/..." />
+                </div>
+                <div class="pp-form-item">
+                  <label><Twitter :size="14" /> Twitter</label>
+                  <input type="text" placeholder="https://twitter.com/..." />
+                </div>
+                <div class="pp-form-item">
+                  <label><Linkedin :size="14" /> LinkedIn</label>
+                  <input type="text" placeholder="https://linkedin.com/in/..." />
+                </div>
+                <div class="pp-form-item">
+                  <label><Rss :size="14" /> RSS Feed</label>
+                  <input type="text" placeholder="/rss" />
+                </div>
+              </div>
+            </div>
+          </div>
+
         </div>
 
-        <!-- 评论管理 -->
-        <div class="pp-card">
-          <div class="pp-card-header">
+        <!-- ── 右侧：配置与设置 ── -->
+        <div class="pp-settings-side">
+          <div class="pp-card pp-mini-card">
             <div class="pp-card-title-row">
-              <MessageSquare :size="15" class="pp-card-icon"/>
-              <h2 class="pp-card-title">评论管理</h2>
+              <Shield :size="16" class="pp-card-icon"/>
+              <h2 class="pp-card-title">账号安全</h2>
+            </div>
+            <p class="pp-card-desc">管理密码和安全选项。</p>
+            <button class="pp-btn-outline"><Lock :size="14" /> 修改密码</button>
+          </div>
+
+          <div class="pp-card pp-mini-card">
+            <div class="pp-card-title-row">
+              <Settings :size="16" class="pp-card-icon"/>
+              <h2 class="pp-card-title">偏好设置</h2>
+            </div>
+            <div class="pp-pref-list">
+              <div class="pp-pref-item">
+                <div class="pp-pref-info">
+                  <Bell :size="14" />
+                  <span>邮件通知</span>
+                </div>
+                <input type="checkbox" checked @change="toggleEmailNotifications" />
+              </div>
+              <div class="pp-pref-item">
+                <div class="pp-pref-info">
+                  <Palette :size="14" />
+                  <span>深色模式</span>
+                </div>
+                <input type="checkbox" @change="toggleDarkMode" />
+              </div>
             </div>
           </div>
-          <div v-if="!myComments.length" class="pp-empty">暂无评论</div>
-          <div v-for="comment in myComments" :key="comment.id" class="pp-comment-item">
-            <p class="pp-comment-text">{{ comment.content }}</p>
-            <p class="pp-comment-meta">{{ comment.author }} · {{ comment.articleTitle }}</p>
-            <div class="pp-comment-actions">
-              <button type="button" class="pp-action-btn view">查看文章</button>
-              <button type="button" class="pp-action-btn edit">审核</button>
-            </div>
+
+          <div class="pp-system-info">
+            <p>Version 2.0.4-stable</p>
+            <p>© 2026 Etherlog System</p>
           </div>
         </div>
-
       </div>
-
-      <!-- ── 引言 Banner（固定静态） ── -->
-      <div class="pp-quote">
-        <span class="pp-quote-mark">"</span>
-        <blockquote class="pp-quote-text">
-          写作，是把模糊的思考变得清晰，<br/>也是与未来的自己对话。
-        </blockquote>
-        <cite class="pp-quote-author">— Ether</cite>
-        <div class="pp-quote-deco" aria-hidden="true"></div>
-      </div>
-
-      <!-- ── 关于我（固定静态） ── -->
-      <div class="pp-about">
-        <div class="pp-about-avatar-wrap">
-          <img
-            class="pp-about-avatar"
-            :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Ether'"
-            alt="avatar"
-          />
-          <span class="pp-about-badge">Blogger &amp; Developer</span>
-        </div>
-        <div class="pp-about-content">
-          <h2 class="pp-about-title">探索世界，记录思考，创造价值。</h2>
-          <p class="pp-about-desc">热爱于技术、设计与产品，重新把你的想法解构成逻辑，用代码和文字来构建属于自己的数字花园。</p>
-          <div class="pp-about-stats">
-            <div class="pp-about-stat"><strong>{{ articles.length }}</strong><span>文章</span></div>
-            <div class="pp-about-stat"><strong>52K</strong><span>阅读</span></div>
-            <div class="pp-about-stat"><strong>3.2K</strong><span>喜欢</span></div>
-            <div class="pp-about-stat"><strong>2019</strong><span>加入</span></div>
-          </div>
-        </div>
-        <div class="pp-about-deco" aria-hidden="true">
-          <svg width="110" height="110" viewBox="0 0 110 110" fill="none">
-            <g opacity="0.2">
-              <template v-for="r in 5" :key="r">
-                <template v-for="c in 5" :key="c">
-                  <circle :cx="(c-1)*24+5" :cy="(r-1)*24+5" r="3" fill="#4f46e5"/>
-                </template>
-              </template>
-            </g>
-          </svg>
-        </div>
-      </div>
-
     </div><!-- /pp-body -->
   </div>
 </template>
 
 <style scoped>
-/* ── 페이지 컨테이너 ── */
-.pp-page { background:#f5f5f7; min-height:100vh; padding-top:6.5rem; }
-.pp-body { max-width:64rem; margin:0 auto; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:1.5rem; }
+/* ── 页面容器 ── */
+.pp-page { background:#f5f5f7; min-height:100vh; padding-top: 7rem; }
+.pp-body { max-width:64rem; margin:0 auto; padding:2rem 1.5rem 5rem; display:flex; flex-direction:column; gap:2rem; }
 
 /* ── Hero Banner：和 navbar 等宽，两侧留白对齐 ── */
 .pp-hero {
   max-width: 64rem;
   margin: 0 auto;
-  padding: 0 1rem;
+  padding: 0 1.5rem;
 }
 .pp-hero-bg-wrap {
   position: relative;
@@ -221,18 +244,15 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
   border-radius: 1.75rem;
   background: linear-gradient(160deg, #0a0e1a 0%, #0f172a 40%, #1e1b4b 100%);
   min-height: 200px;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.1);
 }
 .pp-hero-bg { position:absolute; inset:0; pointer-events:none; }
 .pp-hero-orb {
   position:absolute; border-radius:50%;
-  background:radial-gradient(circle,rgba(99,102,241,0.25),transparent 70%);
+  background:radial-gradient(circle,rgba(99,102,241,0.3),transparent 70%);
 }
-.pp-orb-1 { width:400px;height:400px;top:-100px;right:-80px; }
+.pp-orb-1 { width:400px;height:400px;top:-150px;right:-80px; }
 .pp-orb-2 { width:200px;height:200px;bottom:-40px;right:200px;background:radial-gradient(circle,rgba(129,140,248,0.15),transparent 70%); }
-.pp-hero-figure {
-  position:absolute; right:8%; bottom:0; width:180px; height:180px;
-  background:radial-gradient(ellipse at 50% 80%,rgba(99,102,241,0.2),transparent 70%);
-}
 .pp-hero-inner {
   position:relative; z-index:1;
   padding:2.5rem 1.5rem 2.5rem;
@@ -240,17 +260,24 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
 }
 .pp-avatar-wrap { flex-shrink:0; }
 .pp-avatar {
-  width:72px; height:72px; border-radius:50%;
-  border:3px solid rgba(129,140,248,0.4);
+  width:80px; height:80px; border-radius:50%;
+  border:4px solid rgba(255, 255, 255, 0.15);
   box-shadow:0 0 24px rgba(99,102,241,0.3);
   object-fit:cover;
 }
-.pp-hero-info { display:flex; flex-direction:column; gap:0.4rem; }
+.pp-avatar-edit {
+  position: absolute; bottom: 0; right: 0;
+  width: 24px; height: 24px; border-radius: 50%;
+  background: #4f46e5; border: 2px solid white; color: white;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; box-shadow: 0 2px 8px rgba(0,0,0,0.2);
+}
+.pp-hero-info { display:flex; flex-direction:column; gap:0.3rem; }
 .pp-hero-name-row { display:flex; align-items:center; gap:0.5rem; }
-.pp-hero-name { margin:0; font-size:1.5rem; font-weight:900; color:#f8fafc; }
+.pp-hero-name { margin:0; font-size:1.75rem; font-weight:950; color:#f8fafc; letter-spacing: -0.02em; }
 .pp-verified { color:#818cf8; font-size:1rem; }
-.pp-hero-role { margin:0; font-size:0.8rem; color:#818cf8; font-weight:600; }
-.pp-hero-motto { margin:0; font-size:0.88rem; color:#94a3b8; line-height:1.6; }
+.pp-hero-role { margin:0; font-size:0.85rem; color:#818cf8; font-weight:700; letter-spacing: 0.05em; text-transform: uppercase; }
+.pp-hero-motto { margin:0.2rem 0 0; font-size:0.9rem; color:#94a3b8; line-height:1.6; font-weight: 500; }
 .pp-social { display:flex; gap:0.4rem; margin-top:0.25rem; }
 .pp-social-btn {
   width:2rem; height:2rem; border-radius:0.5rem;
@@ -260,151 +287,112 @@ function fmtDate(d: string) { return d?.slice(0, 10) || '' }
 }
 .pp-social-btn:hover { background:rgba(129,140,248,0.2); color:#a5b4fc; }
 
-/* ── 统计卡片 ── */
-.pp-stats-grid { display:grid; grid-template-columns:repeat(4,1fr); gap:1rem; }
-.pp-stat-card {
-  background:white; border-radius:1.25rem; padding:1.25rem 1.25rem 1rem;
-  border:1px solid rgba(226,232,240,0.8);
-  box-shadow:0 2px 8px rgba(15,23,42,0.04);
-  display:flex; flex-direction:column; gap:0.35rem; position:relative; overflow:hidden;
+/* ── 设置区域布局 ── */
+.pp-settings-grid {
+  display:grid; grid-template-columns:1.6fr 1fr; gap:1.5rem;
+  animation: fadeIn 0.4s ease-out;
 }
-.pp-stat-icon {
-  width:2.25rem; height:2.25rem; border-radius:0.65rem;
-  display:flex; align-items:center; justify-content:center; margin-bottom:0.25rem;
-}
-.pp-stat-label { font-size:0.75rem; color:#94a3b8; font-weight:600; }
-.pp-stat-value { font-size:1.75rem; font-weight:900; color:#0f172a; line-height:1; }
-/* 波形装饰（纯 CSS） */
-.pp-stat-wave {
-  position:absolute; bottom:0; left:0; right:0; height:32px;
-  background-repeat:no-repeat; background-size:100% 100%;
-  opacity:0.35;
-}
-.pp-wave-blue   { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%236366f1'/%3E%3C/svg%3E"); }
-.pp-wave-green  { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%2322c55e'/%3E%3C/svg%3E"); }
-.pp-wave-orange { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23f97316'/%3E%3C/svg%3E"); }
-.pp-wave-purple { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23a855f7'/%3E%3C/svg%3E"); }
-
-/* ── 主内容双栏 ── */
-.pp-main-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:1.25rem; }
 .pp-card {
   background:white; border-radius:1.5rem; padding:1.5rem;
-  border:1px solid rgba(226,232,240,0.8);
-  box-shadow:0 2px 8px rgba(15,23,42,0.04);
-  display:flex; flex-direction:column; gap:0;
+  border: 1px solid rgba(255, 255, 255, 1);
+  box-shadow: 0 10px 30px rgba(15, 23, 42, 0.03), 0 1px 3px rgba(15, 23, 42, 0.02);
+  display:flex; flex-direction:column; gap:1.25rem;
 }
-.pp-card-header {
-  display:flex; align-items:center; justify-content:space-between;
-  margin-bottom:1rem;
-}
+.pp-mini-card { padding: 1.25rem; gap: 0.75rem; }
+.pp-card-desc { font-size: 0.8rem; color: #64748b; margin: 0; }
+
 .pp-card-title-row { display:flex; align-items:center; gap:0.5rem; }
 .pp-card-icon { color:#4f46e5; }
 .pp-card-title { margin:0; font-size:0.95rem; font-weight:800; color:#0f172a; }
-.pp-btn-new {
-  padding:0.35rem 0.9rem; border:none; border-radius:9999px;
-  background:#4f46e5; color:white; font-size:0.75rem; font-weight:800;
-  cursor:pointer; transition:background 0.2s;
-}
-.pp-btn-new:hover { background:#4338ca; }
 
-/* 表格头 */
-.pp-table-head {
-  display:grid; grid-template-columns:2fr 1fr 0.7fr 1.2fr;
-  padding:0.5rem 0.5rem; border-bottom:1px solid #f1f5f9;
-  font-size:0.7rem; font-weight:700; color:#94a3b8; text-transform:uppercase; letter-spacing:0.08em;
-  margin-bottom:0.25rem;
+/* 设置表单项 */
+.pp-settings-form { display: flex; flex-direction: column; gap: 1rem; }
+.pp-form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+.pp-form-item { display: flex; flex-direction: column; gap: 0.5rem; }
+.pp-form-item label {
+  font-size: 0.75rem; font-weight: 800; color: #94a3b8;
+  text-transform: uppercase; letter-spacing: 0.05em;
+  display: flex; align-items: center; gap: 0.4rem;
 }
-.pp-table-row {
-  display:grid; grid-template-columns:2fr 1fr 0.7fr 1.2fr;
-  align-items:center; padding:0.65rem 0.5rem;
-  border-bottom:1px solid #f8fafc; gap:0.5rem;
-  transition:background 0.15s; border-radius:0.75rem;
+.pp-form-item input, .pp-form-item textarea {
+  padding: 0.8rem 1rem; border-radius: 0.8rem; border: 1px solid #edf2f7;
+  background: #f8fafc; font-size: 0.9rem; outline: none; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #1e293b; font-weight: 550;
 }
-.pp-table-row:hover { background:#f8fafc; }
-.pp-row-title { display:flex; align-items:center; gap:0.6rem; min-width:0; }
-.pp-row-cover {
-  width:32px; height:32px; border-radius:0.5rem; flex-shrink:0;
-  background-size:cover; background-position:center;
+.pp-form-item input:focus, .pp-form-item textarea:focus {
+  border-color: #4f46e5; background: white;
+  box-shadow: 0 0 0 4px rgba(79, 70, 229, 0.08), 0 2px 4px rgba(0, 0, 0, 0.02);
 }
-.pp-row-title span { font-size:0.82rem; font-weight:700; color:#0f172a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-.pp-row-cat { font-size:0.75rem; color:#64748b; }
-.pp-row-status {
-  display:inline-flex; padding:0.15rem 0.55rem; border-radius:9999px;
-  font-size:0.68rem; font-weight:800;
-}
-.pp-row-status.top { background:#eff6ff; color:#2563eb; }
-.pp-row-status.pub { background:#f0fdf4; color:#16a34a; }
-.pp-row-actions { display:flex; gap:0.35rem; }
-.pp-action-btn {
-  display:inline-flex; align-items:center; gap:0.25rem;
-  padding:0.25rem 0.6rem; border:none; border-radius:9999px;
-  font-size:0.7rem; font-weight:700; cursor:pointer; transition:background 0.2s;
-}
-.pp-action-btn.edit { background:rgba(79,70,229,0.08); color:#4f46e5; }
-.pp-action-btn.edit:hover { background:rgba(79,70,229,0.15); }
-.pp-action-btn.view { background:#f1f5f9; color:#475569; }
-.pp-action-btn.view:hover { background:#e2e8f0; }
-.pp-empty { padding:2rem; text-align:center; color:#94a3b8; font-size:0.85rem; }
+.pp-social-input-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
 
-/* 评论 */
-.pp-comment-item {
-  padding:1rem; border-radius:1rem; background:#f8fafc;
-  margin-bottom:0.75rem; display:flex; flex-direction:column; gap:0.4rem;
-}
-.pp-comment-text { margin:0; font-size:0.85rem; color:#334155; line-height:1.55; }
-.pp-comment-meta { margin:0; font-size:0.72rem; color:#94a3b8; }
-.pp-comment-actions { display:flex; gap:0.4rem; }
+.pp-actions-footer { margin-top: 1rem; display: flex; justify-content: flex-end; }
 
-/* ── 引言 Banner ── */
-.pp-quote {
-  position:relative; background:#0f172a; border-radius:1.75rem;
-  padding:3rem 3.5rem; overflow:hidden;
-  display:flex; flex-direction:column; gap:0.85rem;
+/* 新增：卡片内部的动作区域，用于放置保存按钮 */
+.pp-card-actions-footer { margin-top: 1.5rem; display: flex; justify-content: center; }
+.pp-card-actions-footer .pp-btn-save {
+  width: 100%; /* 使其宽度与表单输入框对齐，更加整齐 */
+  padding: 0.85rem 1.75rem; border-radius: 0.8rem;
+  border: 1px solid #edf2f7; /* 更浅的边框，减少割裂感 */
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%); /* 浅灰白渐变，增加质感 */
+  color: #334155; /* 深灰色文字，确保可读性 */
+  font-size: 0.88rem; font-weight: 800; cursor: pointer;
+  display: flex; align-items: center; justify-content: center; gap: 0.6rem;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); /* 更流畅的过渡 */
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04); /* 极细微的投影，紧贴表面 */
+  letter-spacing: 0.02em;
 }
-.pp-quote-mark { font-size:4.5rem; line-height:0.8; color:#4f46e5; font-family:Georgia,serif; font-weight:900; opacity:0.8; }
-.pp-quote-text { margin:0; font-size:clamp(1.1rem,2vw,1.5rem); font-weight:700; color:#f1f5f9; line-height:1.65; font-style:normal; }
-.pp-quote-author { font-size:0.88rem; color:#64748b; font-style:normal; font-weight:600; }
-.pp-quote-deco {
-  position:absolute; right:-40px; top:-40px; width:200px; height:200px; border-radius:50%;
-  background:radial-gradient(circle,rgba(99,102,241,0.15),transparent 70%);
+.pp-btn-save:hover {
+  background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%); /* hover时背景略深 */
+  border-color: #e2e8f0; /* hover时边框略深 */
+  transform: translateY(-0.5px); /* 极轻微的反馈 */
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.06); /* 稍微增强投影 */
+}
+.pp-btn-outline {
+  padding: 0.6rem; border-radius: 0.8rem; border: 1px solid #e2e8f0;
+  background: white; color: #475569; font-size: 0.75rem; font-weight: 800; cursor: pointer;
+  transition: all 0.2s;
+}
+.pp-btn-outline:hover { background: #f8fafc; border-color: #cbd5e1; }
+
+/* 偏好列表 */
+.pp-pref-list { display: flex; flex-direction: column; gap: 0.75rem; }
+.pp-pref-item {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0.5rem 0;
+}
+.pp-pref-info { display: flex; align-items: center; gap: 0.6rem; color: #475569; font-size: 0.88rem; font-weight: 500; }
+.pp-pref-item input[type="checkbox"] {
+  width: 1.75rem; height: 1rem; appearance: none;
+  background: #cbd5e1; border-radius: 1rem; position: relative;
+  cursor: pointer; transition: background 0.2s;
+}
+.pp-pref-item input[type="checkbox"]:checked { background: #10b981; }
+.pp-pref-item input[type="checkbox"]::before {
+  content: ''; position: absolute; left: 2px; top: 2px;
+  width: 12px; height: 12px; background: white; border-radius: 50%;
+  transition: transform 0.2s;
+}
+.pp-pref-item input[type="checkbox"]:checked::before { transform: translateX(12px); }
+
+.pp-system-info {
+  margin-top: 1rem; text-align: center;
+  color: #94a3b8; font-size: 0.7rem; font-weight: 600;
+  display: flex; flex-direction: column; gap: 0.2rem;
 }
 
-/* ── 关于我 ── */
-.pp-about {
-  background:white; border-radius:2rem; padding:2.5rem;
-  border:1px solid rgba(226,232,240,0.8);
-  box-shadow:0 2px 8px rgba(15,23,42,0.04);
-  display:grid; grid-template-columns:auto 1fr auto; gap:2.5rem; align-items:center;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
-.pp-about-avatar-wrap { display:flex; flex-direction:column; align-items:center; gap:0.6rem; }
-.pp-about-avatar { width:80px; height:80px; border-radius:50%; object-fit:cover; border:3px solid rgba(79,70,229,0.2); box-shadow:0 8px 24px rgba(79,70,229,0.2); }
-.pp-about-badge { padding:0.2rem 0.65rem; border-radius:9999px; background:#eff6ff; color:#4f46e5; font-size:0.65rem; font-weight:800; white-space:nowrap; }
-.pp-about-content { display:flex; flex-direction:column; gap:0.85rem; }
-.pp-about-title { margin:0; font-size:1.2rem; font-weight:900; color:#0f172a; }
-.pp-about-desc { margin:0; font-size:0.85rem; color:#64748b; line-height:1.75; }
-.pp-about-stats { display:flex; gap:2rem; flex-wrap:wrap; }
-.pp-about-stat { display:flex; flex-direction:column; gap:0.1rem; }
-.pp-about-stat strong { font-size:1.3rem; font-weight:900; color:#0f172a; }
-.pp-about-stat span { font-size:0.7rem; color:#94a3b8; font-weight:600; }
-.pp-about-deco { opacity:0.7; }
 
 /* ── 响应式 ── */
 @media (max-width:900px) {
-  .pp-stats-grid { grid-template-columns:repeat(2,1fr); }
-  .pp-main-grid { grid-template-columns:1fr; }
-  .pp-about { grid-template-columns:1fr; text-align:center; }
-  .pp-about-avatar-wrap { align-items:center; }
-  .pp-about-stats { justify-content:center; }
-  .pp-about-deco { display:none; }
+  .pp-settings-grid { grid-template-columns: 1fr; }
+  .pp-social-input-grid { grid-template-columns: 1fr; }
 }
 @media (max-width:600px) {
-  .pp-stats-grid { grid-template-columns:repeat(2,1fr); }
-  .pp-table-head,
-  .pp-table-row { grid-template-columns:1fr auto; }
-  .pp-table-head span:nth-child(2),
-  .pp-table-head span:nth-child(3),
-  .pp-table-row .pp-row-cat,
-  .pp-table-row .pp-row-status { display:none; }
-  .pp-quote { padding:2rem 1.5rem; }
+  .pp-hero-inner { flex-direction: column; text-align: center; }
+  .pp-social { justify-content: center; }
+  .pp-form-row { grid-template-columns: 1fr; }
 }
 </style>

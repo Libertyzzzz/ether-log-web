@@ -10,6 +10,7 @@ import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
+import AppToast from './components/AppToast.vue' // Import the new Toast component
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
 import type {
@@ -58,18 +59,24 @@ const articleError = ref('')
 const isLoadingArticles = ref(false)
 const selectedArticle = ref<ArticleDetail | null>(null)
 const selectedArticlePreview = ref<ArticleListItem | null>(null)
+const showFeaturedOnly = ref(false)
 const isLoadingArticleDetail = ref(false)
 const showPublishModal = ref(false)
 const publishError = ref('')
 const isPublishing = ref(false)
 const editingArticleId = ref<number | null>(null)
 const isDeletingArticle = ref(false)
+const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图文件输入框的引用
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const imageInput = ref<HTMLInputElement | null>(null)
 const isPreviewingMarkdown = ref(false)
 const isUploadingImage = ref(false)
 const showUserMenu = ref(false)
 const accessCodeInput = ref('')
+const showToast = ref(false)
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error' | 'info'>('info')
+let toastTimeout: number | undefined
 const accessCodeError = ref('')
 const accessGranted = ref(sessionStorage.getItem('mainSiteAccessGranted') === 'true')
 // const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
@@ -95,12 +102,18 @@ const myComments = ref<CommentItem[]>([
 ])
 
 const filteredArticles = computed(() => {
+  let list = articles.value
+
+  if (showFeaturedOnly.value) {
+    list = list.filter(a => a.isTop === 1)
+  }
+
   if (!activeCategoryId.value) {
-    return articles.value
+    return list
   }
 
   const activeCategory = categories.value.find(category => category.id === activeCategoryId.value)
-  return articles.value.filter(article => article.categoryName === activeCategory?.label)
+  return list.filter(article => article.categoryName === activeCategory?.label)
 })
 
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
@@ -112,6 +125,16 @@ const recentArticles = computed(() => articles.value.slice(0, 5))
 const totalViews = computed(() => articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0))
 const commentCount = computed(() => myComments.value.length)
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
+
+function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastMessage.value = message
+  toastType.value = type
+  showToast.value = true
+  toastTimeout = setTimeout(() => {
+    showToast.value = false
+  }, 3000) as unknown as number // Cast to number for consistency
+}
 
 async function validateMainAccessCode(code: string) {
   const response = await axios.get<ResultResponse<boolean>>('/api/access-code/verify', { 
@@ -176,17 +199,81 @@ async function insertMarkdown(before: string, after = '', placeholder = '文本'
   contentTextarea.value?.setSelectionRange(cursor, cursor)
 }
 
-function triggerImageUpload() {
+/**
+ * 从后端获取最新的用户信息，确保数据真实性
+ * 复用你提供的获取资料接口 /api/user/info
+ */
+async function fetchUserProfile() {
+  if (!localStorage.getItem('authToken')) return
+
+  try {
+    // 根据用户提供的最新接口定义，获取用户信息的接口为 /api/user/{id}
+    const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${loginUser.value.id}`, {
+      headers: getAuthHeaders()
+    })
+
+    if (response.data.code === 200 && response.data.data) {
+      const freshUser = response.data.data
+      // 更新本地响应式状态并同步到 localStorage，确保全站展示最新资料
+      loginUser.value = freshUser
+      localStorage.setItem('authUser', JSON.stringify(freshUser))
+    }
+  } catch (error) {
+    console.error('无法同步最新用户信息:', error)
+  }
+}
+
+/**
+ * 调用后端保存更新用户数据接口 api/user/save
+ * 用于同步修改昵称、格言、邮箱、头像等个人信息
+ */
+async function updateUserProfile(data: any) {
+  if (!isLoggedIn.value || !loginUser.value.id) {
+    showAppToast('请登录后再修改个人信息', 'error')
+    return
+  }
+
+  try {
+    // 根据后端 SysUserSaveDto 定义构造请求体
+    const payload = {
+      id: loginUser.value.id,
+      nickname: data.nickname !== undefined ? data.nickname : loginUser.value.nickname,
+      motto: data.motto !== undefined ? data.motto : loginUser.value.motto,
+      email: data.email !== undefined ? data.email : loginUser.value.email,
+      avatar: data.avatar !== undefined ? data.avatar : loginUser.value.avatar,
+      username: loginUser.value.username // 保持用户名不变
+    }
+
+    const response = await axios.post<ResultResponse<any>>('/api/user/save', payload, {
+      headers: getAuthHeaders()
+    })
+
+    if (response.data.code === 200) {
+      // 保存成功后，直接重新获取最新资料，确保前后台完全一致
+      await fetchUserProfile()
+      showAppToast('个人信息已同步至云端', 'success')
+    } else {
+      showAppToast(response.data.message || '信息更新失败', 'error')
+    }
+  } catch (error) {
+    showAppToast('网络异常，无法保存个人信息', 'error')
+  }
+}
+
+function triggerImageUpload(type: 'markdown' | 'cover' | 'avatar') {
   if (!localStorage.getItem('authToken')) {
     publishError.value = '登录状态已失效，请重新登录后再上传图片。'
     openLoginModal()
     return
   }
-
-  imageInput.value?.click()
+  if (type === 'markdown') {
+    imageInput.value?.click()
+  } else {
+    coverImageInput.value?.click()
+  }
 }
 
-async function uploadMarkdownImage(event: Event) {
+async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   target.value = ''
@@ -211,13 +298,24 @@ async function uploadMarkdownImage(event: Event) {
       return
     }
 
-    await insertMarkdown(`![${response.data.data.name || file.name}](`, ')', response.data.data.url)
+    if (type === 'markdown') {
+      await insertMarkdown('!', ``, response.data.data.name || '图片')
+    } else if (type === 'cover') {
+      publishForm.coverImg = response.data.data.url
+    } else {
+      // 头像上传：图片服务器返回 URL 后，调用 save 接口持久化到用户表
+      await updateUserProfile({ avatar: response.data.data.url })
+    }
   } catch (error) {
     publishError.value = axios.isAxiosError(error) && error.response?.data?.message
       ? error.response.data.message
       : '图片上传接口暂时不可用，请稍后再试。'
   } finally {
-    isUploadingImage.value = false
+    if (type === 'markdown') {
+      isUploadingImage.value = false
+    } else {
+      // 如果需要，可以为封面图添加一个独立的上传中状态
+    }
   }
 }
 
@@ -264,6 +362,7 @@ function resetPublishForm() {
   publishForm.status = 1
   publishForm.isTop = 0
   publishForm.categoryId = 1
+  publishForm.coverImg = '' // 新增：重置封面图
   publishForm.tagIds = []
   isPreviewingMarkdown.value = false
   editingArticleId.value = null
@@ -425,6 +524,7 @@ async function publishArticle() {
     const savedArticleId = editingArticleId.value
     resetPublishForm()
     closePublishModal()
+    showAppToast(savedArticleId ? '文章保存成功！' : '文章发布成功！', 'success')
     await fetchArticles()
     if (savedArticleId && selectedArticle.value?.id === savedArticleId) {
       await openArticleDetail(selectedArticle.value)
@@ -434,12 +534,14 @@ async function publishArticle() {
       publishError.value = editingArticleId.value
         ? '编辑接口被权限拦截，请确认 token 和后端认证配置。'
         : '发布接口被权限拦截，请确认 token 和后端认证配置。'
+      showAppToast(publishError.value, 'error')
       return
     }
 
     publishError.value = axios.isAxiosError(error) && error.response?.data?.message
       ? error.response.data.message
       : (editingArticleId.value ? '保存接口暂时不可用，请稍后再试。' : '发布接口暂时不可用，请稍后再试。')
+    showAppToast(publishError.value, 'error')
   } finally {
     isPublishing.value = false
   }
@@ -451,12 +553,13 @@ async function deleteArticle(articleId: number) {
     return
   }
 
-  const confirmed = window.confirm('确认删除这篇文章？此操作不可恢复。')
+  const confirmed = window.confirm('确认删除这篇文章？此操作不可恢复。') // Still using confirm for now
   if (!confirmed) {
     return
   }
 
   isDeletingArticle.value = true
+  showAppToast('正在删除文章...', 'info')
   publishError.value = ''
 
   try {
@@ -465,6 +568,7 @@ async function deleteArticle(articleId: number) {
     })
 
     if (response.data.code !== 200) {
+      showAppToast(response.data.message || '删除失败，请稍后重试。', 'error')
       publishError.value = response.data.message || '删除失败，请稍后重试。'
       return
     }
@@ -477,12 +581,14 @@ async function deleteArticle(articleId: number) {
     if (selectedArticle.value?.id === articleId) {
       closeArticleDetail()
     }
-
+    showAppToast('文章删除成功！', 'success')
     await fetchArticles()
   } catch (error) {
+    showAppToast('删除失败，请稍后重试。', 'error')
     publishError.value = axios.isAxiosError(error) && error.response?.data?.message
       ? error.response.data.message
       : '删除接口暂时不可用，请稍后再试。'
+    showAppToast(publishError.value, 'error')
   } finally {
     isDeletingArticle.value = false
   }
@@ -519,6 +625,7 @@ async function login() {
     localStorage.setItem('authUser', JSON.stringify(loginData.user))
     loginUser.value = loginData.user
     isLoggedIn.value = true
+    showAppToast('登录成功！', 'success')
     showLoginModal.value = false
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 401) {
@@ -538,8 +645,8 @@ async function login() {
 
     loginError.value = '登录接口暂不可用，请确认后端服务和代理配置是否正常。'
   } finally {
-    isLoggingIn.value = false
-  }
+    showAppToast(loginError.value, 'error')
+  } 
 }
 
 function logout() {
@@ -552,6 +659,7 @@ function logout() {
   selectedArticle.value = null
   selectedArticlePreview.value = null
   localStorage.removeItem('authToken')
+  showAppToast('已退出登录。', 'info')
   localStorage.removeItem('authUser')
 }
 
@@ -587,6 +695,8 @@ onMounted(() => {
   if (storedUser && storedToken) {
     loginUser.value = JSON.parse(storedUser)
     isLoggedIn.value = true
+    // 应用启动时，立即从服务器拉取最新数据，防止 localStorage 缓存过期
+    fetchUserProfile()
   } else {
     localStorage.removeItem('authToken')
     localStorage.removeItem('authUser')
@@ -616,16 +726,59 @@ onUnmounted(() => {
         @logout="handleLogout"
       />
 
-      <ArticleDetailView
-        v-if="articleForDetail && !showPublishModal"
-        :article="articleForDetail"
-        :selected-article="selectedArticle"
-        :is-loading="isLoadingArticleDetail"
-        :show-actions="showActionsInCurrentView"
-        @close="closeArticleDetail"
-        @edit="openPublishModal"
-        @delete="deleteArticle"
-      />
+      <Transition name="page-fade" mode="out-in">
+        <ArticleDetailView
+          v-if="isArticleDetailOpen && !showPublishModal"
+          :article="articleForDetail"
+          :selected-article="selectedArticle"
+          :is-loading="isLoadingArticleDetail"
+          :show-actions="showActionsInCurrentView"
+          @close="closeArticleDetail"
+          @edit="openPublishModal"
+          @delete="deleteArticle"
+        />
+        <div v-else-if="!showPublishModal" class="main-content-wrapper">
+          <HomePage
+            v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
+            :categories="categories"
+            :active-category-id="activeCategoryId"
+            :filtered-articles="filteredArticles"
+            :article-error="articleError"
+            :is-loading-articles="isLoadingArticles"
+            :show-actions="showActionsInCurrentView"
+            :show-featured-only="showFeaturedOnly"
+            @toggle-category="toggleCategory"
+            @open-article="openArticleDetail"
+            @edit-article="openPublishModal"
+            @delete-article="deleteArticle"
+            @scroll-to-posts="navigateToSection('posts')"
+            @toggle-featured="showFeaturedOnly = $event"
+          />
+
+          <ProfilePage
+            v-if="currentPage === 'profile'"
+            :login-user="loginUser"
+            @upload-avatar="uploadImage($event, 'avatar')"
+            @update-profile="updateUserProfile"
+          />
+
+          <DashboardPage
+            v-if="currentPage === 'dashboard'"
+            :articles="articles"
+            :my-comments="myComments"
+            :comment-count="commentCount"
+            :total-views="totalViews"
+            @new-article="openPublishModal"
+            @edit-article="openPublishModal"
+            @delete-article="deleteArticle"
+            @open-article="openArticleDetail"
+          />
+
+          <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
+          <ContactSection v-if="currentPage === 'home'" />
+          <AppFooter v-if="currentPage === 'home'" />
+        </div>
+      </Transition>
 
       <LoginModal
         v-if="showLoginModal"
@@ -638,45 +791,6 @@ onUnmounted(() => {
         @close="closeLoginModal"
         @login="login"
         @logout="logout"
-      />
-
-      <HomePage
-        v-if="!isArticleDetailOpen && !showPublishModal && (currentPage === 'home' || currentPage === 'posts' || currentPage === 'about')"
-        :categories="categories"
-        :active-category-id="activeCategoryId"
-        :filtered-articles="filteredArticles"
-        :article-error="articleError"
-        :is-loading-articles="isLoadingArticles"
-        :show-actions="showActionsInCurrentView"
-        @toggle-category="toggleCategory"
-        @open-article="openArticleDetail"
-        @edit-article="openPublishModal"
-        @delete-article="deleteArticle"
-      />
-
-      <ProfilePage
-        v-if="!isArticleDetailOpen && !showPublishModal && currentPage === 'profile'"
-        :login-user="loginUser"
-        :articles="articles"
-        :recent-articles="recentArticles"
-        :my-comments="myComments"
-        :comment-count="commentCount"
-        :total-views="totalViews"
-        @open-article="openArticleDetail"
-        @edit-article="openPublishModal"
-        @new-article="openPublishModal"
-      />
-
-      <DashboardPage
-        v-if="!isArticleDetailOpen && !showPublishModal && currentPage === 'dashboard'"
-        :articles="articles"
-        :my-comments="myComments"
-        :comment-count="commentCount"
-        :total-views="totalViews"
-        @new-article="openPublishModal"
-        @edit-article="openPublishModal"
-        @delete-article="deleteArticle"
-        @open-article="openArticleDetail"
       />
 
       <PublishModal
@@ -692,15 +806,15 @@ onUnmounted(() => {
         @close="closePublishModal"
         @publish="publishArticle"
         @insert-markdown="insertMarkdown"
-        @trigger-image-upload="triggerImageUpload"
-        @upload-markdown-image="uploadMarkdownImage"
+        @trigger-image-upload="triggerImageUpload('markdown')"
+        @upload-markdown-image="uploadImage($event, 'markdown')"
+        @upload-cover-image="uploadImage($event, 'cover')" 
+        @remove-cover-image="publishForm.coverImg = ''" 
         @content-textarea-ready="contentTextarea = $event"
         @image-input-ready="imageInput = $event"
       />
 
-      <AboutSection v-if="!isArticleDetailOpen && (currentPage === 'home' || currentPage === 'about')" />
-      <ContactSection v-if="!isArticleDetailOpen && currentPage === 'home'" />
-      <AppFooter v-if="!isArticleDetailOpen && currentPage === 'home'" />
+      <AppToast :message="toastMessage" :type="toastType" :show="showToast" />
     </div>
 
     <div v-if="!accessGranted" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
@@ -724,3 +838,25 @@ onUnmounted(() => {
     </div>
   </div>
 </template>
+
+<style>
+/* Global page transition styles */
+.page-fade-enter-active,
+.page-fade-leave-active {
+  transition: opacity 0.3s ease, transform 0.3s ease;
+}
+
+.page-fade-enter-from,
+.page-fade-leave-to {
+  opacity: 0;
+  transform: translateY(10px); /* Slight slide effect */
+}
+
+/* Wrapper for content when ArticleDetailView is not open */
+.main-content-wrapper {
+  /* This ensures the wrapper takes up space and allows transitions */
+  min-height: 1px; /* Or some other minimal height */
+  display: flex;
+  flex-direction: column;
+}
+</style>
