@@ -121,7 +121,6 @@ const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const isEditMode = computed(() => editingArticleId.value !== null)
 const currentPage = computed(() => (route.meta.page as string) || 'home')
 const showActionsInCurrentView = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
-const recentArticles = computed(() => articles.value.slice(0, 5))
 const totalViews = computed(() => articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0))
 const commentCount = computed(() => myComments.value.length)
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
@@ -201,7 +200,7 @@ async function insertMarkdown(before: string, after = '', placeholder = '文本'
 
 /**
  * 从后端获取最新的用户信息，确保数据真实性
- * 复用你提供的获取资料接口 /api/user/info
+ * 复用你提供的获取资料接口 /api/user/{id}
  */
 async function fetchUserProfile() {
   if (!localStorage.getItem('authToken')) return
