@@ -13,7 +13,7 @@ import { useAssessmentChat } from '../composables/useAssessmentChat'
 // 分享模块
 const route = useRoute()
 
-// [新增] 使用聊天 composable
+// [新增] 使用聊天 composab
 const {
   chatMessages,
   currentQuestionId: chatCurrentQuestionId,
@@ -1084,23 +1084,41 @@ onUnmounted(() => {
 
 <template>
   <main class="assessment-root" :class="{ 'is-chat-root': step === 'chat' }">
-    <nav v-if="step !== 'chat'" class="assessment-nav">
-      <button class="brand-button" type="button" @click="router.push({ name: 'assessment-home' })">
-        <span class="brand-mark">V</span>
-        <span>Aether Valuation | 人间估值</span>
-      </button>
-      <div class="nav-meta">
-        <span>PLAYFUL DIAGNOSTIC</span>         
+    <nav v-if="step !== 'chat'" class="assessment-nav animate-fade-in">
+      <div class="nav-left">
+        <button class="brand-button" type="button" @click="router.push({ name: 'assessment-home' })">
+          <div class="brand-mark-wrapper">
+            <span class="brand-mark">V</span>
+            <div class="mark-glow"></div>
+          </div>
+          <div class="brand-text">
+            <span class="brand-main">Aether Valuation</span>
+            <span class="brand-sub">人间估值</span>
+          </div>
+        </button>
+      </div>
+      <div class="nav-right">
+        <div class="status-indicator">
+          <span class="status-dot"></span>
+          <span class="status-text">SYSTEM ACTIVE</span>
+        </div>
+        <div class="nav-divider"></div>
+        <div class="nav-meta">
+          <span>PLAYFUL DIAGNOSTIC / v2.5</span>
+        </div>
       </div>
     </nav>
 
     <section v-if="step === 'intro'" class="intro-stage animate-fade-in">
+      <!-- 文案放在左侧 -->
       <div class="intro-copy">
-        <span class="eyebrow">FUN TEST / NOT A REAL PRICE TAG</span>
-        <h1>测测你在人间市场的估值啦</h1>
-        <p>输入你的身高、资产、生活习惯和情绪参数，生成一份带梗报告和可分享海报。它只负责好玩，不负责定义你。</p>
+        <span class="eyebrow">DIGITAL MIRROR / ALGORITHMIC SOUL</span>
+        <h1 class="art-title">
+          数字洪流中<br />
+          重构你的<span class="text-gradient">感性画像</span>
+        </h1>
+        <p class="art-desc">捕捉潜意识里的逻辑碎屑，通过算法推演出你在“人间市场”的估值。这不仅是一场关于参数的校准，更是一次关于自我的感性解码。</p>
         <div class="intro-warning">
-          <strong>重要提示</strong>
           <span>进入测试后，表单里的数据只是默认初始值。请改成你自己的情况，再生成报告。</span>
         </div>
 
@@ -1113,11 +1131,8 @@ onUnmounted(() => {
           </a>
         </div>
         
-        <!-- [新增] 模式选择 -->
         <div class="mode-selection">
-          <h3 class="mode-title">选择你的体验方式：</h3>
           <div class="mode-cards">
-            <!-- 正式填写（聊天模式） -->
             <div class="mode-card recommended" @click="selectMode('chat')">
               <div class="mode-badge">推荐</div>
               <div class="mode-icon">
@@ -1135,8 +1150,6 @@ onUnmounted(() => {
                 <span>✨ 开始探索</span>
               </button>
             </div>
-            
-            <!-- 快速模式（表单） -->
             <div class="mode-card" @click="selectMode('form')">
               <div class="mode-icon">
                 <Zap :size="32" />
@@ -1156,31 +1169,51 @@ onUnmounted(() => {
           </div>
         </div>
       </div>
+
+      <!-- 预览面板放在右侧 -->
       <aside class="intro-preview" aria-label="报告预览">
-        <div class="intro-preview-top">
-          <span class="panel-kicker">REPORT PREVIEW</span>
-          <strong>?</strong>
+        <!-- 预览面板的 HTML 结构保持不变，因为之前已经调整过样式 -->
+        <div class="preview-bg-deco" aria-hidden="true">
+          <div class="p-orb p-orb-1"></div>
+          <div class="p-orb p-orb-2"></div>
         </div>
-        <div class="intro-preview-score">
-          <span>估值指数</span>
-          <b>生成后揭晓</b>
+
+        <div class="preview-content">
+          <div class="intro-preview-top">
+            <span class="panel-kicker">REPORT PREVIEW</span>
+            <div class="preview-status-pill">
+              <Sparkles :size="12" />
+              <span>Awaiting Logic</span>
+            </div>
+          </div>
+
+          <div class="intro-preview-score-card">
+            <div class="score-card-label">预估指数</div>
+            <div class="score-card-value">
+              <span class="score-placeholder">??</span>
+              <span class="score-unit">PTS</span>
+            </div>
+            <div class="score-card-glow"></div>
+          </div>
+
+          <div class="intro-preview-metrics">
+            <div class="metric-item" style="--val: 74%">
+              <div class="metric-label"><span>生存资源</span><b>S-74</b></div>
+              <div class="metric-track"><div class="metric-fill"></div></div>
+            </div>
+            <div class="metric-item" style="--val: 58%">
+              <div class="metric-label"><span>情绪带宽</span><b>E-58</b></div>
+              <div class="metric-track"><div class="metric-fill"></div></div>
+            </div>
+            <div class="metric-item" style="--val: 86%">
+              <div class="metric-label"><span>审美溢价</span><b>A-86</b></div>
+              <div class="metric-track"><div class="metric-fill"></div></div>
+            </div>
+          </div>
+          <p class="preview-hint">报告包含六维画像映射、深度带梗解读及一份极具审美力的数字海报。</p>
         </div>
-        <div class="intro-preview-bars">
-          <div style="--bar: 74%">
-            <span>生存资源</span>
-            <i></i>
-          </div>
-          <div style="--bar: 58%">
-            <span>情绪带宽</span>
-            <i></i>
-          </div>
-          <div style="--bar: 86%">
-            <span>审美溢价</span>
-            <i></i>
-          </div>
-        </div>
-        <p>报告会给出六维画像、轻松解读和保存海报入口。</p>
       </aside>
+
       <div class="intro-points" aria-label="测试亮点">
         <div>
           <strong>先调数据</strong>
@@ -1964,7 +1997,7 @@ onUnmounted(() => {
 .fun-card,
 .advice-card,
 .loading-panel {
-  border-radius: 8px;
+  border-radius: 1.75rem;
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(226, 232, 240, 0.86);
   box-shadow: 0 24px 70px rgba(15, 23, 42, 0.07), inset 0 1px 0 rgba(255, 255, 255, 0.78);
@@ -1973,105 +2006,69 @@ onUnmounted(() => {
 .intro-copy {
   position: relative;
   overflow: hidden;
-  min-height: 470px;
-  padding: 54px;
+  min-height: 520px;
+  padding: 64px;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(239, 246, 255, 0.9)),
-    linear-gradient(90deg, rgba(37, 99, 235, 0.08), transparent 42%);
+    radial-gradient(circle at 0% 0%, rgba(99, 102, 241, 0.12) 0%, transparent 50%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.9));
 }
 
-.intro-copy::after {
-  content: '';
-  position: absolute;
-  right: 42px;
-  bottom: 38px;
-  width: 150px;
-  height: 150px;
-  border: 1px solid rgba(37, 99, 235, 0.14);
-  border-radius: 8px;
-  transform: rotate(8deg);
-  background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.68), rgba(255, 255, 255, 0.28));
-  z-index: 0;
-  pointer-events: none;
-}
-
-.intro-copy h1 {
+.art-title {
   position: relative;
   z-index: 1;
-  max-width: 760px;
-  margin: 18px 0;
+  max-width: 800px;
+  margin: 24px 0;
   color: #111827;
-  font-size: clamp(46px, 6.4vw, 86px);
-  line-height: 0.98;
-  font-weight: 950;
-  letter-spacing: 0;
+  font-size: clamp(42px, 5.5vw, 72px);
+  line-height: 1.1;
+  font-weight: 900;
+  letter-spacing: -0.04em;
 }
 
-.intro-copy p {
+.text-gradient {
+  background: linear-gradient(135deg, #4f46e5, #10b981);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  display: inline-block;
+}
+
+.art-desc {
   position: relative;
   z-index: 1;
-  max-width: 660px;
+  max-width: 620px;
   margin: 0;
   color: #64748b;
-  font-size: 18px;
-  line-height: 1.8;
+  font-size: 17px;
+  line-height: 1.85;
+  font-weight: 500;
+  letter-spacing: 0.01em;
 }
 
 .intro-warning {
   position: relative;
   z-index: 1;
-  display: grid;
-  gap: 4px;
-  max-width: 620px;
-  margin-top: 24px;
-  padding: 16px 18px;
-  border-radius: 8px;
-  background: rgba(248, 250, 252, 0.82);
-  border: 1px solid rgba(191, 219, 254, 0.76);
-  box-shadow: inset 3px 0 0 #2563eb, 0 12px 28px rgba(37, 99, 235, 0.06);
-}
-
-.intro-warning strong {
-  color: #1d4ed8;
-  font-size: 14px;
+  display: inline-flex;
+  max-width: 580px;
+  margin-top: 32px;
+  padding: 12px 20px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  backdrop-filter: blur(8px);
 }
 
 .intro-warning span {
-  color: #334155;
-  font-size: 14px;
-  line-height: 1.6;
-  font-weight: 800;
+  color: #94a3b8;
+  font-size: 13px;
+  line-height: 1.5;
+  font-weight: 600;
 }
-
-.intro-helper-links {
-  position: relative;
-  z-index: 1;
-  margin-top: 18px;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  font-size: 14px;
-  color: #64748b;
-}
-.intro-helper-links a {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 6px 14px;
-  background: rgba(255, 255, 255, 0.6);
-  border: 1px solid rgba(226, 232, 240, 0.8);
-  border-radius: 8px;
-  color: #2563eb;
-  text-decoration: none;
-  font-weight: 700;
-  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-}
-.intro-helper-links a:hover {
-  background: #ffffff;
-  border-color: #2563eb;
-  transform: translateY(-1px);
-  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
+/* 伪元素做装饰：加个微弱的亮点 */
+.intro-warning::before {
+  content: '✦';
+  margin-right: 8px;
+  color: #4f46e5;
+  font-size: 12px;
 }
 
 .intro-actions {
@@ -2099,81 +2096,225 @@ onUnmounted(() => {
 }
 
 .intro-preview {
-  display: grid;
-  align-content: start;
-  gap: 18px;
-  min-height: 470px;
-  padding: 32px;
-  background: #111827;
+  position: relative;
+  overflow: hidden;
+  min-height: 540px;
+  padding: 40px 32px;
+  background: #0f172a;
   color: #ffffff;
+  display: flex;
+  flex-direction: column;
+  border: none !important;
 }
 
-.intro-preview-top,
-.intro-preview-score {
+.preview-bg-deco {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+.p-orb {
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(40px);
+}
+
+.p-orb-1 {
+  width: 200px; height: 200px;
+  top: -50px; right: -50px;
+  background: rgba(79, 70, 229, 0.3);
+}
+
+.p-orb-2 {
+  width: 150px; height: 150px;
+  bottom: -30px; left: -30px;
+  background: rgba(16, 185, 129, 0.2);
+}
+
+.preview-content {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 32px;
+}
+
+.intro-preview-top {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 18px;
 }
 
-.intro-preview-top .panel-kicker {
-  color: #93c5fd;
-}
-
-.intro-preview-top strong {
-  display: inline-grid;
-  place-items: center;
-  width: 44px;
-  height: 44px;
-  border-radius: 14px;
-  background: #2563eb;
-  font-size: 26px;
-}
-
-.intro-preview-score {
-  min-height: 146px;
-  padding: 22px;
-  border-radius: 16px;
-  background: #ffffff;
-  color: #111827;
-}
-
-.intro-preview-score span,
-.intro-preview-bars span {
+.preview-status-pill {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 700;
   color: #94a3b8;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.intro-preview-score-card {
+  position: relative;
+  padding: 32px 24px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  overflow: hidden;
+  text-align: center;
+}
+
+.score-card-label {
   font-size: 12px;
+  font-weight: 800;
+  color: #64748b;
+  letter-spacing: 0.2em;
+  text-transform: uppercase;
+  margin-bottom: 12px;
+}
+
+.score-card-value {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+
+.score-placeholder {
+  font-size: 64px;
+  font-weight: 950;
+  color: #f8fafc;
+  line-height: 1;
+  font-family: "SF Pro Display", system-ui;
+}
+
+.score-unit {
+  font-size: 14px;
   font-weight: 900;
+  color: #4f46e5;
 }
 
-.intro-preview-score b {
-  max-width: 150px;
-  text-align: right;
-  font-size: 34px;
-  line-height: 1.05;
+.score-card-glow {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(circle at 50% 50%, rgba(79, 70, 229, 0.15) 0%, transparent 70%);
+  pointer-events: none;
 }
 
-.intro-preview-bars {
+.intro-preview-metrics {
   display: grid;
-  gap: 14px;
+  gap: 20px;
 }
 
-.intro-preview-bars div {
+.metric-item {
   display: grid;
   gap: 8px;
 }
 
-.intro-preview-bars i {
-  display: block;
-  height: 10px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #60a5fa var(--bar), rgba(255, 255, 255, 0.14) var(--bar));
+.metric-label {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
 }
 
-.intro-preview p {
-  margin: 4px 0 0;
-  color: #cbd5e1;
-  line-height: 1.7;
+.metric-label span {
+  font-size: 13px;
   font-weight: 800;
+  color: #cbd5e1;
+}
+
+.metric-label b {
+  font-size: 10px;
+  font-weight: 900;
+  color: #4f46e5;
+  letter-spacing: 0.1em;
+}
+
+.metric-track {
+  height: 6px;
+  background: rgba(255, 255, 255, 0.06);
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.metric-fill {
+  height: 100%;
+  width: var(--val);
+  background: linear-gradient(90deg, #4f46e5, #10b981);
+  border-radius: inherit;
+  box-shadow: 0 0 10px rgba(79, 70, 229, 0.3);
+}
+
+.preview-hint {
+  margin-top: auto;
+  font-size: 13px;
+  line-height: 1.7;
+  color: #64748b;
+  font-weight: 600;
+  padding-top: 12px;
+}
+
+.intro-helper-links {
+  position: relative;
+  z-index: 1;
+  margin-top: 24px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  font-size: 14px;
+  color: #94a3b8;
+  font-weight: 500;
+}
+.intro-helper-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 18px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1.5px solid rgba(79, 70, 229, 0.2);
+  border-radius: 12px;
+  color: #312e81;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  animation: subtle-glow 2.5s infinite ease-in-out;
+  backdrop-filter: blur(8px);
+}
+.intro-helper-links a:hover {
+  background: #ffffff;
+  border-color: #4f46e5;
+  color: #4f46e5;
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(79, 70, 229, 0.15);
+}
+
+@keyframes subtle-glow {
+  0%, 100% { box-shadow: 0 0 0 0px rgba(79, 70, 229, 0.15); }
+  50% { box-shadow: 0 0 0 5px rgba(79, 70, 229, 0.08); }
+}
+
+.mode-card {
+  padding: 24px !important;
+}
+
+.mode-button {
+  min-height: 54px !important;
+  font-size: 16px !important;
+  font-weight: 800 !important;
+  border-radius: 14px !important;
+  letter-spacing: 0.02em;
+}
+
+.mode-features {
+  margin-bottom: 24px !important;
 }
 
 .intro-points {
