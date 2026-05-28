@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
-import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck } from 'lucide-vue-next'
+import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck, ExternalLink } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
 
@@ -1103,6 +1103,15 @@ onUnmounted(() => {
           <strong>重要提示</strong>
           <span>进入测试后，表单里的数据只是默认初始值。请改成你自己的情况，再生成报告。</span>
         </div>
+
+        <div class="intro-helper-links">
+          <span class="helper-label">还没准备好性格参数？</span>
+          <a href="https://www.16personalities.com/ch" target="_blank" rel="noopener">
+            <span class="helper-icon">🧩</span>
+            16Personalities (MBTI) 测试
+            <ExternalLink :size="12" />
+          </a>
+        </div>
         
         <!-- [新增] 模式选择 -->
         <div class="mode-selection">
@@ -1629,7 +1638,7 @@ onUnmounted(() => {
               </button>
               <div class="wechat-share-icon">☕</div>
               <h3>请作者喝杯咖啡</h3>
-              <p>打开支付宝扫一扫，感谢支持 🙏</p>
+              <p>扫码支付宝转账，感谢支持 🙏</p>
               <div class="wechat-qr-box">
                 <canvas ref="donateQrCanvasRef" width="188" height="188"></canvas>
               </div>
@@ -2033,6 +2042,36 @@ onUnmounted(() => {
   font-size: 14px;
   line-height: 1.6;
   font-weight: 800;
+}
+
+.intro-helper-links {
+  position: relative;
+  z-index: 1;
+  margin-top: 18px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: #64748b;
+}
+.intro-helper-links a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 8px;
+  color: #2563eb;
+  text-decoration: none;
+  font-weight: 700;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.intro-helper-links a:hover {
+  background: #ffffff;
+  border-color: #2563eb;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(37, 99, 235, 0.1);
 }
 
 .intro-actions {

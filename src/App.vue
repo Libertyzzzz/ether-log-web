@@ -520,6 +520,15 @@ function closeArticleDetail() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+/**
+ * 跳转至人间估值页面
+ */
+function openAssessment() {
+  router.push({ name: 'assessment-home' })
+  selectedArticle.value = null
+  selectedArticlePreview.value = null
+}
+
 function handleSearchSelect(article: ArticleListItem) {
   showSearchModal.value = false
   openArticleDetail(article)
@@ -842,6 +851,7 @@ onUnmounted(() => {
             @delete-article="deleteArticle"
             @scroll-to-posts="navigateToSection('posts')"
             @toggle-featured="showFeaturedOnly = $event"
+            @open-assessment="openAssessment"
             @open-donate="openDonate"
           />
 

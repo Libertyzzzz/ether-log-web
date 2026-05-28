@@ -20,6 +20,7 @@ defineEmits<{
   deleteArticle: [articleId: number]
   scrollToPosts: []
   toggleFeatured: [val: boolean]
+  openAssessment: [] // 新增：打开人间估值事件
   openDonate: []
 }>()
 
@@ -85,6 +86,10 @@ function formatDate(dateStr: string) {
             </button>
             <button class="hp-btn-ghost" :class="{ active: showFeaturedOnly }" type="button" @click="$emit('toggleFeatured', !showFeaturedOnly)">
               {{ showFeaturedOnly ? '查看全部' : '☆ 精选文章' }}
+            </button>
+            <!-- 新增：人间估值入口 -->
+            <button class="hp-btn-ghost" type="button" @click="$emit('openAssessment')">
+              ✨ 人间估值
             </button>
           </div>
         </div>
