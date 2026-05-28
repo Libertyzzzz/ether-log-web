@@ -129,17 +129,6 @@ const filteredArticles = computed(() => {
   return list.filter(article => article.categoryName === activeCategory?.label)
 })
 
-// 搜索过滤逻辑（示例，可根据需要扩展）
-const searchQuery = ref('')
-const searchResults = computed(() => {
-  if (!searchQuery.value.trim()) return []
-  const q = searchQuery.value.toLowerCase()
-  return articles.value.filter(a => 
-    a.title.toLowerCase().includes(q) || 
-    (a.summary && a.summary.toLowerCase().includes(q))
-  )
-})
-
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
 const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const isEditMode = computed(() => editingArticleId.value !== null)
