@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info } from 'lucide-vue-next'
+import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
@@ -16,6 +16,7 @@ const emit = defineEmits<{
   openDashboard: []
   openLogin: []
   toggleStatus: []
+  openSearch: []
   logout: []
 }>()
 
@@ -118,6 +119,13 @@ onUnmounted(() => {
 
       <!-- 3. 右侧：PC 操作按钮 + 状态标签 (始终靠右) -->
       <div class="nav-right">
+        <!-- 搜索触发按钮 -->
+        <button class="nav-search-trigger" type="button" @click="$emit('openSearch')" title="搜索 (⌘K)">
+          <Search :size="16" />
+          <span class="desktop-only">Search...</span>
+          <kbd class="desktop-only">⌘K</kbd>
+        </button>
+
         <div class="nav-actions desktop-only">
           <button v-if="isLoggedIn" class="nav-action-button" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
           <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
@@ -198,6 +206,31 @@ onUnmounted(() => {
   cursor: pointer; transition: opacity 0.2s;
 }
 .nav-action-button.secondary { background: #f1f5f9; color: #475569; }
+
+/* 搜索触发器样式 */
+.nav-search-trigger {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0.6rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  background: #f8fafc;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nav-search-trigger:hover {
+  border-color: #cbd5e1;
+  background: #f1f5f9;
+  color: #64748b;
+}
+kbd {
+  font-family: inherit;
+  font-size: 0.65rem;
+  font-weight: 800;
+  opacity: 0.6;
+}
 
 /* 系统状态栏 (Badge) */
 .status-badge-wrapper { position: relative; }
