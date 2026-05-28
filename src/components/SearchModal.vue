@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, watch, onMounted, onUnmounted } from 'vue'
-import { Search, X, FileText, CornerDownLeft, Command, Loader2 } from 'lucide-vue-next'
+import { ref, watch } from 'vue'
+import { Search, FileText, CornerDownLeft, Command, Loader2 } from 'lucide-vue-next'
 import type { ArticleListItem } from '../types/blog'
 import axios from 'axios'
 
