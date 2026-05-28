@@ -2,6 +2,8 @@
 import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
+import QRCode from 'qrcode'
+import confetti from 'canvas-confetti'
 import AboutSection from './components/AboutSection.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
@@ -11,6 +13,7 @@ import DashboardPage from './components/DashboardPage.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
 import AppToast from './components/AppToast.vue' // Import the new Toast component
+import SearchModal from './components/SearchModal.vue' // Import SearchModal
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
 import type {
@@ -58,6 +61,7 @@ const activeCategoryId = ref<number | null>(null)
 const articleError = ref('')
 const isLoadingArticles = ref(false)
 const selectedArticle = ref<ArticleDetail | null>(null)
+const showSearchModal = ref(false) // 搜索模态框状态
 const selectedArticlePreview = ref<ArticleListItem | null>(null)
 const showFeaturedOnly = ref(false)
 const isLoadingArticleDetail = ref(false)
@@ -74,11 +78,20 @@ const isUploadingImage = ref(false)
 const showUserMenu = ref(false)
 const accessCodeInput = ref('')
 const showToast = ref(false)
+const isCheckingGate = ref(true) // 初始进入时的门禁校验状态
 const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
 let toastTimeout: number | undefined
+
+// 打赏功能状态
+const isDonateOpen = ref(false)
+// 检测是否手机端（复用 Assessment 的逻辑）
+const checkIsMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+const donateQrCanvasRef = ref<HTMLCanvasElement | null>(null)
+const ALIPAY_URL = 'https://qr.alipay.com/fkx15570bli95fl5zczgq60'
+
 const accessCodeError = ref('')
-const accessGranted = ref(sessionStorage.getItem('mainSiteAccessGranted') === 'true')
+const accessGranted = ref(false) // 默认不放行，由后端逻辑决定
 // const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
 const isVerifyingAccessCode = ref(false)
 const publishForm = reactive<ArticlePublishRequest>({
@@ -116,6 +129,17 @@ const filteredArticles = computed(() => {
   return list.filter(article => article.categoryName === activeCategory?.label)
 })
 
+// 搜索过滤逻辑（示例，可根据需要扩展）
+const searchQuery = ref('')
+const searchResults = computed(() => {
+  if (!searchQuery.value.trim()) return []
+  const q = searchQuery.value.toLowerCase()
+  return articles.value.filter(a => 
+    a.title.toLowerCase().includes(q) || 
+    (a.summary && a.summary.toLowerCase().includes(q))
+  )
+})
+
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
 const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const isEditMode = computed(() => editingArticleId.value !== null)
@@ -133,6 +157,35 @@ function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'inf
   toastTimeout = setTimeout(() => {
     showToast.value = false
   }, 3000) as unknown as number // Cast to number for consistency
+}
+
+/**
+ * 打开打赏：网页端弹出二维码 + 彩带特效，移动端直接跳转支付宝
+ */
+async function openDonate() {
+  if (checkIsMobile()) {
+    // 移动端直接跳转支付宝（复用 Assessment 逻辑）
+    window.open(ALIPAY_URL, '_blank')
+  } else {
+    // PC 端触发全屏彩带碎屑效果，增加趣味性
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.7 },
+      colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'],
+      zIndex: 9999
+    })
+
+    isDonateOpen.value = true
+    await nextTick()
+    if (donateQrCanvasRef.value) {
+      await QRCode.toCanvas(donateQrCanvasRef.value, ALIPAY_URL, {
+        width: 188,
+        margin: 2,
+        color: { dark: '#0f172a', light: '#ffffff' }
+      })
+    }
+  }
 }
 
 async function validateMainAccessCode(code: string) {
@@ -196,6 +249,32 @@ async function insertMarkdown(before: string, after = '', placeholder = '文本'
   contentTextarea.value?.focus()
   const cursor = start + before.length + selectedText.length + after.length
   contentTextarea.value?.setSelectionRange(cursor, cursor)
+}
+
+/**
+ * 检查后端门禁状态
+ * status: 0-关闭(放行), 1-开启(校验)
+ */
+async function checkGateStatus() {
+  try {
+    const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
+    if (response.data.code === 200 && response.data.data) {
+      const status = response.data.data.status
+      if (status === 0) {
+        // 门禁已关闭，直接进入
+        accessGranted.value = true
+      } else {
+        // 门禁开启，检查本地会话是否曾验证通过
+        accessGranted.value = sessionStorage.getItem('mainSiteAccessGranted') === 'true'
+      }
+    }
+  } catch (error) {
+    console.error('门禁状态获取失败:', error)
+    // 兜底：接口失败时维持 sessionStorage 验证逻辑
+    accessGranted.value = sessionStorage.getItem('mainSiteAccessGranted') === 'true'
+  } finally {
+    isCheckingGate.value = false
+  }
 }
 
 /**
@@ -452,6 +531,11 @@ function closeArticleDetail() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function handleSearchSelect(article: ArticleListItem) {
+  showSearchModal.value = false
+  openArticleDetail(article)
+}
+
 function openProfile() {
   router.push({ name: 'profile' })
   selectedArticle.value = null
@@ -683,8 +767,21 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-onMounted(() => {
+// 快捷键监听
+function handleKeyDown(e: KeyboardEvent) {
+  if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+    e.preventDefault()
+    showSearchModal.value = !showSearchModal.value
+  }
+}
+
+onMounted(async () => {
   document.title = 'ETHERLOG'
+  window.addEventListener('keydown', handleKeyDown)
+  
+  // 1. 优先执行门禁状态同步
+  await checkGateStatus()
+
   const storedUser = localStorage.getItem('authUser')
   const storedToken = localStorage.getItem('authToken')
   if (storedUser && storedToken) {
@@ -702,13 +799,20 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('keydown', handleKeyDown)
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
 
 <template>
-  <div class="app-container">
-    <div class="main-site-shell" :class="{ locked: !accessGranted }" :aria-hidden="!accessGranted">
+  <div class="app-container" :class="{ 'gate-pending': isCheckingGate }">
+    <!-- 全局初始加载 Loading -->
+    <div v-if="isCheckingGate" class="app-init-loader">
+      <div class="loader-logo">E</div>
+      <div class="loader-line"></div>
+    </div>
+
+    <div v-else class="main-site-shell" :class="{ locked: !accessGranted }" :aria-hidden="!accessGranted">
       <AppNavbar
         :is-logged-in="isLoggedIn"
         :login-user="loginUser"
@@ -718,6 +822,7 @@ onUnmounted(() => {
         @open-dashboard="openDashboard"
         @open-login="openLoginModal"
         @toggle-status="handleStatusClick"
+        @open-search="showSearchModal = true"
         @logout="handleLogout"
       />
 
@@ -748,6 +853,7 @@ onUnmounted(() => {
             @delete-article="deleteArticle"
             @scroll-to-posts="navigateToSection('posts')"
             @toggle-featured="showFeaturedOnly = $event"
+            @open-donate="openDonate"
           />
 
           <ProfilePage
@@ -809,10 +915,34 @@ onUnmounted(() => {
         @image-input-ready="imageInput = $event"
       />
 
+      <!-- 打赏模态框（复用 Assessment 的样式逻辑） -->
+      <Teleport to="body">
+        <div v-if="isDonateOpen" class="donate-overlay" @click.self="isDonateOpen = false">
+          <div class="donate-dialog">
+            <button class="donate-close" type="button" @click="isDonateOpen = false">×</button>
+            <div class="donate-icon">☕</div>
+            <h3>请作者喝杯咖啡</h3>
+            <p>感谢你的支持与认可 🙏</p>
+            <div class="donate-qr-box">
+              <canvas ref="donateQrCanvasRef" width="188" height="188"></canvas>
+            </div>
+            <p class="donate-tip">打开支付宝扫一扫</p>
+            <p class="donate-sub-tip">PC端扫码，手机端跳转</p>
+          </div>
+        </div>
+      </Teleport>
+
+      <SearchModal
+        :show="showSearchModal"
+        :articles="articles"
+        @close="showSearchModal = false"
+        @select="handleSearchSelect"
+      />
+
       <AppToast :message="toastMessage" :type="toastType" :show="showToast" />
     </div>
 
-    <div v-if="!accessGranted" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
+    <div v-if="!accessGranted && !isCheckingGate" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
       <form class="access-card" @submit.prevent="verifyMainAccess">
         <span>PRIVATE AREA</span>
         <h1>Access Code</h1>
@@ -835,6 +965,36 @@ onUnmounted(() => {
 </template>
 
 <style>
+/* 打赏弹窗全局样式 */
+.donate-overlay {
+  position: fixed; inset: 0; z-index: 3000;
+  display: grid; place-items: center; padding: 20px;
+  background: rgba(15, 23, 42, 0.4); backdrop-filter: blur(12px);
+  animation: fadeIn 0.3s ease;
+}
+.donate-dialog {
+  position: relative; width: min(340px, 100%); padding: 32px 24px;
+  border-radius: 20px; background: white; text-align: center;
+  box-shadow: 0 25px 50px -12px rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+}
+.donate-close {
+  position: absolute; top: 12px; right: 16px; border: none;
+  background: transparent; font-size: 24px; color: #94a3b8; cursor: pointer;
+}
+.donate-icon { font-size: 40px; margin-bottom: 12px; }
+.donate-dialog h3 { margin: 0 0 8px; color: #0f172a; font-size: 20px; font-weight: 800; }
+.donate-dialog p { margin: 0 0 20px; color: #64748b; font-size: 14px; font-weight: 500; }
+.donate-qr-box {
+  display: grid; place-items: center; width: 210px; height: 212px;
+  margin: 0 auto 16px; border-radius: 16px; border: 1px solid #e2e8f0;
+  background: #f8fafc; padding: 10px;
+}
+.donate-tip { font-weight: 800; color: #0f172a; font-size: 15px; margin: 0; }
+.donate-sub-tip { font-size: 12px; color: #94a3b8; margin-top: 4px; }
+
+@keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+
 /* Global page transition styles */
 .page-fade-enter-active,
 .page-fade-leave-active {
@@ -854,4 +1014,37 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
 }
+
+/* ── 初始门禁校验 Loading ── */
+.app-init-loader {
+  position: fixed; inset: 0; z-index: 9999;
+  display: flex; flex-direction: column; align-items: center; justify-content: center;
+  background: #f5f5f7; gap: 2.5rem;
+}
+.loader-logo {
+  width: 3.8rem; height: 3.8rem; background: #0f172a; color: white;
+  display: flex; align-items: center; justify-content: center;
+  border-radius: 0.85rem; font-size: 2rem; font-weight: 950;
+  animation: loaderPulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+.loader-line {
+  width: 140px; height: 2px; background: #e2e8f0; border-radius: 99px;
+  position: relative; overflow: hidden;
+}
+.loader-line::after {
+  content: ''; position: absolute; left: 0; top: 0; height: 100%; width: 30%;
+  background: #2563eb; border-radius: 99px;
+  animation: loaderMove 1.5s infinite ease-in-out;
+}
+
+@keyframes loaderPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.7; transform: scale(0.94); }
+}
+@keyframes loaderMove {
+  0% { left: -30%; }
+  100% { left: 100%; }
+}
+
+.gate-pending { overflow: hidden; height: 100vh; }
 </style>

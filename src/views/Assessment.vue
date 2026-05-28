@@ -1629,7 +1629,7 @@ onUnmounted(() => {
               </button>
               <div class="wechat-share-icon">☕</div>
               <h3>请作者喝杯咖啡</h3>
-              <p>扫码支付宝转账，感谢支持 🙏</p>
+              <p>打开支付宝扫一扫，感谢支持 🙏</p>
               <div class="wechat-qr-box">
                 <canvas ref="donateQrCanvasRef" width="188" height="188"></canvas>
               </div>

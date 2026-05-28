@@ -20,6 +20,7 @@ defineEmits<{
   deleteArticle: [articleId: number]
   scrollToPosts: []
   toggleFeatured: [val: boolean]
+  openDonate: []
 }>()
 
 // 分类图标映射（固定静态，和后端 label 对应）
@@ -219,7 +220,15 @@ function formatDate(dateStr: string) {
             写作，是把模糊的思考变得清晰，<br />
             也是与未来的自己对话。
           </blockquote>
-          <cite class="hp-quote-author">— Ether</cite>
+          <div class="hp-quote-footer">
+            <cite class="hp-quote-author">— Ether</cite>
+            <div class="hp-quote-action">
+              <button class="hp-btn-donate" type="button" @click="$emit('openDonate')">
+                <span class="hp-btn-donate-icon">☕</span>
+                <span class="hp-btn-donate-text">来杯咖啡吧</span>
+              </button>
+            </div>
+          </div>
         </div>
         <!-- 右侧装饰：纯 CSS，无需图片 -->
         <div class="hp-quote-deco" aria-hidden="true">
@@ -735,14 +744,14 @@ function formatDate(dateStr: string) {
 .hp-quote-content {
   position: relative;
   background: #0f172a;
-  padding: 3rem 3.5rem;
+  padding: 2.2rem 3rem; /* 显著减少上下内边距，压缩高度 */
   display: flex;
   flex-direction: column;
-  gap: 1rem;
+  gap: 0.75rem; /* 缩小元素间距 */
   border-radius: 1.75rem;
 }
 .hp-quote-mark {
-  font-size: 5rem;
+  font-size: 3.5rem; /* 减小引号尺寸 */
   line-height: 0.8;
   color: #4f46e5;
   font-family: Georgia, serif;
@@ -757,12 +766,42 @@ function formatDate(dateStr: string) {
   line-height: 1.65;
   font-style: normal;
 }
+.hp-quote-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* 左右分布，作者在左按钮在右 */
+  margin-top: 0.5rem;
+}
 .hp-quote-author {
   font-size: 0.88rem;
   color: #64748b;
   font-style: normal;
   font-weight: 600;
 }
+
+/* ── 打赏按钮集成（引言卡片内） ── */
+.hp-quote-action {
+  margin-top: 0; /* 移除顶部间距，由 footer 统一控制 */
+  display: flex;
+  justify-content: flex-start;
+}
+.hp-btn-donate {
+  display: inline-flex; align-items: center; gap: 0.6rem;
+  padding: 0.5rem 1.25rem; /* 缩小按钮尺寸 */
+  border-radius: 999px; /* 改为全圆角，更显灵动 */
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+  color: #334155; cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+.hp-btn-donate:hover {
+  background: #ffffff;
+  transform: translateY(-0.5px);
+  box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
+}
+.hp-btn-donate-icon { font-size: 1rem; }
+.hp-btn-donate-text { font-size: 0.85rem; font-weight: 800; letter-spacing: 0.02em; }
 
 /* ════════════════════════════════
    响应式
@@ -772,6 +811,7 @@ function formatDate(dateStr: string) {
   .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
+  .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; } /* 移动端切回垂直排列 */
   .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
   .hp-hero-visual { display: none; }
   .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
@@ -779,174 +819,6 @@ function formatDate(dateStr: string) {
   .hp-quote-content { padding: 2rem 1.5rem; }
 }
 
-/* ════════════════════════════════
-   分类卡片
-════════════════════════════════ */
-.hp-categories {
-  background: #f5f5f7;
-  padding: 2.5rem 0;
-}
-.hp-categories-inner {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 1rem;
-}
-.hp-cat-card {
-  display: flex;
-  align-items: center;
-  gap: 0.85rem;
-  padding: 1rem 1.1rem;
-  border-radius: 1.25rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
-  cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
-}
-.hp-cat-card:hover {
-  box-shadow: 0 8px 24px rgba(79,70,229,0.1);
-  border-color: rgba(79,70,229,0.25);
-  transform: translateY(-2px);
-}
-.hp-cat-card.active {
-  background: #4f46e5;
-  border-color: #4f46e5;
-  box-shadow: 0 12px 32px rgba(79,70,229,0.3);
-}
-.hp-cat-card.active .hp-cat-icon { background: rgba(255,255,255,0.15); color: white; }
-.hp-cat-card.active .hp-cat-info strong { color: white; }
-.hp-cat-card.active .hp-cat-info span { color: rgba(255,255,255,0.7); }
-.hp-cat-card.active .hp-cat-arrow { color: rgba(255,255,255,0.6); }
-
-.hp-cat-icon {
-  width: 2.5rem;
-  height: 2.5rem;
-  border-radius: 0.75rem;
-  background: #eff6ff;
-  color: #4f46e5;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-.hp-cat-info {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 0.15rem;
-  min-width: 0;
-}
-.hp-cat-info strong {
-  font-size: 0.88rem;
-  font-weight: 800;
-  color: #0f172a;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hp-cat-info span {
-  font-size: 0.7rem;
-  color: #94a3b8;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.hp-cat-arrow { color: #cbd5e1; flex-shrink: 0; }
-
-/* ════════════════════════════════
-   最新文章
-════════════════════════════════ */
-.hp-posts {
-  padding: 1rem 0 3rem;
-}
-.hp-posts-inner {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-.hp-section-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 1.5rem;
-}
-.hp-section-title {
-  margin: 0;
-  font-size: 1.1rem;
-  font-weight: 900;
-  color: #0f172a;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-}
-.hp-section-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #4f46e5;
-  box-shadow: 0 0 6px #4f46e5;
-}
-.hp-view-all {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.3rem;
-  border: none;
-  background: transparent;
-  color: #4f46e5;
-  font-size: 0.78rem;
-  font-weight: 700;
-  cursor: pointer;
-  letter-spacing: 0.04em;
-  transition: gap 0.2s;
-}
-.hp-view-all:hover { gap: 0.5rem; }
-
-/* 文章网格 */
-.hp-posts-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 1.25rem;
-}
-
-/* 文章卡片 */
-.hp-article-card {
-  border-radius: 1.5rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
-  overflow: hidden;
-  cursor: pointer;
-  transition: box-shadow 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
-}
-.hp-article-card:hover {
-  box-shadow: 0 16px 40px rgba(15,23,42,0.1);
-  transform: translateY(-3px);
-}
-
-/* 封面图区域 */
-.hp-card-cover {
-  position: relative;
-  height: 180px;
-  background-size: cover;
-  background-position: center;
-  background-repeat: no-repeat;
-}
-.hp-card-category-badge {
-  position: absolute;
-  top: 0.75rem;
-  left: 0.75rem;
-  padding: 0.2rem 0.65rem;
-  border-radius: 9999px;
-  background: rgba(0,0,0,0.45);
-  backdrop-filter: blur(8px);
-  color: white;
-  font-size: 0.65rem;
-  font-weight: 800;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-}
 .hp-card-admin-actions {
   position: absolute;
   bottom: 0.75rem;
