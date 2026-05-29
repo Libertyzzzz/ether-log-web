@@ -294,9 +294,9 @@ async function fetchUserProfile() {
  * 调用后端保存更新用户数据接口 api/user/save
  * 用于同步修改昵称、格言、邮箱、头像等个人信息
  */
-async function updateUserProfile(data: any) {
+async function updateUserProfile(data: any, silent = false) {
   if (!isLoggedIn.value || !loginUser.value.id) {
-    showAppToast('请登录后再修改个人信息', 'error')
+    if (!silent) showAppToast('请登录后再修改个人信息', 'error')
     return
   }
 
@@ -308,6 +308,7 @@ async function updateUserProfile(data: any) {
       motto: data.motto !== undefined ? data.motto : loginUser.value.motto,
       email: data.email !== undefined ? data.email : loginUser.value.email,
       avatar: data.avatar !== undefined ? data.avatar : loginUser.value.avatar,
+      lastLoginTime: data.lastLoginTime || loginUser.value.lastLoginTime,
       username: loginUser.value.username // 保持用户名不变
     }
 
@@ -318,12 +319,12 @@ async function updateUserProfile(data: any) {
     if (response.data.code === 200) {
       // 保存成功后，直接重新获取最新资料，确保前后台完全一致
       await fetchUserProfile()
-      showAppToast('个人信息已同步至云端', 'success')
+      if (!silent) showAppToast('个人信息已同步至云端', 'success')
     } else {
-      showAppToast(response.data.message || '信息更新失败', 'error')
+      if (!silent) showAppToast(response.data.message || '信息更新失败', 'error')
     }
   } catch (error) {
-    showAppToast('网络异常，无法保存个人信息', 'error')
+    if (!silent) showAppToast('网络异常，无法保存个人信息', 'error')
   }
 }
 
@@ -706,6 +707,11 @@ async function login() {
     localStorage.setItem('authUser', JSON.stringify(loginData.user))
     loginUser.value = loginData.user
     isLoggedIn.value = true
+
+    // 登录成功后，复用 save 接口静默更新最后登录时间 (获取用户设备本地时间并格式化)
+    const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19)
+    updateUserProfile({ lastLoginTime }, true)
+
     showAppToast('登录成功！', 'success')
     showLoginModal.value = false
   } catch (error) {
@@ -726,8 +732,11 @@ async function login() {
 
     loginError.value = '登录接口暂不可用，请确认后端服务和代理配置是否正常。'
   } finally {
-    showAppToast(loginError.value, 'error')
-  } 
+    isLoggingIn.value = false
+    if (loginError.value) {
+      showAppToast(loginError.value, 'error')
+    }
+  }
 }
 
 function logout() {
