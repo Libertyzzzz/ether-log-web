@@ -73,10 +73,19 @@ const questionFlow: QuestionConfig[] = [
     hint: '单位：厘米',
     stage: 1,
     easterEgg: {
-      condition: (form: any) => form.height > 200,
+      condition: (form: any) => form.height > 205,
       response: '等等...你是篮球运动员吗？🏀 还是模特？'
     },
-    nextQuestion: 'visualHeight'
+    nextQuestion: 'visual_sample' // <--- 引导到新的视觉采样问题
+  },
+  // [新增] 视觉采样问题 - 激活对话模式下的图像上传组件
+  {
+    id: 'visual_sample', // 唯一的问题 ID
+    text: '为了更精准地评估“审美溢价”，系统需要获取一张你的视觉样本。这能让算法捕捉到潜意识无法描述的特征。',
+    inputType: 'image', // <--- 关键：设置为 'image' 类型，触发组件显示
+    stage: 1, // 放在基础建模阶段
+    // next 属性可以指向下一个问题，或者在用户点击“确认采样”后由 handleChatAnswer 自动处理
+    nextQuestion: 'visualHeight' // <--- 采样完成后，继续询问视觉身高
   },
   {
     id: 'visualHeight',

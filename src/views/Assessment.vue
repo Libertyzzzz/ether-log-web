@@ -5,7 +5,7 @@ import { useRoute } from 'vue-router'
 import axios from 'axios'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
-import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck, ExternalLink } from 'lucide-vue-next'
+import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck, ExternalLink, Camera } from 'lucide-vue-next'
 import QRCode from 'qrcode'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
 
@@ -31,6 +31,49 @@ const {
   handleAnswer: chatHandleAnswer,
   initSliderValue
 } = useAssessmentChat()
+
+// [新增] 视觉采样相关状态
+const valuationImage = ref<string | null>(null)
+const valuationImageServerName = ref<string | null>(null)
+const valuationImageInput = ref<HTMLInputElement | null>(null)
+const isUploadingValuationImage = ref(false)
+
+const handleImageUpload = async (event: Event) => {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  if (file) {
+    // 1. 本地即时预览 (Blob URL)
+    valuationImage.value = URL.createObjectURL(file)
+
+    // 2. 实际上传到后端接口
+    isUploadingValuationImage.value = true
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      
+      const response = await axios.post('/api/admin/upload/image', formData, {
+        headers: {
+          Authorization: localStorage.getItem('authToken') || ''
+        }
+      })
+
+      if (response.data.code === 200 && response.data.data?.name) {
+        // 保存后端返回的 name，用于评估接口提交，后端会自行拼接路径
+        valuationImageServerName.value = response.data.data.name
+        // 更新预览地址为远程全路径，确保 UI 显示正常
+        valuationImage.value = response.data.data.url
+      }
+    } catch (error) {
+      console.error('采样图片上传异常:', error)
+    } finally {
+      isUploadingValuationImage.value = false
+    }
+  }
+}
+
+const triggerImageUpload = () => {
+  valuationImageInput.value?.click()
+}
 
 const posterRef = ref<HTMLElement | null>(null)
 const isGenerating = ref(false) // [新增] 生成状态
@@ -431,6 +474,7 @@ interface AssessmentResult {
   marketLevel: string
   report: string
   radar: AssessmentRadar
+  beautyScore?: number
   lieFactor?: number
   advice?: string[]
   shareId?: string
@@ -550,6 +594,11 @@ const handleChatAnswer = async (value: any) => {
   const currentQ = getCurrentQuestion.value
   if (!currentQ) return
   
+  // [修复] 如果是图像采样步骤，跳过表单字段自动映射逻辑，由 valuationImage 独立管理
+  if (currentQ.inputType === 'image') {
+    return await chatHandleAnswer(value, form, startAnalysis)
+  }
+
   let val = value
   if (currentQ.field) {
     const field = currentQ.field as keyof AssessmentForm
@@ -583,7 +632,7 @@ watch(chatCurrentQuestionId, () => {
 })
 
 const canSubmit = computed(() => {
-  return form.age >= 18 && form.height > 0 && form.visualHeight > 0 && form.weight > 0 && form.annualIncome >= 0
+  return form.age >= 18 && form.height > 0 && form.visualHeight > 0 && form.weight > 0 && form.annualIncome >= 0 && !isUploadingValuationImage.value
 })
 
 const assetPreview = computed(() => {
@@ -729,11 +778,17 @@ const funFacts = computed(() => {
 
 const resultChips = computed(() => {
   const score = result.value?.score ?? 0
-  return [
+  const chips = [
     { label: '报告性质', value: '娱乐观测' },
     { label: '心理负担', value: score >= 60 ? '轻量级' : '请勿当真' },
     { label: '推荐动作', value: '笑一下再看' }
   ]
+
+  // 如果后端返回了颜值评分，则展示在结果标签中
+  if (result.value?.beautyScore !== undefined) {
+    chips.splice(1, 0, { label: '颜值评估', value: `${result.value.beautyScore} pts` })
+  }
+  return chips
 })
 
 
@@ -780,6 +835,11 @@ function buildAssessmentPayload() {
       longitude: userLocation.value.longitude
     })
   }
+
+  // 如果已有上传成功的图片 name，则将其作为 imageUrl 传递给评估接口
+  if (valuationImageServerName.value) {
+    Object.assign(payload, { imageUrl: valuationImageServerName.value })
+  }
   return payload
 }
 
@@ -812,6 +872,7 @@ function normalizeResult(payload: any): AssessmentResult {
     marketLevel: source.marketLevel || '评估完成',
     report: source.report || '暂无详细报告内容...',
     lieFactor: typeof source.lieFactor === 'number' ? source.lieFactor : undefined,
+    beautyScore: typeof source.beautyScore === 'number' ? source.beautyScore : undefined,
     shareId: source.shareId, // [新增] 映射后端返回的 ID
     inputSnapshot: inputSnapshot
       ? {
@@ -1022,6 +1083,8 @@ function resetAssessment() {
   result.value = null
   lastInputSnapshot.value = null
   errorMessage.value = ''
+  valuationImage.value = null // [修复] 重置评估时清空采样图
+  valuationImageServerName.value = null // 清空图片名称
   step.value = 'input'
   chart?.dispose()
   chart = null
@@ -1338,6 +1401,39 @@ onUnmounted(() => {
                   </button>
                 </div>
               </div>
+
+              <!-- [新增] 对话模式下的视觉采样组件 -->
+              <div v-if="msg.questionId === chatCurrentQuestionId && getCurrentQuestion?.inputType === 'image'">
+                <div class="bubble-upload-zone" :class="{ 'has-image': valuationImage }">
+                  <div v-if="!valuationImage" class="upload-placeholder" @click="triggerImageUpload">
+                    <div class="scan-line"></div>
+                    <Camera :size="24" />
+                    <span>点击开启视觉特征扫描</span>
+                    <small>解析审美溢价与皮肤特质</small>
+                  </div>
+                  <div v-else class="upload-preview-wrap">
+                    <img :src="valuationImage" class="upload-preview" alt="Biometric Sample" />
+                    <div class="scan-overlay"></div>
+                    <button class="re-upload-btn" @click="triggerImageUpload">
+                      <X :size="14" />
+                    </button>
+                  </div>
+                  <button 
+                    v-if="valuationImage" 
+                    class="chat-confirm-btn" 
+                    type="button"
+                    :disabled="isUploadingValuationImage"
+                    @click="handleChatAnswer('IMAGE_SAMPLED')"
+                  >
+                    {{ isUploadingValuationImage ? '正在上传视觉样本...' : '确认采样数据并继续' }}
+                  </button>
+                  <button 
+                    v-else 
+                    class="chat-skip-btn" 
+                    @click="handleChatAnswer('SKIPPED')"
+                  >跳过此步骤</button>
+                </div>
+              </div>
             </div>
             <div class="chat-avatar" v-if="msg.type === 'user'">
               <div class="avatar-user">👤</div>
@@ -1370,6 +1466,27 @@ onUnmounted(() => {
 
     <section v-if="step === 'input'" class="assessment-layout animate-fade-in">
       <form class="input-panel" @submit.prevent="startAnalysis">
+        <!-- [新增] 快速模式下的顶部采样位 -->
+        <div class="form-visual-sampler">
+          <div class="sampler-info">
+            <span class="panel-kicker">OPTIONAL SCAN</span>
+            <h3>视觉特征采样</h3>
+            <p>上传一张照片以激活算法对“审美溢价”维度的加成校验。</p>
+          </div>
+          <div class="sampler-box" :class="{ 'has-img': valuationImage }" @click="triggerImageUpload">
+            <div v-if="!valuationImage" class="sampler-empty">
+               <Sparkles :size="20" />
+               <span>START SCAN</span>
+            </div>
+            <template v-else>
+              <img :src="valuationImage" class="sampler-img" />
+              <div class="sampler-mask">
+                <span>REPLACE</span>
+              </div>
+            </template>
+          </div>
+        </div>
+
         <div class="input-note">
             <div class="note-header">
                 <span class="note-emoji">🎭</span>
@@ -1532,12 +1649,23 @@ onUnmounted(() => {
     <section v-else-if="result" class="result-stage animate-zoom-in">
       <div class="result-hero-card" :style="{ '--verdict-color': playfulVerdict.color }">
         <div class="result-copy">
-          <div class="result-meta-rail">
-            <span>REPORT READY</span>
-            <span>LOW STAKES ONLY</span>
-            <span>{{ result.marketLevel }}</span>
+          <div class="result-main-header">
+            <!-- [修复] 图像整合进页眉，移除 absolute 定位 -->
+            <div v-if="valuationImage" class="result-user-profile">
+              <div class="profile-frame">
+                <img :src="valuationImage" class="profile-img" alt="Visual Sample" />
+                <div class="profile-scan-line"></div>
+                <div class="profile-grid-overlay"></div>
+              </div>
+            </div>
+            <div class="header-text-group">
+              <div class="result-meta-rail">
+                <span>REPORT READY</span>
+                <span>{{ result.marketLevel }}</span>
+              </div>
+              <h2>{{ playfulVerdict.title }}</h2>
+            </div>
           </div>
-          <h2>{{ playfulVerdict.title }}</h2>
           <p>{{ playfulVerdict.subtitle }}</p>
           <div class="result-chip-row">
             <div v-for="chip in resultChips" :key="chip.label">
@@ -1826,6 +1954,16 @@ onUnmounted(() => {
         </section>
       </div>
     </Teleport>
+
+    <!-- 隐藏的文件上传控件：放在根部确保全局可用 -->
+    <input 
+      type="file" 
+      ref="valuationImageInput" 
+      class="hidden-input" 
+      accept="image/*" 
+      style="display: none;"
+      @change="handleImageUpload" 
+    />
   </main>
 </template>
 
@@ -2742,6 +2880,66 @@ onUnmounted(() => {
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--verdict-color, #2563eb) 72%, #94a3b8);
 }
 
+.result-main-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 32px;
+  margin-bottom: 24px;
+}
+
+.header-text-group {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.result-meta-rail {
+  margin-bottom: 0 !important;
+}
+
+/* 结果页用户头像样式重构 */
+.profile-frame {
+  width: 90px;
+  height: 112px;
+  background: #000;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+  position: relative;
+  overflow: hidden;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+}
+
+.profile-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  opacity: 0.9;
+  filter: grayscale(0.2) contrast(1.1);
+}
+
+.profile-scan-line {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 2px;
+  background: var(--verdict-color, #2563eb);
+  box-shadow: 0 0 10px var(--verdict-color, #2563eb);
+  animation: profileScan 4s infinite linear;
+  z-index: 2;
+}
+
+.profile-grid-overlay {
+  position: absolute;
+  inset: 0;
+  background-image: 
+    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
+  background-size: 10px 10px;
+  pointer-events: none;
+}
+
 .score-orb {
   position: relative;
   z-index: 1;
@@ -2782,6 +2980,15 @@ onUnmounted(() => {
   bottom: 28px;
   height: 1px;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
+}
+
+/* 微调移动端适配：如果有头像，增加 Hero 卡片的顶部间距 */
+@media (max-width: 960px) {
+  .result-main-header {
+    flex-direction: column;
+    gap: 20px;
+  }
+  .profile-frame { width: 80px; height: 100px; }
 }
 
 .score-ring-label {
@@ -3342,6 +3549,123 @@ onUnmounted(() => {
   color: #000 !important;
   border: none !important;
   box-shadow: 0 8px 20px rgba(255, 165, 0, 0.3);
+}
+
+/* ════════════════════════════════════════
+   视觉特征采样组件样式 (Apple Style)
+   ════════════════════════════════════════ */
+
+/* 快速模式顶层容器 */
+.form-visual-sampler {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 24px 28px;
+  background: rgba(248, 250, 252, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.8);
+  border-radius: 16px;
+  margin-bottom: 28px;
+  backdrop-filter: blur(10px);
+}
+
+.sampler-info h3 { margin: 4px 0; font-size: 19px; font-weight: 850; color: #0f172a; }
+.sampler-info p { margin: 0; font-size: 13.5px; color: #64748b; font-weight: 500; }
+
+.sampler-box {
+  width: 84px; height: 84px;
+  border: 2px dashed #cbd5e1;
+  border-radius: 14px;
+  display: grid; place-items: center;
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+.sampler-box:hover { border-color: #2563eb; background: #fff; transform: scale(1.02); }
+.sampler-box.has-img { border-style: solid; border-color: #2563eb; box-shadow: 0 8px 20px rgba(37, 99, 235, 0.15); }
+
+.sampler-empty { display: flex; flex-direction: column; align-items: center; gap: 6px; color: #94a3b8; font-size: 10px; font-weight: 900; }
+.sampler-img { width: 100%; height: 100%; object-fit: cover; }
+.sampler-mask { 
+  position: absolute; inset: 0; background: rgba(15, 23, 42, 0.45); 
+  display: grid; place-items: center; opacity: 0; transition: 0.25s;
+  backdrop-filter: blur(4px);
+}
+.sampler-box:hover .sampler-mask { opacity: 1; }
+.sampler-mask span { color: white; font-size: 11px; font-weight: 900; letter-spacing: 0.05em; }
+
+/* 对话模式采样组件 */
+.bubble-upload-zone { margin-top: 18px; width: 100%; }
+.upload-placeholder {
+  aspect-ratio: 16/10; border: 1.5px dashed rgba(37, 99, 235, 0.3); border-radius: 14px;
+  background: linear-gradient(135deg, rgba(239, 246, 255, 0.5), rgba(255, 255, 255, 0.8));
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center; gap: 10px;
+  cursor: pointer; position: relative; overflow: hidden;
+  transition: all 0.3s ease;
+}
+.upload-placeholder:hover { border-color: #2563eb; background: rgba(239, 246, 255, 0.8); }
+
+/* 激光扫描动画 */
+.scan-line {
+  position: absolute; top: 0; left: 0; width: 100%; height: 3px;
+  background: linear-gradient(90deg, transparent, #2563eb, #10b981, #2563eb, transparent);
+  box-shadow: 0 0 15px rgba(37, 99, 235, 0.6);
+  animation: scanMove 3.5s infinite ease-in-out;
+  z-index: 2;
+}
+@keyframes scanMove { 
+  0%, 100% { top: 0; opacity: 0; } 
+  5%, 95% { opacity: 1; }
+  50% { top: 100%; } 
+}
+
+.upload-placeholder span { font-size: 15px; font-weight: 850; color: #1e40af; }
+.upload-placeholder small { font-size: 12px; color: #94a3b8; font-weight: 500; }
+
+.upload-preview-wrap {
+  position: relative; border-radius: 14px; overflow: hidden;
+  aspect-ratio: 16/10; border: 1px solid #e2e8f0;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.1);
+}
+.upload-preview { width: 100%; height: 100%; object-fit: cover; }
+.scan-overlay {
+  position: absolute; inset: 0;
+  background: linear-gradient(rgba(37, 99, 235, 0.05) 50%, rgba(37, 99, 235, 0.1) 50%);
+  background-size: 100% 4px;
+  pointer-events: none;
+}
+
+.re-upload-btn {
+  position: absolute; top: 12px; right: 12px; width: 30px; height: 30px;
+  background: rgba(255, 255, 255, 0.9); border: 1px solid #e2e8f0; border-radius: 50%;
+  display: grid; place-items: center; cursor: pointer; color: #64748b;
+  transition: all 0.2s ease;
+}
+.re-upload-btn:hover { background: #fff; color: #ef4444; transform: rotate(90deg); }
+
+.chat-confirm-btn {
+  width: 100%; margin-top: 14px; height: 50px;
+  background: linear-gradient(135deg, #2563eb, #1d4ed8);
+  color: white; border: none; border-radius: 10px;
+  font-weight: 850; font-size: 15px; cursor: pointer;
+  box-shadow: 0 8px 20px rgba(37, 99, 235, 0.25);
+  transition: all 0.3s ease;
+}
+.chat-confirm-btn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(37, 99, 235, 0.35); }
+
+.chat-skip-btn {
+  width: 100%; margin-top: 10px; height: 36px;
+  background: transparent; color: #94a3b8; border: none;
+  font-size: 13px; font-weight: 700; text-decoration: none; cursor: pointer;
+  opacity: 0.8; transition: opacity 0.2s;
+}
+.chat-skip-btn:hover { opacity: 1; color: #64748b; }
+
+/* 隐藏输入框 */
+.hidden-input {
+  position: absolute;
+  width: 1px; height: 1px;
+  padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0, 0, 0, 0); border: 0;
 }
 
 .poster-score {
