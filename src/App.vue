@@ -75,6 +75,7 @@ const contentTextarea = ref<HTMLTextAreaElement | null>(null)
 const imageInput = ref<HTMLInputElement | null>(null)
 const isPreviewingMarkdown = ref(false)
 const isUploadingImage = ref(false)
+const pendingMarkdownImage = ref<{ id: number; src: string; alt: string } | null>(null)
 const showUserMenu = ref(false)
 const accessCodeInput = ref('')
 const showToast = ref(false)
@@ -240,6 +241,23 @@ async function insertMarkdown(before: string, after = '', placeholder = '文本'
   contentTextarea.value?.setSelectionRange(cursor, cursor)
 }
 
+function getUploadedImageUrl(data: UploadImageData | Record<string, unknown> | string | null | undefined) {
+  if (!data) return ''
+  if (typeof data === 'string') return data
+
+  const values = data as Record<string, unknown>
+
+  return [values.url, values.fullUrl, values.fileUrl, values.imageUrl, values.path]
+    .find(value => typeof value === 'string' && value.trim().length > 0) as string || ''
+}
+
+function clearStoredLogin() {
+  isLoggedIn.value = false
+  loginUser.value = emptyLoginUser
+  localStorage.removeItem('authToken')
+  localStorage.removeItem('authUser')
+}
+
 /**
  * 检查后端门禁状态
  * status: 0-关闭(放行), 1-开启(校验)
@@ -350,6 +368,13 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
     return
   }
 
+  if (!localStorage.getItem('authToken')) {
+    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
+    showAppToast(publishError.value, 'error')
+    openLoginModal()
+    return
+  }
+
   publishError.value = ''
   isUploadingImage.value = true
 
@@ -361,29 +386,45 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
       headers: getAuthHeaders()
     })
 
-    if (response.data.code !== 200 || !response.data.data?.url) {
+    const imageUrl = getUploadedImageUrl(response.data.data)
+
+    if (response.data.code !== 200 || !imageUrl) {
       publishError.value = response.data.message || '图片上传失败，请稍后重试。'
+      showAppToast(publishError.value, 'error')
       return
     }
 
     if (type === 'markdown') {
-      await insertMarkdown('!', ``, response.data.data.name || '图片')
+      const altText = response.data.data.name || 'image'
+      pendingMarkdownImage.value = {
+        id: Date.now(),
+        src: imageUrl,
+        alt: altText
+      }
+      showAppToast('图片已插入正文', 'success')
     } else if (type === 'cover') {
-      publishForm.coverImg = response.data.data.url
+      publishForm.coverImg = imageUrl
+      showAppToast('封面图上传成功', 'success')
     } else {
       // 头像上传：图片服务器返回 URL 后，调用 save 接口持久化到用户表
-      await updateUserProfile({ avatar: response.data.data.url })
+      await updateUserProfile({ avatar: imageUrl })
     }
   } catch (error) {
-    publishError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '图片上传接口暂时不可用，请稍后再试。'
-  } finally {
-    if (type === 'markdown') {
-      isUploadingImage.value = false
-    } else {
-      // 如果需要，可以为封面图添加一个独立的上传中状态
+    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+      publishError.value = '图片上传被后端权限拦截，请重新登录后再试。'
+      clearStoredLogin()
+      openLoginModal()
+      showAppToast(publishError.value, 'error')
+      return
     }
+
+    publishError.value = axios.isAxiosError(error)
+      ? (error.response?.data?.message || `图片上传失败：HTTP ${error.response?.status || '网络错误'}`)
+      : '图片上传失败，请稍后再试。'
+    showAppToast(publishError.value, 'error')
+  } finally {
+    // [修复] 无论哪种类型，完成后都应重置上传状态，避免工具栏按钮锁死
+    isUploadingImage.value = false
   }
 }
 
@@ -406,6 +447,8 @@ function openPublishModal(article?: ArticleListItem | ArticleDetail) {
     resetPublishForm()
     editingArticleId.value = null
     showPublishModal.value = true
+    // [增强] 开启实时预览模式，实现类似知乎的即时反馈体验
+    isPreviewingMarkdown.value = true
     return
   }
 
@@ -432,7 +475,7 @@ function resetPublishForm() {
   publishForm.categoryId = 1
   publishForm.coverImg = '' // 新增：重置封面图
   publishForm.tagIds = []
-  isPreviewingMarkdown.value = false
+  isPreviewingMarkdown.value = true // 默认保持预览开启
   editingArticleId.value = null
 }
 
@@ -441,7 +484,7 @@ function fillPublishForm(article: ArticleDetail) {
   publishForm.subtitle = article.subtitle || ''
   publishForm.summary = article.summary || ''
   publishForm.content = article.content || ''
-  publishForm.contentHtml = article.contentHtml || ''
+  publishForm.contentHtml = article.contentHtml || article.renderContent || ''
   publishForm.coverImg = article.coverImg || ''
   publishForm.cardStyle = article.cardStyle || 1
   publishForm.status = article.status || 1
@@ -458,6 +501,7 @@ async function loadArticleForEdit(articleId: number) {
     const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`)
     if (response.data.code === 200 && response.data.data) {
       fillPublishForm(response.data.data)
+      isPreviewingMarkdown.value = true // 编辑时也默认开启实时预览
       return
     }
 
@@ -584,7 +628,7 @@ async function publishArticle() {
   }
 
   isPublishing.value = true
-  publishForm.contentHtml = markdownPreviewHtml.value
+  publishForm.contentHtml = publishForm.contentHtml || markdownPreviewHtml.value
 
   try {
     let response
@@ -912,6 +956,7 @@ onUnmounted(() => {
         :is-edit-mode="isEditMode"
         :is-uploading-image="isUploadingImage"
         :markdown-preview-html="markdownPreviewHtml"
+        :pending-markdown-image="pendingMarkdownImage"
         @close="closePublishModal"
         @publish="publishArticle"
         @insert-markdown="insertMarkdown"

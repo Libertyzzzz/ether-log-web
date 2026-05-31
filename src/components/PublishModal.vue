@@ -1,8 +1,21 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import { Bold, Code2, Eye, Heading, Image, Italic, List, Quote, X, PenLine, Settings2, EyeOff } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
+import { Bold, Code2, Heading, Image, Italic, List, Quote, X, PenLine, Settings2 } from 'lucide-vue-next'
+import { EditorContent, useEditor } from '@tiptap/vue-3'
+import StarterKit from '@tiptap/starter-kit'
+import TiptapImage from '@tiptap/extension-image'
+import Link from '@tiptap/extension-link'
+import Placeholder from '@tiptap/extension-placeholder'
+import TurndownService from 'turndown'
 import type { ComponentPublicInstance } from 'vue'
 import type { ArticlePublishRequest, Category } from '../types/blog'
+import { renderMarkdown } from '../utils/markdown'
+
+type PendingMarkdownImage = {
+  id: number
+  src: string
+  alt: string
+}
 
 const props = defineProps<{
   publishForm: ArticlePublishRequest
@@ -13,6 +26,7 @@ const props = defineProps<{
   isPreviewingMarkdown: boolean
   isUploadingImage: boolean
   markdownPreviewHtml: string
+  pendingMarkdownImage: PendingMarkdownImage | null
 }>()
 
 const emit = defineEmits<{
@@ -28,15 +42,115 @@ const emit = defineEmits<{
   removeCoverImage: [] // 新增：移除封面图事件
 }>()
 
-function setContentTextarea(element: Element | ComponentPublicInstance | null) {
-  emit('contentTextareaReady', element instanceof HTMLTextAreaElement ? element : null)
-}
-
 function setImageInput(element: Element | ComponentPublicInstance | null) {
-  emit('imageInputReady', element instanceof HTMLInputElement ? element : null)
+  const input = element instanceof HTMLInputElement ? element : null
+  markdownImageInput.value = input
+  emit('imageInputReady', input)
 }
 
 const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图文件输入框的引用
+const markdownImageInput = ref<HTMLInputElement | null>(null)
+const markdownImageInputId = 'publish-markdown-image-input'
+const isSyncingEditor = ref(false)
+const turndown = new TurndownService({
+  headingStyle: 'atx',
+  bulletListMarker: '-',
+  codeBlockStyle: 'fenced'
+})
+
+turndown.addRule('fencedCodeBlocks', {
+  filter: ['pre'],
+  replacement: (_content, node) => {
+    const code = node.textContent || ''
+    return `\n\n\`\`\`\n${code.replace(/\n$/, '')}\n\`\`\`\n\n`
+  }
+})
+
+function getEditorHtml() {
+  if (props.publishForm.contentHtml) return props.publishForm.contentHtml
+  if (props.publishForm.content?.trim()) return renderMarkdown(props.publishForm.content)
+  return ''
+}
+
+function syncPublishContentFromEditor() {
+  if (!editor.value) return
+
+  isSyncingEditor.value = true
+  const html = editor.value.getHTML()
+  const isEmpty = editor.value.isEmpty
+
+  props.publishForm.contentHtml = isEmpty ? '' : html
+  props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
+
+  nextTick(() => {
+    isSyncingEditor.value = false
+  })
+}
+
+const editor = useEditor({
+  content: getEditorHtml(),
+  extensions: [
+    StarterKit.configure({
+      heading: { levels: [1, 2, 3] }
+    }),
+    TiptapImage.configure({
+      inline: false,
+      allowBase64: false,
+      HTMLAttributes: {
+        loading: 'lazy'
+      }
+    }),
+    Link.configure({
+      openOnClick: false,
+      autolink: true,
+      linkOnPaste: true,
+      HTMLAttributes: {
+        target: '_blank',
+        rel: 'noopener noreferrer'
+      }
+    }),
+    Placeholder.configure({
+      placeholder: '开始写作... 支持直接输入 Markdown 快捷语法'
+    })
+  ],
+  editorProps: {
+    attributes: {
+      class: 'rich-editor-content markdown-body'
+    }
+  },
+  onUpdate: syncPublishContentFromEditor
+})
+
+watch(
+  () => [props.publishForm.contentHtml, props.publishForm.content],
+  () => {
+    if (isSyncingEditor.value || !editor.value) return
+
+    const nextHtml = getEditorHtml()
+    if (nextHtml === editor.value.getHTML()) return
+
+    editor.value.commands.setContent(nextHtml, { emitUpdate: false })
+  },
+  { flush: 'post' }
+)
+
+watch(
+  () => props.pendingMarkdownImage?.id,
+  () => {
+    const image = props.pendingMarkdownImage
+    if (!image || !editor.value) return
+
+    editor.value
+      .chain()
+      .focus()
+      .setImage({ src: image.src, alt: image.alt })
+      .run()
+  }
+)
+
+onBeforeUnmount(() => {
+  editor.value?.destroy()
+})
 
 function setCoverImageInput(element: Element | ComponentPublicInstance | null) {
   coverImageInput.value = element instanceof HTMLInputElement ? element : null
@@ -60,6 +174,13 @@ const wordCount = computed(() => {
   const text = props.publishForm.content || ''
   return text.replace(/\s+/g, '').length
 })
+
+const isHeadingActive = computed(() => editor.value?.isActive('heading', { level: 2 }) || false)
+const isBoldActive = computed(() => editor.value?.isActive('bold') || false)
+const isItalicActive = computed(() => editor.value?.isActive('italic') || false)
+const isQuoteActive = computed(() => editor.value?.isActive('blockquote') || false)
+const isListActive = computed(() => editor.value?.isActive('bulletList') || false)
+const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || false)
 </script>
 
 <template>
@@ -85,34 +206,41 @@ const wordCount = computed(() => {
 
         <!-- Markdown 工具栏：合并进面包屑行 -->
         <div class="breadcrumb-toolbar">
-          <button type="button" title="标题" @click="$emit('insertMarkdown', '## ', '', '标题')"><Heading :size="14" /></button>
-          <button type="button" title="加粗" @click="$emit('insertMarkdown', '**', '**', '加粗文本')"><Bold :size="14" /></button>
-          <button type="button" title="斜体" @click="$emit('insertMarkdown', '*', '*', '斜体文本')"><Italic :size="14" /></button>
-          <button type="button" title="引用" @click="$emit('insertMarkdown', '> ', '', '引用内容')"><Quote :size="14" /></button>
-          <button type="button" title="列表" @click="$emit('insertMarkdown', '- ', '', '列表项')"><List :size="14" /></button>
+          <button type="button" title="标题" :class="{ active: isHeadingActive }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading :size="14" /></button>
+          <button type="button" title="加粗" :class="{ active: isBoldActive }" @click="editor?.chain().focus().toggleBold().run()"><Bold :size="14" /></button>
+          <button type="button" title="斜体" :class="{ active: isItalicActive }" @click="editor?.chain().focus().toggleItalic().run()"><Italic :size="14" /></button>
+          <button type="button" title="引用" :class="{ active: isQuoteActive }" @click="editor?.chain().focus().toggleBlockquote().run()"><Quote :size="14" /></button>
+          <button type="button" title="列表" :class="{ active: isListActive }" @click="editor?.chain().focus().toggleBulletList().run()"><List :size="14" /></button>
           <button
             class="toolbar-code-btn"
+            :class="{ active: isCodeBlockActive }"
             type="button"
             title="代码块"
-            @click="$emit('insertMarkdown', '```ts\n', '\n```', 'const value = await nextify.run()')"
+            @click="editor?.chain().focus().toggleCodeBlock().run()"
           >
             <Code2 :size="14" /><span>Code</span>
           </button>
-          <button type="button" title="插入图片" :disabled="isUploadingImage" @click="$emit('triggerImageUpload')">
-            <Image :size="14" />
-          </button>
-          <input :ref="setImageInput" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden @change="$emit('uploadMarkdownImage', $event)" />
-          <div class="toolbar-divider"></div>
-          <button
-            class="toolbar-preview-btn"
-            :class="{ active: isPreviewingMarkdown }"
-            type="button"
-            @click="$emit('update:isPreviewingMarkdown', !isPreviewingMarkdown)"
+          <label
+            class="toolbar-file-btn"
+            :class="{ disabled: isUploadingImage }"
+            :for="markdownImageInputId"
+            title="插入图片"
+            :aria-disabled="isUploadingImage"
+            @click="isUploadingImage && $event.preventDefault()"
           >
-            <Eye v-if="!isPreviewingMarkdown" :size="14" />
-            <EyeOff v-else :size="14" />
-            <span>{{ isPreviewingMarkdown ? '编辑' : '预览' }}</span>
-          </button>
+            <Image :size="14" />
+          </label>
+          <input
+            :id="markdownImageInputId"
+            :ref="setImageInput"
+            class="file-input-hidden"
+            type="file"
+            accept="image/jpeg,image/png,image/webp,image/gif"
+            :disabled="isUploadingImage"
+            @change="$emit('uploadMarkdownImage', $event)"
+          />
+          <div class="toolbar-divider"></div>
+          <span class="toolbar-mode-label">所见即所得</span>
         </div>
 
         <div class="breadcrumb-spacer"></div>
@@ -203,35 +331,24 @@ const wordCount = computed(() => {
 
       <!-- 右侧编辑区（对应文章详情的 article-main） -->
       <main class="publish-main">
-        <!-- 标题输入区 -->
-        <div class="publish-title-block">
-          <input
-            class="publish-title-input"
-            v-model="publishForm.title"
-            placeholder="文章标题..."
-          />
-          <input
-            class="publish-subtitle-input"
-            v-model="publishForm.subtitle"
-            placeholder="副标题（可选）"
-          />
+        <div class="editor-pane">
+          <div class="publish-title-block">
+            <input
+              class="publish-title-input"
+              v-model="publishForm.title"
+              placeholder="文章标题..."
+            />
+            <input
+              class="publish-subtitle-input"
+              v-model="publishForm.subtitle"
+              placeholder="副标题（可选）"
+            />
+          </div>
+
+          <hr class="publish-divider" />
+
+          <EditorContent v-if="editor" :editor="editor" class="rich-editor-shell" />
         </div>
-
-        <hr class="publish-divider" />
-
-        <!-- 编辑 / 预览区 -->
-        <textarea
-          v-if="!isPreviewingMarkdown"
-          :ref="setContentTextarea"
-          class="publish-textarea"
-          v-model="publishForm.content"
-          placeholder="开始写作... 支持 Markdown 语法"
-        ></textarea>
-        <div
-          v-else
-          class="publish-preview markdown-body"
-          v-html="markdownPreviewHtml"
-        ></div>
       </main>
 
     </div>
@@ -329,6 +446,29 @@ const wordCount = computed(() => {
 }
 .breadcrumb-toolbar button:hover { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
 .breadcrumb-toolbar button:disabled { opacity: 0.4; cursor: not-allowed; }
+.breadcrumb-toolbar button.active {
+  background: #2563eb;
+  color: #ffffff;
+}
+.toolbar-file-btn {
+  width: 1.85rem;
+  height: 1.85rem;
+  border-radius: 0.45rem;
+  color: #64748b;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background 0.15s, color 0.15s;
+}
+.toolbar-file-btn:hover {
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+}
+.toolbar-file-btn.disabled {
+  cursor: not-allowed;
+  opacity: 0.4;
+}
 .toolbar-code-btn {
   width: auto !important;
   padding: 0 0.55rem !important;
@@ -362,6 +502,21 @@ const wordCount = computed(() => {
 }
 .toolbar-preview-btn.active { background: #2563eb; color: #fff; }
 .toolbar-preview-btn:hover:not(.active) { background: rgba(37, 99, 235, 0.14); }
+.toolbar-mode-label {
+  color: #94a3b8;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.file-input-hidden {
+  position: fixed;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+  pointer-events: none;
+}
 
 /* 右侧操作按钮 */
 .breadcrumb-actions {
@@ -515,11 +670,17 @@ const wordCount = computed(() => {
   flex-direction: column;
   min-width: 0;
   height: 100%;
-  overflow-y: auto;
-  padding: 2rem 1.5rem 2rem 2.5rem;
+  overflow: hidden;
   background: #ffffff;
-  overflow-wrap: break-word;
-  word-break: break-word;
+}
+
+.editor-pane {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  padding: 2rem 1.5rem 2rem 2.5rem;
+  overflow-y: auto;
+  transition: all 0.3s ease;
 }
 
 .publish-title-block {
@@ -562,32 +723,68 @@ const wordCount = computed(() => {
   flex-shrink: 0; /* 防止分割线被压缩 */
 }
 
-.publish-textarea {
-  display: block;
-  width: 100%;
-  flex: 1; /* 填充剩余高度 */
-  min-height: 0; /* 允许 Flex item 缩小 */
-  border: none;
-  outline: none;
-  resize: none;
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-  font-size: 0.95rem;
-  line-height: 1.85;
-  color: #1e293b;
-  background: transparent;
-  overflow-wrap: break-word;
-  word-break: break-word;
-}
-.publish-textarea::placeholder { color: #cbd5e1; }
-
-.publish-preview {
+.rich-editor-shell {
   flex: 1;
-  min-height: 0; /* 允许 Flex item 缩小 */
-  color: #1f2937;
+  min-height: 0;
+  display: flex;
+}
+
+:deep(.rich-editor-content) {
+  width: 100%;
+  min-height: 100%;
+  outline: none;
+  color: #1e293b;
   font-size: 1.05rem;
   line-height: 1.9;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+:deep(.rich-editor-content p.is-editor-empty:first-child::before) {
+  content: attr(data-placeholder);
+  float: left;
+  height: 0;
+  color: #cbd5e1;
+  pointer-events: none;
+}
+
+:deep(.rich-editor-content > *:first-child) {
+  margin-top: 0;
+}
+
+:deep(.rich-editor-content img) {
+  display: block;
+  max-width: 100%;
+  max-height: 34rem;
+  object-fit: contain;
+  border-radius: 0.75rem;
+  margin: 1.5rem 0;
+  box-shadow: 0 20px 70px rgba(15, 23, 42, 0.12);
+}
+
+:deep(.rich-editor-content pre) {
+  overflow: auto;
+  margin: 1.6rem 0;
+  padding: 1.1rem 1.25rem;
+  border-radius: 0.75rem;
+  background: #0f172a;
+  color: #e5e7eb;
+  line-height: 1.7;
+}
+
+:deep(.rich-editor-content pre code) {
+  background: transparent;
+  color: inherit;
+  padding: 0;
+}
+
+:deep(.rich-editor-content blockquote) {
+  margin: 1.6rem 0;
+  padding: 1rem 1.2rem;
+  border-left: 4px solid #2563eb;
+  background: #f8fafc;
+  border-radius: 0 0.65rem 0.65rem 0;
+  color: #475569;
 }
 
 /* 响应式 */
@@ -595,7 +792,14 @@ const wordCount = computed(() => {
   .publish-layout { padding-top: 4.5rem; }
   .publish-layout-inner { padding: 0 1rem; }
   .publish-sidebar { display: none; }
-  .publish-main { padding: 1.5rem 0 4rem; }
+  .publish-main {
+    padding: 1.5rem 0 4rem;
+    overflow-y: auto;
+  }
+  .editor-pane {
+    flex: none;
+    min-height: 50vh;
+  }
   .breadcrumb-toolbar { display: none; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }

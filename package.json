@@ -9,12 +9,19 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@tiptap/extension-image": "^3.24.0",
+    "@tiptap/extension-link": "^3.24.0",
+    "@tiptap/extension-placeholder": "^3.24.0",
+    "@tiptap/starter-kit": "^3.24.0",
+    "@tiptap/vue-3": "^3.24.0",
+    "@types/turndown": "^5.0.6",
     "axios": "^1.15.2",
     "canvas-confetti": "^1.9.4",
     "echarts": "^6.0.0",
     "html2canvas": "^1.4.1",
     "lucide-vue-next": "^1.0.0",
     "qrcode": "^1.5.4",
+    "turndown": "^7.2.4",
     "vue": "^3.5.32",
     "vue-router": "^4.6.4",
     "workbox-window": "^7.4.1"

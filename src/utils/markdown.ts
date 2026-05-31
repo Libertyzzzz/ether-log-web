@@ -7,10 +7,28 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#039;')
 }
 
+function escapeAttribute(value: string) {
+  return escapeHtml(value).replace(/`/g, '&#096;')
+}
+
+function normalizeMarkdownUrl(value: string) {
+  return value
+    .trim()
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#039;/g, "'")
+}
+
 function renderInlineMarkdown(value: string) {
   return value
-    .replace(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/g, '<img src="$2" alt="$1" />')
-    .replace(/\[([^\]]+)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/g, '<a href="$2" target="_blank" rel="noopener noreferrer">$1</a>')
+    .replace(/!\[([^\]]*)\]\(([^)\s]+(?:\s+&quot;[^&]*&quot;)?)\)/g, (_, alt, rawUrl) => {
+      const [url] = normalizeMarkdownUrl(rawUrl).split(/\s+"/)
+      return `<img src="${escapeAttribute(url)}" alt="${escapeAttribute(alt)}" loading="lazy" />`
+    })
+    .replace(/\[([^\]]+)\]\(([^)\s]+)\)/g, (_, text, rawUrl) => {
+      const url = normalizeMarkdownUrl(rawUrl)
+      return `<a href="${escapeAttribute(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`
+    })
     .replace(/`([^`]+)`/g, '<code>$1</code>')
     .replace(/\*\*([^*]+)\*\*/g, '<strong>$1</strong>')
     .replace(/\*([^*]+)\*/g, '<em>$1</em>')
