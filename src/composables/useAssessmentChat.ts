@@ -8,7 +8,7 @@ export interface ChatMessage {
   content: string
   timestamp: number
   options?: Array<{ label: string; value: any }>
-  inputType?: 'text' | 'number' | 'select' | 'slider'
+  inputType?: 'text' | 'number' | 'select' | 'slider' | 'image'
   field?: string
   validation?: { min?: number; max?: number }
 }
@@ -17,7 +17,7 @@ export interface QuestionConfig {
   id: string
   text: string
   field?: string
-  inputType: 'text' | 'number' | 'select' | 'slider'
+  inputType: 'text' | 'number' | 'select' | 'slider' | 'image'
   options?: Array<{ label: string; value: any }>
   range?: { min: number; max: number; step: number }
   hint?: string

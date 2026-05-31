@@ -475,6 +475,7 @@ interface AssessmentResult {
   report: string
   radar: AssessmentRadar
   beautyScore?: number
+  visualImageUrl?: string
   lieFactor?: number
   advice?: string[]
   shareId?: string
@@ -692,6 +693,20 @@ const strongestRadarItem = computed(() => {
   return [...radarItems.value].sort((a, b) => b.value - a.value)[0]
 })
 
+const resultVisualImage = computed(() => result.value?.visualImageUrl || valuationImage.value || '')
+
+const visualPanelStats = computed(() => {
+  const aesthetic = result.value?.radar.aesthetic ?? 0
+  const biological = result.value?.radar.biological ?? 0
+  const beautyScore = result.value?.beautyScore
+
+  return [
+    { label: '审美溢价', value: aesthetic },
+    { label: '生物属性', value: biological },
+    { label: '颜值采样', value: typeof beautyScore === 'number' ? beautyScore : 'N/A' }
+  ]
+})
+
 const playfulVerdict = computed(() => {
   const score = result.value?.score ?? 0
   let themeColor = ''
@@ -873,6 +888,7 @@ function normalizeResult(payload: any): AssessmentResult {
     report: source.report || '暂无详细报告内容...',
     lieFactor: typeof source.lieFactor === 'number' ? source.lieFactor : undefined,
     beautyScore: typeof source.beautyScore === 'number' ? source.beautyScore : undefined,
+    visualImageUrl: source.visualImageUrl || source.imageUrl || source.photoUrl || source.image || undefined,
     shareId: source.shareId, // [新增] 映射后端返回的 ID
     inputSnapshot: inputSnapshot
       ? {
@@ -1649,23 +1665,12 @@ onUnmounted(() => {
     <section v-else-if="result" class="result-stage animate-zoom-in">
       <div class="result-hero-card" :style="{ '--verdict-color': playfulVerdict.color }">
         <div class="result-copy">
-          <div class="result-main-header">
-            <!-- [修复] 图像整合进页眉，移除 absolute 定位 -->
-            <div v-if="valuationImage" class="result-user-profile">
-              <div class="profile-frame">
-                <img :src="valuationImage" class="profile-img" alt="Visual Sample" />
-                <div class="profile-scan-line"></div>
-                <div class="profile-grid-overlay"></div>
-              </div>
-            </div>
-            <div class="header-text-group">
-              <div class="result-meta-rail">
-                <span>REPORT READY</span>
-                <span>{{ result.marketLevel }}</span>
-              </div>
-              <h2>{{ playfulVerdict.title }}</h2>
-            </div>
+          <div class="result-meta-rail">
+            <span>REPORT READY</span>
+            <span>{{ result.marketLevel }}</span>
+            <span v-if="resultVisualImage">VISUAL SAMPLED</span>
           </div>
+          <h2>{{ playfulVerdict.title }}</h2>
           <p>{{ playfulVerdict.subtitle }}</p>
           <div class="result-chip-row">
             <div v-for="chip in resultChips" :key="chip.label">
@@ -1676,23 +1681,71 @@ onUnmounted(() => {
           <div class="soft-warning">娱乐报告，不构成任何人生、情感、婚恋或经济建议。请把它当成一张会开玩笑的镜子。</div>
         </div>
 
-        <div class="score-orb">
+        <aside class="result-visual-panel">
+          <div class="visual-sample-card" :class="{ empty: !resultVisualImage }">
+            <img v-if="resultVisualImage" :src="resultVisualImage" alt="Visual Sample" />
+            <div v-else class="visual-sample-empty">
+              <Sparkles :size="28" />
+              <span>NO VISUAL SAMPLE</span>
+            </div>
+            <div class="visual-sample-caption">
+              <span>VISUAL SIGNAL</span>
+              <strong>{{ resultVisualImage ? '样本已纳入估值' : '未启用图像采样' }}</strong>
+            </div>
+          </div>
+
+          <div class="score-orb">
             <div class="score-ring-label">AETHER SCORE</div>
             <span class="badge-highlight">{{ playfulVerdict.badge }}</span>
             <strong>{{ result.score }}</strong>
             <em>{{ result.marketLevel }}</em>
-        </div>
+          </div>
+
+          <div class="visual-stat-grid">
+            <div v-for="stat in visualPanelStats" :key="stat.label">
+              <span>{{ stat.label }}</span>
+              <strong>{{ stat.value }}</strong>
+            </div>
+          </div>
+        </aside>
       </div>
 
       <div class="result-grid">
-        <section class="fun-card">
-          <span class="panel-kicker">COMFORT MODE</span>
-          <h3>轻松解读</h3>
-          <div class="fun-list">
-            <div v-for="fact in funFacts" :key="fact.label">
-              <span>{{ fact.label }}</span>
-              <strong>{{ fact.value }}</strong>
-              <p>{{ fact.text }}</p>
+        <section class="insight-card">
+          <div class="panel-heading compact-heading">
+            <span>SNAPSHOT</span>
+            <h2>报告快照</h2>
+          </div>
+
+          <div class="insight-layout">
+            <div v-if="resultVisualImage" class="visual-analysis-mini">
+              <img :src="resultVisualImage" alt="Visual Sample Detail" />
+              <div>
+                <span>VISUAL SAMPLE</span>
+                <strong>图像已参与本次娱乐估值</strong>
+                <p>作为审美溢价与生物属性的辅助信号，不代表真实颜值判断。</p>
+              </div>
+            </div>
+
+            <div class="fun-list compact">
+              <div v-for="fact in funFacts" :key="fact.label">
+                <span>{{ fact.label }}</span>
+                <strong>{{ fact.value }}</strong>
+                <p>{{ fact.text }}</p>
+              </div>
+            </div>
+
+            <div class="dimension-list compact">
+              <div v-for="item in radarItems" :key="item.key" class="dimension-item">
+                <div>
+                  <strong>{{ item.label }}</strong>
+                  <span>{{ item.quip }}</span>
+                </div>
+                <div class="mini-meter" :style="{ '--meter': `${item.value}%` }">
+                  <i></i>
+                </div>
+                <b>{{ item.value }}</b>
+              </div>
             </div>
           </div>
         </section>
@@ -1703,25 +1756,6 @@ onUnmounted(() => {
             <h2>六维画像</h2>
           </div>
           <div id="radar-chart" class="radar-chart"></div>
-        </section>
-
-        <section class="dimension-card">
-          <div class="panel-heading compact-heading">
-            <span>BADGES</span>
-            <h2>本次掉落</h2>
-          </div>
-          <div class="dimension-list">
-            <div v-for="item in radarItems" :key="item.key" class="dimension-item">
-              <div>
-                <strong>{{ item.label }}</strong>
-                <span>{{ item.quip }}</span>
-              </div>
-              <div class="mini-meter" :style="{ '--meter': `${item.value}%` }">
-                <i></i>
-              </div>
-              <b>{{ item.value }}</b>
-            </div>
-          </div>
         </section>
 
         <section class="report-card">
@@ -2749,29 +2783,29 @@ onUnmounted(() => {
 }
 
 .result-hero-card {
-  min-height: 430px;
+  min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(320px, 0.42fr);
-  gap: 30px;
-  padding: clamp(34px, 4vw, 56px);
-  align-items: center;
+  grid-template-columns: minmax(0, 1fr) minmax(340px, 420px);
+  gap: clamp(28px, 4vw, 54px);
+  padding: clamp(30px, 4vw, 54px);
+  align-items: stretch;
   overflow: hidden;
   position: relative;
   background:
-    linear-gradient(135deg, rgba(255, 255, 255, 0.98), rgba(248, 250, 252, 0.9) 54%, rgba(239, 246, 255, 0.82)),
-    linear-gradient(90deg, color-mix(in srgb, var(--verdict-color, #2563eb) 12%, transparent), transparent 42%),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.99), rgba(248, 250, 252, 0.94) 56%, color-mix(in srgb, var(--verdict-color, #2563eb) 8%, #ffffff)),
     #ffffff;
 }
 
 .result-hero-card::after {
   content: "";
   position: absolute;
-  width: 520px;
-  height: 520px;
-  right: -180px;
-  top: -210px;
-  border-radius: 999px;
-  background: radial-gradient(circle, color-mix(in srgb, var(--verdict-color, #2563eb) 18%, transparent), transparent 68%);
+  inset: 0;
+  background-image:
+    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(148, 163, 184, 0.12) 1px, transparent 1px);
+  background-size: 34px 34px;
+  mask-image: linear-gradient(110deg, transparent 18%, #000 48%, transparent 86%);
+  opacity: 0.38;
   pointer-events: none;
 }
 
@@ -2787,6 +2821,10 @@ onUnmounted(() => {
 .result-copy {
   position: relative;
   z-index: 1;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  min-width: 0;
 }
 
 .result-meta-rail {
@@ -2819,8 +2857,8 @@ onUnmounted(() => {
 .result-copy h2 {
   max-width: 760px;
   margin: 0;
-  font-size: clamp(48px, 6.2vw, 92px);
-  line-height: 0.94;
+  font-size: clamp(44px, 5.2vw, 82px);
+  line-height: 0.98;
   font-weight: 950;
   letter-spacing: 0;
   color: #0f172a;
@@ -2837,7 +2875,7 @@ onUnmounted(() => {
 
 .result-chip-row {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   gap: 12px;
   max-width: 760px;
   margin-top: 30px;
@@ -2880,73 +2918,96 @@ onUnmounted(() => {
   box-shadow: inset 3px 0 0 color-mix(in srgb, var(--verdict-color, #2563eb) 72%, #94a3b8);
 }
 
-.result-main-header {
-  display: flex;
-  align-items: flex-start;
-  gap: 32px;
-  margin-bottom: 24px;
+.result-visual-panel {
+  position: relative;
+  z-index: 1;
+  display: grid;
+  grid-template-rows: auto auto auto;
+  gap: 14px;
+  min-width: 0;
+  align-self: start;
 }
 
-.header-text-group {
-  flex: 1;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-}
-
-.result-meta-rail {
-  margin-bottom: 0 !important;
-}
-
-/* 结果页用户头像样式重构 */
-.profile-frame {
-  width: 90px;
-  height: 112px;
-  background: #000;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  border-radius: 4px;
+.visual-sample-card {
+  width: 100%;
+  height: 280px;
+  max-height: 280px;
+  aspect-ratio: 4 / 3;
   position: relative;
   overflow: hidden;
-  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  background: #0f172a;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  box-shadow: 0 28px 70px rgba(15, 23, 42, 0.18);
 }
 
-.profile-img {
+.visual-sample-card img {
   width: 100%;
   height: 100%;
+  max-height: inherit;
   object-fit: cover;
-  opacity: 0.9;
-  filter: grayscale(0.2) contrast(1.1);
+  display: block;
+  filter: saturate(0.98) contrast(1.04);
 }
 
-.profile-scan-line {
-  position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 2px;
-  background: var(--verdict-color, #2563eb);
-  box-shadow: 0 0 10px var(--verdict-color, #2563eb);
-  animation: profileScan 4s infinite linear;
-  z-index: 2;
-}
-
-.profile-grid-overlay {
+.visual-sample-card::after {
+  content: "";
   position: absolute;
   inset: 0;
-  background-image: 
-    linear-gradient(rgba(255,255,255,0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255,255,255,0.05) 1px, transparent 1px);
-  background-size: 10px 10px;
+  background:
+    linear-gradient(180deg, transparent 46%, rgba(15, 23, 42, 0.72)),
+    linear-gradient(90deg, color-mix(in srgb, var(--verdict-color, #2563eb) 18%, transparent), transparent 42%);
   pointer-events: none;
+}
+
+.visual-sample-card.empty {
+  display: grid;
+  place-items: center;
+  background:
+    linear-gradient(135deg, #0f172a, #1e293b),
+    #0f172a;
+}
+
+.visual-sample-empty {
+  display: grid;
+  gap: 10px;
+  place-items: center;
+  color: #cbd5e1;
+  font-size: 12px;
+  font-weight: 950;
+  letter-spacing: 0.16em;
+}
+
+.visual-sample-caption {
+  position: absolute;
+  left: 18px;
+  right: 18px;
+  bottom: 16px;
+  z-index: 1;
+}
+
+.visual-sample-caption span,
+.visual-stat-grid span {
+  display: block;
+  color: #94a3b8;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.14em;
+}
+
+.visual-sample-caption strong {
+  display: block;
+  margin-top: 5px;
+  color: #ffffff;
+  font-size: 18px;
+  line-height: 1.25;
 }
 
 .score-orb {
   position: relative;
-  z-index: 1;
-  justify-self: stretch;
-  min-height: 360px;
+  min-height: 168px;
+  max-height: 168px;
   width: 100%;
-  max-width: 390px;
   border-radius: 8px;
   background:
     linear-gradient(180deg, rgba(15, 23, 42, 0.98), rgba(30, 41, 59, 0.96)),
@@ -2959,17 +3020,17 @@ onUnmounted(() => {
   place-items: center;
   align-content: center;
   text-align: center;
-  padding: 30px;
+  padding: 18px 22px;
   overflow: hidden;
 }
 
 .score-orb::before {
   content: "";
   position: absolute;
-  inset: 26px;
-  border-radius: 999px;
+  inset: 18px;
+  border-radius: 8px;
   border: 1px solid rgba(255, 255, 255, 0.12);
-  background: radial-gradient(circle, color-mix(in srgb, var(--verdict-color, #2563eb) 24%, transparent), transparent 62%);
+  background: color-mix(in srgb, var(--verdict-color, #2563eb) 12%, transparent);
 }
 
 .score-orb::after {
@@ -2982,15 +3043,6 @@ onUnmounted(() => {
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.28), transparent);
 }
 
-/* 微调移动端适配：如果有头像，增加 Hero 卡片的顶部间距 */
-@media (max-width: 960px) {
-  .result-main-header {
-    flex-direction: column;
-    gap: 20px;
-  }
-  .profile-frame { width: 80px; height: 100px; }
-}
-
 .score-ring-label {
   position: relative;
   z-index: 1;
@@ -2998,7 +3050,7 @@ onUnmounted(() => {
   font-size: 11px;
   font-weight: 950;
   letter-spacing: 0.22em;
-  margin-bottom: 18px;
+  margin-bottom: 12px;
 }
 
 .badge-highlight {
@@ -3006,10 +3058,10 @@ onUnmounted(() => {
   z-index: 1;
   display: inline-block;
   color: #ffffff;
-  font-size: 15px;
+  font-size: 13px;
   font-weight: 900;
   letter-spacing: 0.12em;
-  padding: 8px 13px;
+  padding: 7px 12px;
   border-radius: 999px;
   background: color-mix(in srgb, var(--verdict-color, #2563eb) 72%, #0f172a);
   box-shadow: 0 12px 28px color-mix(in srgb, var(--verdict-color, #2563eb) 28%, transparent);
@@ -3030,39 +3082,116 @@ onUnmounted(() => {
 .score-orb strong {
   position: relative;
   z-index: 1;
-  font-size: clamp(104px, 8vw, 148px);
+  font-size: clamp(58px, 5vw, 78px);
   line-height: 0.85;
   font-weight: 950;
   color: #f8fafc;
-  margin: 16px 0 12px;
+  margin: 12px 0 8px;
   text-shadow: 0 18px 42px rgba(0, 0, 0, 0.32);
 }
 
 .score-orb em {
   position: relative;
   z-index: 1;
-  font-size: 17px;
+  font-size: 15px;
   font-style: normal;
   font-weight: 900;
   color: #cbd5e1;
   letter-spacing: 0.02em;
 }
 
+.visual-stat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.visual-stat-grid div {
+  min-width: 0;
+  padding: 14px 12px;
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.86);
+  border: 1px solid rgba(226, 232, 240, 0.92);
+}
+
+.visual-stat-grid strong {
+  display: block;
+  margin-top: 6px;
+  color: #0f172a;
+  font-size: 20px;
+  line-height: 1;
+}
+
 .result-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(380px, 0.72fr);
-  gap: 20px;
+  grid-template-columns: minmax(0, 1.05fr) minmax(340px, 0.65fr);
+  gap: 16px;
+}
+
+.insight-card {
+  padding: 24px;
+  background:
+    linear-gradient(135deg, rgba(255, 255, 255, 0.97), rgba(248, 250, 252, 0.9)),
+    #ffffff;
+}
+
+.insight-layout {
+  display: grid;
+  gap: 14px;
+}
+
+.visual-analysis-mini {
+  display: grid;
+  grid-template-columns: 86px minmax(0, 1fr);
+  gap: 14px;
+  align-items: center;
+  padding: 12px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--verdict-color, #2563eb) 7%, #ffffff);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+}
+
+.visual-analysis-mini img {
+  width: 86px;
+  height: 86px;
+  object-fit: cover;
+  border-radius: 8px;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.12);
+}
+
+.visual-analysis-mini span,
+.fun-list span {
+  color: #2563eb;
+  font-size: 11px;
+  font-weight: 950;
+  letter-spacing: 0.12em;
+}
+
+.visual-analysis-mini strong {
+  display: block;
+  margin-top: 4px;
+  color: #111827;
+  font-size: 17px;
+  line-height: 1.25;
+}
+
+.visual-analysis-mini p {
+  margin: 5px 0 0;
+  color: #475569;
+  font-size: 13px;
+  line-height: 1.55;
+  font-weight: 720;
 }
 
 .dimension-card,
 .fun-card,
 .advice-card {
-  padding: 30px;
+  padding: 24px;
 }
 
 .chart-card {
-  min-height: 500px;
-  padding: 30px;
+  min-height: 360px;
+  padding: 24px;
   background:
     linear-gradient(180deg, rgba(255, 255, 255, 0.94), rgba(248, 250, 252, 0.88)),
     #ffffff;
@@ -3075,15 +3204,19 @@ onUnmounted(() => {
 .dimension-list,
 .fun-list {
   display: grid;
-  gap: 10px;
+  gap: 8px;
+}
+
+.fun-list.compact {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .dimension-item {
   display: grid;
-  grid-template-columns: 1fr 110px 42px;
+  grid-template-columns: 1fr 96px 36px;
   align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
+  gap: 10px;
+  padding: 10px 12px;
   border-radius: 8px;
   background: rgba(248, 250, 252, 0.86);
   border: 1px solid rgba(226, 232, 240, 0.9);
@@ -3101,7 +3234,7 @@ onUnmounted(() => {
   display: block;
   margin-top: 2px;
   color: #94a3b8;
-  font-size: 12px;
+  font-size: 11px;
   font-weight: 800;
 }
 
@@ -3127,11 +3260,12 @@ onUnmounted(() => {
 
 .radar-chart {
   width: 100%;
-  height: 420px;
+  height: 300px;
 }
 
 .report-card {
-  padding: 30px;
+  grid-column: 1 / -1;
+  padding: 24px;
   background:
     linear-gradient(145deg, #0f172a, #111827 60%, #1e293b);
   color: #f8fafc;
@@ -3147,8 +3281,8 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   gap: 8px;
-  margin-top: 14px;
-  padding: 12px 14px;
+  margin-top: 10px;
+  padding: 10px 12px;
   border-radius: 8px 8px 0 0;
   background: rgba(31, 41, 55, 0.86);
   border: 1px solid rgba(148, 163, 184, 0.22);
@@ -3183,13 +3317,13 @@ onUnmounted(() => {
 
 .report-card p {
   margin: 0;
-  padding: 22px;
+  padding: 18px;
   color: #e5e7eb;
   background: rgba(2, 6, 23, 0.42);
   border: 1px solid rgba(148, 163, 184, 0.22);
   border-radius: 0 0 8px 8px;
-  line-height: 1.9;
-  font-size: 17px;
+  line-height: 1.75;
+  font-size: 15px;
 }
 
 .fun-card {
@@ -3203,12 +3337,12 @@ onUnmounted(() => {
 .fun-card h3,
 .report-card h3,
 .advice-card h3 {
-  margin: 8px 0 16px;
-  font-size: 24px;
+  margin: 6px 0 12px;
+  font-size: 22px;
 }
 
 .fun-list div {
-  padding: 18px 20px;
+  padding: 13px 14px;
   border-radius: 8px;
   background: rgba(248, 250, 252, 0.84);
   border: 1px solid rgba(226, 232, 240, 0.88);
@@ -3220,23 +3354,17 @@ onUnmounted(() => {
   box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08);
 }
 
-.fun-list span {
-  color: #2563eb;
-  font-size: 12px;
-  font-weight: 900;
-  letter-spacing: 0.12em;
-}
-
 .fun-list strong {
   display: block;
-  margin-top: 6px;
-  font-size: 22px;
+  margin-top: 5px;
+  font-size: 18px;
 }
 
 .fun-list p {
-  margin: 8px 0 0;
+  margin: 6px 0 0;
   color: #64748b;
-  line-height: 1.65;
+  font-size: 13px;
+  line-height: 1.55;
 }
 
 .advice-card {
@@ -4850,9 +4978,28 @@ onUnmounted(() => {
     display: none;
   }
 
+  .result-visual-panel {
+    grid-template-rows: auto auto auto;
+  }
+
+  .visual-sample-card {
+    height: 260px;
+    max-height: 260px;
+  }
+
   .score-orb {
-    width: min(280px, 100%);
-    justify-self: center;
+    width: 100%;
+    min-height: 168px;
+    max-height: 168px;
+    justify-self: stretch;
+  }
+
+  .visual-analysis-body {
+    grid-template-columns: 1fr;
+  }
+
+  .visual-analysis-body > img {
+    max-height: 420px;
   }
 
   .shared-action-buttons {
