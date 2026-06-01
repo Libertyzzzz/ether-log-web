@@ -641,7 +641,7 @@ onUnmounted(() => {
 .article-body {
   color: #1f2937;
   font-size: 1.05rem;
-  line-height: 1.9;
+  line-height: 1.68;
 }
 .article-plain { white-space: pre-wrap; }
 

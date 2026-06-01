@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Bold, Code2, Heading, Image, Italic, List, Quote, X, PenLine, Settings2 } from 'lucide-vue-next'
+import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2 } from 'lucide-vue-next'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import TiptapImage from '@tiptap/extension-image'
@@ -180,6 +180,7 @@ const isBoldActive = computed(() => editor.value?.isActive('bold') || false)
 const isItalicActive = computed(() => editor.value?.isActive('italic') || false)
 const isQuoteActive = computed(() => editor.value?.isActive('blockquote') || false)
 const isListActive = computed(() => editor.value?.isActive('bulletList') || false)
+const isOrderedListActive = computed(() => editor.value?.isActive('orderedList') || false)
 const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || false)
 </script>
 
@@ -206,16 +207,18 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 
         <!-- Markdown 工具栏：合并进面包屑行 -->
         <div class="breadcrumb-toolbar">
-          <button type="button" title="标题" :class="{ active: isHeadingActive }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading :size="14" /></button>
-          <button type="button" title="加粗" :class="{ active: isBoldActive }" @click="editor?.chain().focus().toggleBold().run()"><Bold :size="14" /></button>
-          <button type="button" title="斜体" :class="{ active: isItalicActive }" @click="editor?.chain().focus().toggleItalic().run()"><Italic :size="14" /></button>
-          <button type="button" title="引用" :class="{ active: isQuoteActive }" @click="editor?.chain().focus().toggleBlockquote().run()"><Quote :size="14" /></button>
-          <button type="button" title="列表" :class="{ active: isListActive }" @click="editor?.chain().focus().toggleBulletList().run()"><List :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="标题" data-tooltip="标题" :class="{ active: isHeadingActive }" @click="editor?.chain().focus().toggleHeading({ level: 2 }).run()"><Heading :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="加粗" data-tooltip="加粗" :class="{ active: isBoldActive }" @click="editor?.chain().focus().toggleBold().run()"><Bold :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="斜体" data-tooltip="斜体" :class="{ active: isItalicActive }" @click="editor?.chain().focus().toggleItalic().run()"><Italic :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="引用" data-tooltip="引用" :class="{ active: isQuoteActive }" @click="editor?.chain().focus().toggleBlockquote().run()"><Quote :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="无序列表" data-tooltip="无序列表" :class="{ active: isListActive }" @click="editor?.chain().focus().toggleBulletList().run()"><List :size="14" /></button>
+          <button type="button" class="toolbar-tip" aria-label="有序列表" data-tooltip="有序列表" :class="{ active: isOrderedListActive }" @click="editor?.chain().focus().toggleOrderedList().run()"><ListOrdered :size="14" /></button>
           <button
-            class="toolbar-code-btn"
+            class="toolbar-code-btn toolbar-tip"
             :class="{ active: isCodeBlockActive }"
             type="button"
-            title="代码块"
+            aria-label="代码块"
+            data-tooltip="代码块"
             @click="editor?.chain().focus().toggleCodeBlock().run()"
           >
             <Code2 :size="14" /><span>Code</span>
@@ -224,7 +227,8 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
             class="toolbar-file-btn"
             :class="{ disabled: isUploadingImage }"
             :for="markdownImageInputId"
-            title="插入图片"
+            aria-label="插入图片"
+            data-tooltip="插入图片"
             :aria-disabled="isUploadingImage"
             @click="isUploadingImage && $event.preventDefault()"
           >
@@ -432,6 +436,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   gap: 0.15rem;
 }
 .breadcrumb-toolbar button {
+  position: relative;
   width: 1.85rem;
   height: 1.85rem;
   border: none;
@@ -449,6 +454,61 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 .breadcrumb-toolbar button.active {
   background: #2563eb;
   color: #ffffff;
+}
+.toolbar-tip,
+.toolbar-file-btn {
+  position: relative;
+}
+.toolbar-tip::before,
+.toolbar-file-btn::before {
+  content: attr(data-tooltip);
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.55rem);
+  z-index: 30;
+  pointer-events: none;
+  transform: translate(-50%, -0.25rem);
+  min-width: max-content;
+  padding: 0.38rem 0.55rem;
+  border-radius: 0.45rem;
+  background: #0f172a;
+  color: #ffffff;
+  box-shadow: 0 10px 26px rgba(15, 23, 42, 0.22);
+  font-size: 0.68rem;
+  font-weight: 800;
+  line-height: 1;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.toolbar-tip::after,
+.toolbar-file-btn::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: calc(100% + 0.28rem);
+  z-index: 31;
+  pointer-events: none;
+  width: 0.45rem;
+  height: 0.45rem;
+  background: #0f172a;
+  transform: translate(-50%, -0.2rem) rotate(45deg);
+  opacity: 0;
+  transition: opacity 0.14s ease, transform 0.14s ease;
+}
+.toolbar-tip:hover::before,
+.toolbar-tip:focus-visible::before,
+.toolbar-file-btn:hover::before,
+.toolbar-file-btn:focus-visible::before {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.toolbar-tip:hover::after,
+.toolbar-tip:focus-visible::after,
+.toolbar-file-btn:hover::after,
+.toolbar-file-btn:focus-visible::after {
+  opacity: 1;
+  transform: translate(-50%, 0) rotate(45deg);
 }
 .toolbar-file-btn {
   width: 1.85rem;
@@ -671,7 +731,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   min-width: 0;
   height: 100%;
   overflow: hidden;
-  background: #ffffff;
+  background: #fbfaf6;
 }
 
 .editor-pane {
@@ -680,6 +740,9 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   flex-direction: column;
   padding: 2rem 1.5rem 2rem 2.5rem;
   overflow-y: auto;
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.58), rgba(251, 250, 246, 0.94)),
+    #fbfaf6;
   transition: all 0.3s ease;
 }
 
@@ -695,7 +758,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   outline: none;
   font-size: clamp(1.8rem, 3.5vw, 2.8rem);
   font-weight: 900;
-  color: #0f172a;
+  color: #151923;
   letter-spacing: -0.03em;
   line-height: 1.1;
   background: transparent;
@@ -709,7 +772,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   border: none;
   outline: none;
   font-size: 1.05rem;
-  color: #64748b;
+  color: #667085;
   background: transparent;
   padding: 0 0 0.5rem;
   line-height: 1.5;
@@ -733,11 +796,15 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   width: 100%;
   min-height: 100%;
   outline: none;
-  color: #1e293b;
+  color: #232b35;
   font-size: 1.05rem;
-  line-height: 1.9;
+  line-height: 1.68;
   overflow-wrap: break-word;
   word-break: break-word;
+}
+
+:deep(.rich-editor-content p) {
+  margin: 0 0 0.85rem;
 }
 
 :deep(.rich-editor-content p.is-editor-empty:first-child::before) {
@@ -764,12 +831,12 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 
 :deep(.rich-editor-content pre) {
   overflow: auto;
-  margin: 1.6rem 0;
+  margin: 1.25rem 0;
   padding: 1.1rem 1.25rem;
   border-radius: 0.75rem;
   background: #0f172a;
   color: #e5e7eb;
-  line-height: 1.7;
+  line-height: 1.58;
 }
 
 :deep(.rich-editor-content pre code) {
@@ -779,12 +846,35 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 }
 
 :deep(.rich-editor-content blockquote) {
-  margin: 1.6rem 0;
+  margin: 1.2rem 0;
   padding: 1rem 1.2rem;
   border-left: 4px solid #2563eb;
   background: #f8fafc;
   border-radius: 0 0.65rem 0.65rem 0;
   color: #475569;
+}
+
+:deep(.rich-editor-content ul),
+:deep(.rich-editor-content ol) {
+  margin: 0.75rem 0 1rem;
+  padding-left: 1.45rem;
+}
+
+:deep(.rich-editor-content ul) {
+  list-style: disc;
+}
+
+:deep(.rich-editor-content ol) {
+  list-style: decimal;
+}
+
+:deep(.rich-editor-content li) {
+  margin: 0.28rem 0;
+  padding-left: 0.18rem;
+}
+
+:deep(.rich-editor-content li p) {
+  margin: 0;
 }
 
 /* 响应式 */
