@@ -34,22 +34,22 @@
 
 <style scoped>
 .footer-wrap {
-  background: #f5f5f7;
-  border-top: 1px solid rgba(226,232,240,0.8);
+  background: transparent;
   padding: 2rem 0;
 }
 .footer-inner {
   max-width: 64rem;
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 1.5rem 1.5rem 0;
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  border-top: 1px solid rgba(148,163,184,0.22);
 }
 .footer-copy {
   font-size: 0.78rem;
-  color: #94a3b8;
+  color: #64748b;
   font-weight: 500;
 }
 .footer-links {
@@ -62,7 +62,7 @@
   height: 2rem;
   border-radius: 0.5rem;
   background: transparent;
-  color: #94a3b8;
+  color: #334155;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -70,7 +70,14 @@
   transition: background 0.2s, color 0.2s;
 }
 .footer-icon-btn:hover {
-  background: rgba(79,70,229,0.08);
-  color: #4f46e5;
+  background: rgba(79,124,255,0.1);
+  color: #3b82f6;
+}
+
+@media (max-width: 640px) {
+  .footer-inner {
+    align-items: flex-start;
+    flex-direction: column;
+  }
 }
 </style>
