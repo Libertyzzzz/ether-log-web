@@ -16,6 +16,7 @@ import AppToast from './components/AppToast.vue' // Import the new Toast compone
 import SearchModal from './components/SearchModal.vue' // Import SearchModal
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
+import QuantLabPage from './components/QuantLabPage.vue'
 import type {
   ArticleDetail,
   ArticleListItem,
@@ -593,6 +594,18 @@ function openDashboard() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function openQuantLab() {
+  if (!isLoggedIn.value || !localStorage.getItem('authToken')) {
+    openLoginModal()
+    return
+  }
+
+  router.push({ name: 'quant-lab' })
+  selectedArticle.value = null
+  selectedArticlePreview.value = null
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 function navigateToSection(sectionId: string) {
   router.push({ name: sectionId })
   selectedArticle.value = null
@@ -846,6 +859,13 @@ onMounted(async () => {
   }
 
   fetchArticles()
+
+  if (currentPage.value === 'quant-lab' && !isLoggedIn.value) {
+    router.replace({ name: 'home' })
+    openLoginModal()
+    showAppToast('请登录后进入量化实验室。', 'info')
+  }
+
   document.addEventListener('click', handleClickOutside)
 })
 
@@ -871,6 +891,7 @@ onUnmounted(() => {
         @navigate="navigateToSection"
         @open-profile="openProfile"
         @open-dashboard="openDashboard"
+        @open-quant-lab="openQuantLab"
         @open-login="openLoginModal"
         @toggle-status="handleStatusClick"
         @open-search="showSearchModal = true"
@@ -926,6 +947,8 @@ onUnmounted(() => {
             @delete-article="deleteArticle"
             @open-article="openArticleDetail"
           />
+
+          <QuantLabPage v-if="currentPage === 'quant-lab' && isLoggedIn" />
 
           <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
           <ContactSection v-if="currentPage === 'home'" />
