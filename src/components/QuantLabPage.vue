@@ -200,13 +200,13 @@ async function saveStrategy(payload: BacktestRequest) {
   return { id: Date.now(), ...payload }
 }
 
-async function fetchBacktestResult(_id: number) {
-  return summary.value
-}
+// async function fetchBacktestResult(_id: number) {
+//   return summary.value
+// }
 
-async function fetchTradeRecords(_backtestId: number) {
-  return tradeRecords.value
-}
+// async function fetchTradeRecords(_backtestId: number) {
+//   return tradeRecords.value
+// }
 
 async function handleRunBacktest() {
   isRunning.value = true
