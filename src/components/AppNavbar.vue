@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search } from 'lucide-vue-next'
+import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search, FlaskConical } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
@@ -14,6 +14,7 @@ const emit = defineEmits<{
   navigate: [sectionId: string]
   openProfile: []
   openDashboard: []
+  openQuantLab: []
   openLogin: []
   toggleStatus: []
   openSearch: []
@@ -127,6 +128,7 @@ onUnmounted(() => {
         </button>
 
         <div class="nav-actions desktop-only">
+          <button v-if="isLoggedIn" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
           <button v-if="isLoggedIn" class="nav-action-button" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
           <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
         </div>
@@ -151,6 +153,7 @@ onUnmounted(() => {
               <template v-if="isLoggedIn">
                 <!-- 仅在移动端显示这些链接，因为 PC 端它们已经直接摆在导航栏上了 -->
                 <template v-if="isMobile">
+                  <button class="dropdown-item" type="button" @click="$emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
                   <button class="dropdown-item" type="button" @click="$emit('openProfile')"><User :size="14" /> 个人主页</button>
                   <button class="dropdown-item" type="button" @click="$emit('openDashboard')"><LayoutDashboard :size="14" /> 控制面板</button>
                   <div class="dropdown-divider"></div>
@@ -205,6 +208,7 @@ onUnmounted(() => {
   background: #0f172a; color: white; font-size: 0.75rem; font-weight: 700;
   cursor: pointer; transition: opacity 0.2s;
 }
+.nav-action-button.lab { background: #eff6ff; color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.18); }
 .nav-action-button.secondary { background: #f1f5f9; color: #475569; }
 
 /* 搜索触发器样式 */
