@@ -249,7 +249,11 @@ function formatDate(dateStr: string) {
 <style scoped>
 /* ── 全局背景 ── */
 .home-page {
-  background: #f5f5f7;
+  background:
+    radial-gradient(circle at 12% 5%, rgba(68, 105, 255, 0.14), transparent 32rem),
+    radial-gradient(circle at 88% 0%, rgba(255, 223, 207, 0.42), transparent 30rem),
+    linear-gradient(180deg, #eaf0fb 0%, #f8faff 48%, #eef3fb 100%);
+  color: #0f172a;
 }
 
 /* ════════════════════════════════
@@ -265,7 +269,11 @@ function formatDate(dateStr: string) {
 
 .hp-hero-inner {
   position: relative;
-  background: linear-gradient(160deg, #0f172a 0%, #1e1b4b 45%, #312e81 100%);
+  background:
+    radial-gradient(circle at 78% 28%, rgba(96, 165, 250, 0.24), transparent 16rem),
+    radial-gradient(circle at 88% 70%, rgba(240, 171, 252, 0.16), transparent 18rem),
+    linear-gradient(145deg, rgba(12, 18, 32, 0.96) 0%, rgba(24, 35, 55, 0.92) 46%, rgba(49, 46, 129, 0.82) 100%);
+  border: 1px solid rgba(191, 219, 254, 0.22);
   border-radius: 2rem;
   overflow: hidden;
   padding: 3rem 3.5rem;
@@ -274,12 +282,17 @@ function formatDate(dateStr: string) {
   gap: 2rem;
   align-items: center;
   z-index: 1;
+  box-shadow:
+    0 28px 76px rgba(15, 23, 42, 0.24),
+    inset 0 1px 0 rgba(255, 255, 255, 0.12);
 }
 .hp-hero-inner::after {
   content: '';
   position: absolute;
   inset: 0;
-  background: radial-gradient(ellipse 80% 60% at 70% 40%, rgba(99,102,241,0.18) 0%, transparent 70%);
+  background:
+    linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 35%),
+    radial-gradient(ellipse 80% 60% at 70% 40%, rgba(147, 197, 253, 0.14) 0%, transparent 70%);
   pointer-events: none;
 }
 
@@ -292,17 +305,17 @@ function formatDate(dateStr: string) {
   font-weight: 800;
   letter-spacing: 0.2em;
   text-transform: uppercase;
-  color: #818cf8;
+  color: #93c5fd;
   margin-bottom: 1.5rem;
 }
 .hp-label-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #818cf8;
-  box-shadow: 0 0 8px #818cf8;
+  background: #60a5fa;
+  box-shadow: 0 0 10px rgba(96, 165, 250, 0.85);
 }
-.hp-label-arrow { color: #4f46e5; }
+.hp-label-arrow { color: #c4b5fd; }
 
 .hp-hero-title {
   margin: 0 0 1.5rem;
@@ -313,14 +326,17 @@ function formatDate(dateStr: string) {
   color: #f8fafc;
 }
 .hp-hero-accent {
-  color: #818cf8;
+  background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #f0abfc 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
   font-style: italic;
 }
 
 .hp-hero-sub {
   margin: 0 0 2rem;
   font-size: 1rem;
-  color: #94a3b8;
+  color: #cbd5e1;
   line-height: 1.85;
   font-weight: 400;
 }
@@ -335,31 +351,31 @@ function formatDate(dateStr: string) {
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  border: none;
+  border: 1px solid rgba(191, 219, 254, 0.18);
   border-radius: 9999px;
-  background: #4f46e5;
+  background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   color: white;
   font-size: 0.88rem;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.2s, transform 0.15s;
 }
-.hp-btn-primary:hover { background: #4338ca; transform: translateY(-1px); }
+.hp-btn-primary:hover { background: linear-gradient(135deg, #2563eb 0%, #7c3aed 100%); transform: translateY(-1px); }
 .hp-btn-ghost {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
   padding: 0.75rem 1.5rem;
-  border: 1px solid rgba(129,140,248,0.3);
+  border: 1px solid rgba(191, 219, 254, 0.22);
   border-radius: 9999px;
-  background: rgba(129,140,248,0.08);
-  color: #a5b4fc;
+  background: rgba(15, 23, 42, 0.26);
+  color: #dbeafe;
   font-size: 0.88rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
 }
-.hp-btn-ghost:hover { background: rgba(129,140,248,0.14); border-color: rgba(129,140,248,0.5); }
+.hp-btn-ghost:hover { background: rgba(59, 130, 246, 0.16); border-color: rgba(167, 139, 250, 0.42); }
 
 /* 右侧装饰 */
 .hp-hero-visual {
@@ -374,19 +390,19 @@ function formatDate(dateStr: string) {
 .hp-orb-1 {
   width: 220px; height: 220px;
   top: 20px; right: 10px;
-  background: radial-gradient(circle at 35% 35%, rgba(129,140,248,0.35), rgba(79,70,229,0.1) 60%, transparent);
-  border: 1px solid rgba(129,140,248,0.2);
+  background: radial-gradient(circle at 35% 35%, rgba(147,197,253,0.34), rgba(96,165,250,0.12) 58%, transparent);
+  border: 1px solid rgba(191,219,254,0.22);
 }
 .hp-orb-2 {
   width: 140px; height: 140px;
   top: 60px; right: 80px;
-  background: radial-gradient(circle at 40% 30%, rgba(196,181,253,0.25), transparent 70%);
-  border: 1px solid rgba(196,181,253,0.15);
+  background: radial-gradient(circle at 40% 30%, rgba(240,171,252,0.22), transparent 70%);
+  border: 1px solid rgba(240,171,252,0.16);
 }
 .hp-orb-3 {
   width: 80px; height: 80px;
   bottom: 80px; right: 40px;
-  background: radial-gradient(circle, rgba(99,102,241,0.4), transparent 70%);
+  background: radial-gradient(circle, rgba(96,165,250,0.38), transparent 70%);
 }
 .hp-glass-card {
   position: absolute;
@@ -394,13 +410,13 @@ function formatDate(dateStr: string) {
   transform: translate(-50%, -50%);
   width: 120px; height: 120px;
   border-radius: 2rem;
-  background: rgba(255,255,255,0.06);
-  border: 1px solid rgba(255,255,255,0.12);
+  background: rgba(255,255,255,0.075);
+  border: 1px solid rgba(191,219,254,0.2);
   backdrop-filter: blur(20px);
   display: flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 24px 60px rgba(0,0,0,0.3);
+  box-shadow: 0 24px 60px rgba(2,6,23,0.32);
 }
 .hp-glass-card-inner {
   display: flex;
@@ -408,17 +424,17 @@ function formatDate(dateStr: string) {
   align-items: center;
   gap: 0.25rem;
 }
-.hp-glass-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.2em; color: #818cf8; text-transform: uppercase; }
+.hp-glass-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.2em; color: #93c5fd; text-transform: uppercase; }
 .hp-glass-title { font-size: 3rem; font-weight: 900; color: white; line-height: 1; }
-.hp-glass-sub { font-size: 0.55rem; color: #64748b; font-weight: 600; }
+.hp-glass-sub { font-size: 0.55rem; color: #94a3b8; font-weight: 600; }
 
 .hp-float-chip {
   position: absolute;
   padding: 0.35rem 0.85rem;
   border-radius: 9999px;
-  background: rgba(255,255,255,0.08);
-  border: 1px solid rgba(255,255,255,0.12);
-  color: #c7d2fe;
+  background: rgba(15,23,42,0.28);
+  border: 1px solid rgba(191,219,254,0.18);
+  color: #dbeafe;
   font-size: 0.7rem;
   font-weight: 700;
   backdrop-filter: blur(8px);
@@ -431,7 +447,7 @@ function formatDate(dateStr: string) {
    分类卡片
 ════════════════════════════════ */
 .hp-categories {
-  background: #f5f5f7;
+  background: transparent;
   padding: 2.5rem 0;
 }
 .hp-categories-inner {
@@ -448,21 +464,21 @@ function formatDate(dateStr: string) {
   gap: 0.85rem;
   padding: 1rem 1.1rem;
   border-radius: 1.25rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
+  background: rgba(255,255,255,0.78);
+  border: 1px solid rgba(191,219,254,0.32);
   cursor: pointer;
   transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  box-shadow: 0 12px 30px rgba(70,91,128,0.08);
 }
 .hp-cat-card:hover {
-  box-shadow: 0 8px 24px rgba(79,70,229,0.1);
-  border-color: rgba(79,70,229,0.25);
+  box-shadow: 0 14px 34px rgba(59,130,246,0.12);
+  border-color: rgba(79,124,255,0.34);
   transform: translateY(-2px);
 }
 .hp-cat-card.active {
-  background: #4f46e5;
-  border-color: #4f46e5;
-  box-shadow: 0 12px 32px rgba(79,70,229,0.3);
+  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  border-color: rgba(147,197,253,0.46);
+  box-shadow: 0 14px 34px rgba(37,99,235,0.26);
 }
 .hp-cat-card.active .hp-cat-icon { background: rgba(255,255,255,0.15); color: white; }
 .hp-cat-card.active .hp-cat-info strong { color: white; }
@@ -474,7 +490,7 @@ function formatDate(dateStr: string) {
   height: 2.5rem;
   border-radius: 0.75rem;
   background: #eff6ff;
-  color: #4f46e5;
+  color: #3b82f6;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -509,6 +525,7 @@ function formatDate(dateStr: string) {
 ════════════════════════════════ */
 .hp-posts {
   padding: 1rem 0 3rem;
+  background: transparent;
 }
 .hp-posts-inner {
   max-width: 64rem;
@@ -533,8 +550,8 @@ function formatDate(dateStr: string) {
 .hp-section-dot {
   width: 6px; height: 6px;
   border-radius: 50%;
-  background: #4f46e5;
-  box-shadow: 0 0 6px #4f46e5;
+  background: #4f7cff;
+  box-shadow: 0 0 8px rgba(79,124,255,0.72);
 }
 .hp-view-all {
   display: inline-flex;
@@ -542,7 +559,7 @@ function formatDate(dateStr: string) {
   gap: 0.3rem;
   border: none;
   background: transparent;
-  color: #4f46e5;
+  color: #3b82f6;
   font-size: 0.78rem;
   font-weight: 700;
   cursor: pointer;
@@ -561,15 +578,15 @@ function formatDate(dateStr: string) {
 /* 文章卡片 */
 .hp-article-card {
   border-radius: 1.5rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
+  background: rgba(255,255,255,0.84);
+  border: 1px solid rgba(203,213,225,0.62);
   overflow: hidden;
   cursor: pointer;
   transition: box-shadow 0.2s, transform 0.2s;
-  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+  box-shadow: 0 14px 34px rgba(70,91,128,0.07);
 }
 .hp-article-card:hover {
-  box-shadow: 0 16px 40px rgba(15,23,42,0.1);
+  box-shadow: 0 18px 44px rgba(70,91,128,0.13);
   transform: translateY(-3px);
 }
 
@@ -659,8 +676,8 @@ function formatDate(dateStr: string) {
 .hp-state-card {
   padding: 2.5rem;
   border-radius: 1.5rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
+  background: rgba(255,255,255,0.84);
+  border: 1px solid rgba(203,213,225,0.62);
   text-align: center;
   color: #64748b;
 }
@@ -748,7 +765,10 @@ function formatDate(dateStr: string) {
 }
 .hp-quote-content {
   position: relative;
-  background: #0f172a;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(245,158,11,0.12), transparent 16rem),
+    radial-gradient(circle at 20% 10%, rgba(59,130,246,0.12), transparent 14rem),
+    linear-gradient(135deg, #090e18 0%, #111827 100%);
   padding: 2.2rem 3rem; /* 显著减少上下内边距，压缩高度 */
   display: flex;
   flex-direction: column;
@@ -758,7 +778,7 @@ function formatDate(dateStr: string) {
 .hp-quote-mark {
   font-size: 3.5rem; /* 减小引号尺寸 */
   line-height: 0.8;
-  color: #4f46e5;
+  color: #4f7cff;
   font-family: Georgia, serif;
   font-weight: 900;
   opacity: 0.8;
@@ -943,7 +963,10 @@ function formatDate(dateStr: string) {
 }
 .hp-quote-content {
   position: relative;
-  background: #0f172a;
+  background:
+    radial-gradient(circle at 84% 18%, rgba(245,158,11,0.12), transparent 16rem),
+    radial-gradient(circle at 20% 10%, rgba(59,130,246,0.12), transparent 14rem),
+    linear-gradient(135deg, #090e18 0%, #111827 100%);
   padding: 3rem 3.5rem;
   display: flex;
   flex-direction: column;
@@ -953,7 +976,7 @@ function formatDate(dateStr: string) {
 .hp-quote-mark {
   font-size: 5rem;
   line-height: 0.8;
-  color: #4f46e5;
+  color: #4f7cff;
   font-family: Georgia, serif;
   font-weight: 900;
   opacity: 0.8;
