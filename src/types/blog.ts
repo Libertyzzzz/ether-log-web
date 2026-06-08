@@ -73,6 +73,7 @@ export interface LoginData {
 }
 
 export interface UploadImageData {
+  id: number
   url: string
   path: string
   name: string

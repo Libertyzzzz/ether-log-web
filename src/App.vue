@@ -382,8 +382,17 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
   try {
     const formData = new FormData()
     formData.append('file', file)
+    if (type === 'avatar') {
+      formData.append('usageType', 'AVATAR')
+      formData.append('usageId', String(loginUser.value.id))
+    } else {
+      formData.append('usageType', 'ARTICLE_CONTENT')
+      if (editingArticleId.value) {
+        formData.append('usageId', String(editingArticleId.value))
+      }
+    }
 
-    const response = await axios.post<ResultResponse<UploadImageData>>('/api/admin/upload/image', formData, {
+    const response = await axios.post<ResultResponse<UploadImageData>>('/api/admin/upload/image/with-reference', formData, {
       headers: getAuthHeaders()
     })
 

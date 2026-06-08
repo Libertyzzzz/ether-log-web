@@ -50,8 +50,9 @@ const handleImageUpload = async (event: Event) => {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('usageType', 'OTHER')
       
-      const response = await axios.post('/api/admin/upload/image', formData, {
+      const response = await axios.post('/api/admin/upload/image/with-reference', formData, {
         headers: {
           Authorization: localStorage.getItem('authToken') || ''
         }
