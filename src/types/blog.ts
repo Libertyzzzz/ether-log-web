@@ -53,6 +53,7 @@ export interface ArticlePublishRequest {
   isTop: number
   categoryId: number
   tagIds: number[]
+  imageIds: number[]
 }
 
 export interface LoginUser {
