@@ -107,7 +107,8 @@ const publishForm = reactive<ArticlePublishRequest>({
   status: 1,
   isTop: 0,
   categoryId: 1,
-  tagIds: []
+  tagIds: [],
+  imageIds: [] // 新增字段，用于接收文章中使用的图片ID
 })
 
 const myComments = ref<CommentItem[]>([
@@ -115,6 +116,9 @@ const myComments = ref<CommentItem[]>([
   { id: 2, author: 'Bob', articleTitle: '前端性能优化技巧', content: '图例部分可以加一个真实案例。', status: '待审核', createTime: '2026-04-29 09:23' },
   { id: 3, author: 'Carol', articleTitle: '系统设计与扩展性', content: '很喜欢这种模块化的落地方式。', status: '已审核', createTime: '2026-04-30 20:05' }
 ])
+
+// 用于存储已上传图片 URL 到其后端 ID 的映射
+const uploadedImageMap = reactive<Map<string, number>>(new Map());
 
 const filteredArticles = computed(() => {
   let list = articles.value
@@ -369,6 +373,12 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
     return
   }
 
+  // [优化] 前端预校验：检查文件大小 (例如 50MB)
+  if (file.size > 50 * 1024 * 1024) {
+    showAppToast('图片大小不能超过 50MB', 'error')
+    return
+  }
+
   if (!localStorage.getItem('authToken')) {
     publishError.value = '登录状态已失效，请重新登录后再上传图片。'
     showAppToast(publishError.value, 'error')
@@ -382,14 +392,15 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
   try {
     const formData = new FormData()
     formData.append('file', file)
-    if (type === 'avatar') {
-      formData.append('usageType', 'AVATAR')
-      formData.append('usageId', String(loginUser.value.id))
-    } else {
-      formData.append('usageType', 'ARTICLE_CONTENT')
-      if (editingArticleId.value) {
-        formData.append('usageId', String(editingArticleId.value))
-      }
+
+    // 根据后端新接口要求，添加业务关联参数
+    // 映射关系推断：1-头像, 2-封面, 3-文章内容 4-人间估值评估图像
+    const usageTypeMap = { markdown: '3', cover: '2', avatar: '1' }
+    formData.append('usageType', usageTypeMap[type])
+
+    // 如果当前处于“编辑已有文章”状态，则传递文章 ID 进行关联
+    if (editingArticleId.value && (type === 'markdown' || type === 'cover')) {
+      formData.append('usageId', editingArticleId.value.toString())
     }
 
     const response = await axios.post<ResultResponse<UploadImageData>>('/api/admin/upload/image/with-reference', formData, {
@@ -397,14 +408,19 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
     })
 
     const imageUrl = getUploadedImageUrl(response.data.data)
+    const imageId = response.data.data?.id // 假设后端返回的图片数据中包含 id 字段
 
-    if (response.data.code !== 200 || !imageUrl) {
+    if (response.data.code !== 200 || !imageUrl || imageId === undefined) {
       publishError.value = response.data.message || '图片上传失败，请稍后重试。'
       showAppToast(publishError.value, 'error')
       return
     }
 
     if (type === 'markdown') {
+      // 将图片 URL 和后端 ID 存储起来，以便发布文章时收集
+      uploadedImageMap.set(imageUrl, imageId)
+
+      // 更新 pendingMarkdownImage，用于 Tiptap 编辑器插入图片
       const altText = response.data.data.name || 'image'
       pendingMarkdownImage.value = {
         id: Date.now(),
@@ -652,6 +668,19 @@ async function publishArticle() {
   isPublishing.value = true
   publishForm.contentHtml = publishForm.contentHtml || markdownPreviewHtml.value
 
+  // 从文章内容中提取所有图片 ID
+  const parser = new DOMParser();
+  const doc = parser.parseFromString(publishForm.contentHtml, 'text/html');
+  const imgElements = doc.querySelectorAll('img');
+  const extractedImageIds: number[] = [];
+  imgElements.forEach(img => {
+    const src = img.getAttribute('src');
+    if (src && uploadedImageMap.has(src)) {
+      extractedImageIds.push(uploadedImageMap.get(src)!);
+    }
+  });
+  publishForm.imageIds = extractedImageIds; // 将提取到的图片 ID 赋值给 publishForm
+
   try {
     let response
     if (editingArticleId.value) {
@@ -692,6 +721,8 @@ async function publishArticle() {
     showAppToast(publishError.value, 'error')
   } finally {
     isPublishing.value = false
+    publishForm.imageIds = []; // 清空图片 ID，避免下次发布时混淆
+    uploadedImageMap.clear(); // 清空映射，释放内存
   }
 }
 

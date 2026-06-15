@@ -42,6 +42,11 @@ const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (file) {
+    // [优化] 如果之前已经有了预览图且是本地 Blob URL，先释放它以节省内存
+    if (valuationImage.value && valuationImage.value.startsWith('blob:')) {
+      URL.revokeObjectURL(valuationImage.value)
+    }
+
     // 1. 本地即时预览 (Blob URL)
     valuationImage.value = URL.createObjectURL(file)
 
@@ -66,6 +71,7 @@ const handleImageUpload = async (event: Event) => {
       }
     } catch (error) {
       console.error('采样图片上传异常:', error)
+      alert('图片上传失败，请稍后重试') // [优化] 增加基础用户反馈
     } finally {
       isUploadingValuationImage.value = false
     }

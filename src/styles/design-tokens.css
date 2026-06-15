@@ -1,0 +1,23 @@
+/* Global design tokens and helper classes (Apple-style minimal) */
+:root {
+  --bg: #f6f8fb;
+  --card-bg: #ffffff;
+  --muted: #64748b;
+  --surface: #eef2f7;
+  --accent: #6b7280; /* neutral accent */
+  --accent-strong: #0f172a;
+  --glass: rgba(255,255,255,0.6);
+  --radius-sm: 12px;
+  --radius-lg: 22px;
+  --shadow-soft: 0 12px 32px rgba(2,6,23,0.06);
+  --shadow-deep: 0 24px 56px rgba(2,6,23,0.08);
+  --text-primary: #0f172a;
+}
+
+.card { background: var(--card-bg); border-radius: var(--radius-lg); box-shadow: var(--shadow-soft); border:1px solid rgba(226,232,240,0.9); }
+.card-sm { border-radius: var(--radius-sm); }
+.btn-card { background: linear-gradient(180deg,var(--card-bg), #f8fafc); border:1px solid rgba(219,227,239,0.98); color:var(--text-primary); border-radius:12px; padding: 10px 16px; font-weight:900 }
+.glass-pill { background: rgba(255,255,255,0.6); backdrop-filter: blur(6px); border-radius:999px; padding:6px 12px; border:1px solid rgba(226,232,240,0.8); }
+
+/* Utility */
+.u-center { display:flex; align-items:center; justify-content:center; }
