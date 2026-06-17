@@ -83,8 +83,39 @@ export interface UploadImageData {
 export interface CommentItem {
   id: number
   author: string
-  articleTitle: string
+  articleTitle?: string
+  articleId?: number
   content: string
   status: string
   createTime: string
+  nickname?: string
+  avatar?: string
+  children?: CommentItem[]
+  parentNickname?: string
+  website?: string
+}
+
+export interface BackendCommentVO {
+  id: number
+  parentId: number | null
+  articleId: number | null
+  nickname: string | null
+  avatarUrl: string | null
+  content: string
+  website: string | null
+  isAdmin: number | null
+  createTime: string
+  children: BackendCommentVO[] | null
+  parentNickname: string | null
+}
+
+export interface CommentSubmitRequest {
+  articleId: number
+  content: string
+  parentId?: number
+  nickname?: string
+  email?: string
+  avatarUrl?: string
+  website?: string
+  anonymousId?: string
 }

@@ -10,6 +10,7 @@ import AppNavbar from './components/AppNavbar.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
+import GuestbookView from './components/GuestbookView.vue' // Import GuestbookView
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
 import AppToast from './components/AppToast.vue' // Import the new Toast component
@@ -641,6 +642,10 @@ function navigateToSection(sectionId: string) {
     return
   }
 
+  // 对于独立页面组件（如留言板、实验室），跳转后直接回顶
+  if (['guestbook', 'quant-lab', 'profile', 'dashboard'].includes(sectionId)) {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
   requestAnimationFrame(() => {
     const target = document.getElementById(sectionId)
     if (target) {
@@ -945,6 +950,8 @@ onUnmounted(() => {
           :selected-article="selectedArticle"
           :is-loading="isLoadingArticleDetail"
           :show-actions="showActionsInCurrentView"
+          :is-logged-in="isLoggedIn"
+          :login-user="loginUser"
           @close="closeArticleDetail"
           @edit="openPublishModal"
           @delete="deleteArticle"
@@ -967,6 +974,7 @@ onUnmounted(() => {
             @toggle-featured="showFeaturedOnly = $event"
             @open-assessment="openAssessment"
             @open-donate="openDonate"
+            @navigate="navigateToSection"
           />
 
           <ProfilePage
@@ -986,6 +994,12 @@ onUnmounted(() => {
             @edit-article="openPublishModal"
             @delete-article="deleteArticle"
             @open-article="openArticleDetail"
+          />
+
+          <GuestbookView
+            v-if="currentPage === 'guestbook'"
+            :is-logged-in="isLoggedIn"
+            :login-user="loginUser"
           />
 
           <QuantLabPage v-if="currentPage === 'quant-lab' && isLoggedIn" />

@@ -25,6 +25,12 @@ const router = createRouter({
       meta: { page: 'about' }
     },
     {
+      path: '/guestbook',
+      name: 'guestbook',
+      component: App,
+      meta: { page: 'guestbook' }
+    },
+    {
       path: '/profile',
       name: 'profile',
       component: App,

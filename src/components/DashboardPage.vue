@@ -50,7 +50,7 @@ function getCover(post: ArticleListItem, i: number) {
           </div>
           <button class="db-btn-new" type="button" @click="$emit('newArticle')">
             <Plus :size="15" />
-            新建文章
+            发布文章
           </button>
         </div>
       </div>

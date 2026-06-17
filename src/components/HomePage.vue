@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { BookOpen, ArrowRight, ArrowUpRight, Lightbulb, Code2, Palette, BookMarked } from 'lucide-vue-next'
+import { BookOpen, ArrowRight, ArrowUpRight, Lightbulb, Code2, Palette, BookMarked, MessageCircle } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 
@@ -22,6 +22,7 @@ defineEmits<{
   toggleFeatured: [val: boolean]
   openAssessment: [] // 新增：打开人间估值事件
   openDonate: []
+  navigate: [page: string]
 }>()
 
 // 分类图标映射（固定静态，和后端 label 对应）
@@ -90,6 +91,11 @@ function formatDate(dateStr: string) {
             <!-- 新增：人间估值入口 -->
             <button class="hp-btn-ghost" type="button" @click="$emit('openAssessment')">
               ✨ 人间估值
+            </button>
+            <!-- 新增：留言板入口 -->
+            <button class="hp-btn-ghost" type="button" @click="$emit('navigate', 'guestbook')">
+              <MessageCircle :size="15" />
+              留言板
             </button>
           </div>
         </div>
