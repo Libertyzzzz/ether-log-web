@@ -1,155 +1,109 @@
 <script setup lang="ts">
-import { ref, computed } from 'vue'
-import axios from 'axios'
-import type { CommentItem, CommentSubmitRequest, ResultResponse, LoginUser } from '../types/blog'
+import { ref, computed, nextTick } from 'vue'
+import type { CommentItem as CommentItemType, LoginUser } from '../types/blog'
+import { useComments } from '../composables/useComments'
 
 const props = defineProps<{
-  comment: CommentItem;
-  articleId: number;
-  isLoggedIn: boolean;
-  loginUser: Partial<LoginUser>;
-  allowAnonymous?: boolean;
-}>();
-const emit = defineEmits<{ (e: 'comment-posted'): void }>();
+  comment: CommentItemType
+  articleId: number
+  isLoggedIn: boolean
+  loginUser: Partial<LoginUser>
+}>()
+const emit = defineEmits<{ (e: 'comment-posted'): void }>()
 
-const collapsed = ref(false);
-const showReplyBox = ref(false);
-const replyContent = ref('');
-const anonymousNickname = ref('');
-const anonymousEmail = ref('');
-const anonymousWebsite = ref('');
-const isSubmitting = ref(false);
-const errorMsg = ref('');
+const {
+  isLoading: _isLoading,
+  error,
+  submitComment,
+  ensureAnonymousId,
+  isAnonymousProfileReady,
+  saveAnonymousProfile,
+  clearAnonymousProfile,
+  loadAnonymousProfile,
+} = useComments()
 
-const hasChildren = computed(() => props.comment.children && props.comment.children.length > 0);
-const childCount = computed(() => props.comment.children?.length || 0);
+const collapsed = ref(false)
+const showReplyBox = ref(false)
+const replyContent = ref('')
+const anonymousNickname = ref('')
+const anonymousEmail = ref('')
+const anonymousWebsite = ref('')
+const isSubmitting = ref(false)
+const errorMsg = ref('')
+
+const hasChildren = computed(() => props.comment.children && props.comment.children.length > 0)
+const childCount = computed(() => props.comment.children?.length || 0)
+const anonymousProfileReadyItem = computed(() => isAnonymousProfileReady())
 
 function toggleCollapse() {
-  collapsed.value = !collapsed.value;
+  collapsed.value = !collapsed.value
 }
 
 function openReply() {
-  showReplyBox.value = true;
-  loadAnonymousProfile();
-  setTimeout(() => {
-    const ta = document.querySelector(`.reply-box-${props.comment.id} textarea`) as HTMLTextAreaElement | null;
-    if (ta) ta.focus();
-  }, 50);
+  showReplyBox.value = true
+  const stored = loadAnonymousProfile()
+  anonymousNickname.value = stored.nickname
+  anonymousEmail.value = stored.email
+  anonymousWebsite.value = stored.website
+  nextTick(() => {
+    const ta = document.querySelector(`.reply-box-${props.comment.id} textarea`) as HTMLTextAreaElement | null
+    if (ta) ta.focus()
+  })
 }
 
 function cancelReply() {
-  showReplyBox.value = false;
-  replyContent.value = '';
-  errorMsg.value = '';
-}
-
-function getAnonymousId(): string {
-  let id = localStorage.getItem('anonymousCommentId');
-  if (!id) {
-    id = 'anon_' + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem('anonymousCommentId', id);
-  }
-  return id;
-}
-
-function saveAnonymousProfile(nickname: string, email: string, website: string) {
-  localStorage.setItem('anonymousNickname', nickname);
-  localStorage.setItem('anonymousEmail', email);
-  localStorage.setItem('anonymousWebsite', website || '');
-}
-
-function loadAnonymousProfile() {
-  if (localStorage.getItem('anonymousCommentId')) {
-    const n = localStorage.getItem('anonymousNickname') || '';
-    const e = localStorage.getItem('anonymousEmail') || '';
-    const w = localStorage.getItem('anonymousWebsite') || '';
-    anonymousNickname.value = n;
-    anonymousEmail.value = e;
-    anonymousWebsite.value = w;
-  }
+  showReplyBox.value = false
+  replyContent.value = ''
+  errorMsg.value = ''
 }
 
 function clearAnonymousProfileItem() {
-  localStorage.removeItem('anonymousCommentId');
-  localStorage.removeItem('anonymousNickname');
-  localStorage.removeItem('anonymousEmail');
-  localStorage.removeItem('anonymousWebsite');
-  anonymousNickname.value = '';
-  anonymousEmail.value = '';
-  anonymousWebsite.value = '';
+  clearAnonymousProfile()
+  anonymousNickname.value = ''
+  anonymousEmail.value = ''
+  anonymousWebsite.value = ''
 }
-
-const anonymousProfileReadyItem = computed(() => {
-  return !!localStorage.getItem('anonymousCommentId')
-    && !!localStorage.getItem('anonymousNickname')
-    && !!localStorage.getItem('anonymousEmail');
-});
 
 async function submitReply(): Promise<boolean> {
   if (!replyContent.value.trim()) {
-    errorMsg.value = '回复内容不能为空。';
-    return false;
+    errorMsg.value = '回复内容不能为空。'
+    return false
   }
   if (!props.isLoggedIn && !anonymousNickname.value.trim()) {
-    errorMsg.value = '请填写昵称。';
-    return false;
+    errorMsg.value = '请填写昵称。'
+    return false
   }
   if (!props.isLoggedIn && !anonymousEmail.value.trim()) {
-    errorMsg.value = '请填写邮箱。';
-    return false;
+    errorMsg.value = '请填写邮箱。'
+    return false
   }
 
-  isSubmitting.value = true;
-  errorMsg.value = '';
+  isSubmitting.value = true
+  errorMsg.value = ''
 
-  try {
-    const token = localStorage.getItem('authToken');
-    const payload: CommentSubmitRequest = {
-      articleId: props.articleId,
-      content: replyContent.value.trim(),
-      parentId: props.comment.id,
-    };
+  const ok = await submitComment(
+    { articleId: props.articleId, content: replyContent.value.trim(), parentId: props.comment.id },
+    props.isLoggedIn,
+    props.loginUser,
+    anonymousNickname.value,
+    anonymousEmail.value,
+    anonymousWebsite.value,
+    (nick, email, site) => saveAnonymousProfile(nick, email, site),
+    () => ensureAnonymousId()
+  )
 
-    if (props.isLoggedIn) {
-      payload.nickname = props.loginUser.nickname || props.loginUser.username || undefined;
-      payload.avatarUrl = props.loginUser.avatar || undefined;
-    } else {
-      payload.nickname = anonymousNickname.value.trim();
-      payload.email = anonymousEmail.value.trim();
-      payload.website = anonymousWebsite.value.trim() || undefined;
-      payload.anonymousId = getAnonymousId();
-      saveAnonymousProfile(
-        anonymousNickname.value.trim(),
-        anonymousEmail.value.trim(),
-        anonymousWebsite.value.trim()
-      );
-    }
-
-    const response = await axios.post<ResultResponse<void>>(
-      '/api/comment/publish',
-      payload,
-      { headers: token ? { Authorization: token } : {} }
-    );
-
-    if (response.data.code === 200) {
-      showReplyBox.value = false;
-      replyContent.value = '';
-      anonymousEmail.value = '';
-      anonymousWebsite.value = '';
-      emit('comment-posted');
-      return true;
-    } else {
-      errorMsg.value = response.data.message || '回复提交失败。';
-      return false;
-    }
-  } catch (error) {
-    errorMsg.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '回复提交失败，请稍后重试。';
-  } finally {
-    isSubmitting.value = false;
+  if (ok) {
+    showReplyBox.value = false
+    replyContent.value = ''
+    anonymousEmail.value = ''
+    anonymousWebsite.value = ''
+    emit('comment-posted')
+  } else {
+    errorMsg.value = error.value || '回复提交失败，请稍后重试。'
   }
-  return false;
+
+  isSubmitting.value = false
+  return ok
 }
 </script>
 
@@ -157,7 +111,11 @@ async function submitReply(): Promise<boolean> {
   <div class="comment-tree-item">
     <div class="comment-main">
       <div class="comment-header">
-        <img :src="comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author || comment.id}`" alt="" class="comment-avatar" />
+        <img
+          :src="comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author || comment.id}`"
+          alt=""
+          class="comment-avatar"
+        />
         <span class="comment-author">{{ comment.nickname || comment.author }}</span>
         <span v-if="comment.parentNickname" class="comment-reply-to">@{{ comment.parentNickname }}</span>
         <span class="comment-time">{{ comment.createTime }}</span>
@@ -166,17 +124,34 @@ async function submitReply(): Promise<boolean> {
       <p class="comment-content">{{ comment.content }}</p>
 
       <div v-if="showReplyBox" :class="['reply-box', `reply-box-${comment.id}`]">
-        <div class="reply-box-header">回复 <span class="reply-box-target">@{{ comment.nickname || comment.author }}</span></div>
+        <div class="reply-box-header">
+          回复 <span class="reply-box-target">@{{ comment.nickname || comment.author }}</span>
+        </div>
         <div v-if="!isLoggedIn && !anonymousProfileReadyItem" class="anonymous-form">
-          <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
+          <input
+            v-model="anonymousNickname"
+            type="text"
+            placeholder="昵称（必填）"
+            :disabled="isSubmitting"
+          />
           <input v-model="anonymousEmail" type="email" placeholder="邮箱（必填）" :disabled="isSubmitting" />
-          <input v-model="anonymousWebsite" type="text" placeholder="个人网站（选填）" :disabled="isSubmitting" />
+          <input
+            v-model="anonymousWebsite"
+            type="text"
+            placeholder="个人网站（选填）"
+            :disabled="isSubmitting"
+          />
         </div>
         <div v-else-if="!isLoggedIn && anonymousProfileReadyItem" class="anonymous-identity-hint">
           <span>以 <b>{{ anonymousNickname }}</b> 身份回复</span>
           <span class="identity-switch" @click="clearAnonymousProfileItem">切换身份</span>
         </div>
-        <textarea v-model="replyContent" placeholder="写下你的回复..." rows="3" :disabled="isSubmitting"></textarea>
+        <textarea
+          v-model="replyContent"
+          placeholder="写下你的回复..."
+          rows="3"
+          :disabled="isSubmitting"
+        ></textarea>
         <div class="composer-actions">
           <button @click="submitReply" :disabled="isSubmitting || !replyContent.trim()">发布回复</button>
           <button @click="cancelReply" type="button">取消</button>
@@ -188,7 +163,9 @@ async function submitReply(): Promise<boolean> {
     <div v-if="hasChildren" class="comment-children-wrapper">
       <div class="comment-collapse-bar" @click="toggleCollapse">
         <span class="collapse-icon">{{ collapsed ? '▸' : '▾' }}</span>
-        <span class="collapse-text">{{ collapsed ? `展开 ${childCount} 条回复` : `收起 ${childCount} 条回复` }}</span>
+        <span class="collapse-text"
+          >{{ collapsed ? `展开 ${childCount} 条回复` : `收起 ${childCount} 条回复` }}</span
+        >
       </div>
       <div v-if="!collapsed" class="comment-children">
         <CommentItem
@@ -198,7 +175,6 @@ async function submitReply(): Promise<boolean> {
           :article-id="articleId"
           :is-logged-in="isLoggedIn"
           :login-user="loginUser"
-          :allow-anonymous="allowAnonymous"
           @comment-posted="emit('comment-posted')"
         />
       </div>
@@ -214,7 +190,10 @@ async function submitReply(): Promise<boolean> {
 .comment-author { font-weight: 700; color: #0f172a; margin-right: 10px; font-size: 14px; }
 .comment-reply-to { color: #2563eb; font-size: 12px; margin-right: 10px; font-weight: 500; }
 .comment-time { font-size: 12px; color: #6b7280; }
-.comment-reply-btn { margin-left: auto; font-size: 12px; color: #2563eb; cursor: pointer; padding: 2px 8px; border-radius: 4px; transition: background 0.15s; }
+.comment-reply-btn {
+  margin-left: auto; font-size: 12px; color: #2563eb; cursor: pointer;
+  padding: 2px 8px; border-radius: 4px; transition: background 0.15s;
+}
 .comment-reply-btn:hover { background: #dbeafe; }
 .comment-content { color: #374151; line-height: 1.5; font-size: 14px; margin: 0; }
 
@@ -222,27 +201,36 @@ async function submitReply(): Promise<boolean> {
 .comment-collapse-bar {
   display: flex; align-items: center; gap: 6px; font-size: 12px;
   color: #2563eb; cursor: pointer; padding: 4px 8px; border-radius: 4px;
-  margin-bottom: 8px; transition: background 0.15s;
-  background: #f1f5f9;
+  margin-bottom: 8px; transition: background 0.15s; background: #f1f5f9;
 }
 .comment-collapse-bar:hover { background: #dbeafe; }
 .collapse-icon { font-size: 10px; }
 .comment-children { display: flex; flex-direction: column; gap: 8px; }
 
-.reply-box { margin-top: 12px; padding: 12px; background: #f8fafc; border-radius: 6px; border: 1px solid #e6eef6; }
+.reply-box {
+  margin-top: 12px; padding: 12px; background: #f8fafc;
+  border-radius: 6px; border: 1px solid #e6eef6;
+}
 .reply-box-header { font-size: 13px; color: #475569; margin-bottom: 8px; }
 .reply-box-target { color: #2563eb; font-weight: 600; }
-.reply-box textarea { width: 100%; padding: 8px; border: 1px solid #e6eef6; border-radius: 6px; min-height: 80px; resize: vertical; margin-bottom: 8px; font-size: 14px; outline: none; transition: border-color 0.15s; }
+.reply-box textarea {
+  width: 100%; padding: 8px; border: 1px solid #e6eef6;
+  border-radius: 6px; min-height: 80px; resize: vertical;
+  margin-bottom: 8px; font-size: 14px; outline: none;
+  transition: border-color 0.15s;
+}
 .reply-box textarea:focus { border-color: #2563eb; }
 
 .anonymous-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
-.anonymous-form input { padding: 8px 10px; border: 1px solid #e6eef6; border-radius: 6px; font-size: 14px; outline: none; transition: border-color 0.15s; }
+.anonymous-form input {
+  padding: 8px 10px; border: 1px solid #e6eef6; border-radius: 6px;
+  font-size: 14px; outline: none; transition: border-color 0.15s;
+}
 .anonymous-form input:focus { border-color: #2563eb; }
 
 .anonymous-identity-hint {
-  display: flex; align-items: center; gap: 12px;
-  padding: 8px 12px; background: #f0f9ff;
-  border: 1px solid #bae6fd; border-radius: 6px;
+  display: flex; align-items: center; gap: 12px; padding: 8px 12px;
+  background: #f0f9ff; border: 1px solid #bae6fd; border-radius: 6px;
   font-size: 14px; color: #0c4a6e; margin-bottom: 8px;
 }
 .anonymous-identity-hint b { color: #0c4a6e; font-weight: 600; }
@@ -253,7 +241,10 @@ async function submitReply(): Promise<boolean> {
 .identity-switch:hover { color: #1d4ed8; }
 
 .composer-actions { display: flex; gap: 8px; justify-content: flex-end; }
-.composer-actions button { padding: 6px 12px; font-size: 13px; border-radius: 6px; border: none; cursor: pointer; }
+.composer-actions button {
+  padding: 6px 12px; font-size: 13px; border-radius: 6px;
+  border: none; cursor: pointer;
+}
 .composer-actions button:first-child { background: #2563eb; color: white; }
 .composer-actions button:first-child:hover:not(:disabled) { background: #1d4ed8; }
 .composer-actions button:first-child:disabled { background: #93c5fd; cursor: not-allowed; }

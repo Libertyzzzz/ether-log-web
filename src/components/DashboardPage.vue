@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check } from 'lucide-vue-next'
 import type { ArticleListItem, CommentItem } from '../types/blog'
 
 defineProps<{
   articles: ArticleListItem[]
-  myComments: CommentItem[]
+  pendingComments: CommentItem[]
+  isLoadingPending: boolean
   commentCount: number
   totalViews: number
 }>()
@@ -14,6 +15,8 @@ defineEmits<{
   editArticle: [article: ArticleListItem]
   deleteArticle: [articleId: number]
   openArticle: [article: ArticleListItem]
+  approveComment: [commentId: number]
+  deleteComment: [commentId: number]
 }>()
 
 const coverGradients = [
@@ -33,7 +36,7 @@ function getCover(post: ArticleListItem, i: number) {
 <template>
   <div class="db-page">
 
-    <!-- ── 顶部 Banner（和 ProfilePage 风格一致） ── -->
+    <!-- ── 顶部 Banner ── -->
     <div class="db-hero">
       <div class="db-hero-bg-wrap">
         <div class="db-hero-bg" aria-hidden="true">
@@ -68,7 +71,7 @@ function getCover(post: ArticleListItem, i: number) {
         </div>
         <div class="db-stat-card">
           <div class="db-stat-icon" style="background:rgba(34,197,94,0.1);color:#22c55e"><MessageSquare :size="18"/></div>
-          <span class="db-stat-label">评论总数</span>
+          <span class="db-stat-label">待审核评论</span>
           <strong class="db-stat-value">{{ commentCount }}</strong>
           <div class="db-stat-wave db-wave-green"></div>
         </div>
@@ -133,30 +136,32 @@ function getCover(post: ArticleListItem, i: number) {
           </div>
         </div>
 
-        <!-- 评论管理 -->
+        <!-- 待审核评论 -->
         <div class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <MessageSquare :size="15" class="db-card-icon" />
-              <h2 class="db-card-title">评论管理</h2>
+              <h2 class="db-card-title">待审核评论</h2>
             </div>
           </div>
 
-          <div v-if="!myComments.length" class="db-empty">暂无评论</div>
+          <div v-if="isLoadingPending" class="db-empty">加载中...</div>
+          <div v-else-if="!pendingComments.length" class="db-empty">暂无待审核的评论</div>
 
-          <div v-for="comment in myComments" :key="comment.id" class="db-comment-item">
+          <div v-for="comment in pendingComments" :key="comment.id" class="db-comment-item">
             <p class="db-comment-text">{{ comment.content }}</p>
-            <p class="db-comment-meta">{{ comment.author }} · {{ comment.articleTitle }}</p>
+            <p class="db-comment-meta">
+              {{ comment.author }}
+              <template v-if="comment.articleTitle"> · {{ comment.articleTitle }}</template>
+              <template v-if="comment.createTime"> · {{ comment.createTime }}</template>
+            </p>
             <div class="db-comment-actions">
-              <button
-                type="button"
-                class="db-action-btn view"
-                :disabled="!articles.length"
-                @click="$emit('openArticle', articles.find(a => a.title === comment.articleTitle) ?? articles[0])"
-              >
-                查看文章
+              <button type="button" class="db-action-btn approve" @click="$emit('approveComment', comment.id)">
+                <Check :size="11" /> 通过
               </button>
-              <button type="button" class="db-action-btn edit">审核</button>
+              <button type="button" class="db-action-btn danger" @click="$emit('deleteComment', comment.id)">
+                <Trash2 :size="11" /> 删除
+              </button>
             </div>
           </div>
         </div>
@@ -194,7 +199,6 @@ function getCover(post: ArticleListItem, i: number) {
   background:rgba(129,140,248,0.15); border:1px solid rgba(129,140,248,0.25);
   display:flex; align-items:center; justify-content:center; color:#a5b4fc;
 }
-.db-hero-info { flex:1; display:flex; flex-direction:column; gap:0.25rem; }
 .db-hero-title { margin:0; font-size:1.5rem; font-weight:900; color:#f8fafc; }
 .db-hero-sub { margin:0; font-size:0.85rem; color:#94a3b8; }
 .db-btn-new {
@@ -271,6 +275,8 @@ function getCover(post: ArticleListItem, i: number) {
 .db-action-btn.view:hover { background:#e2e8f0; }
 .db-action-btn.danger { background:rgba(239,68,68,0.08);color:#dc2626; }
 .db-action-btn.danger:hover { background:rgba(239,68,68,0.15); }
+.db-action-btn.approve { background:rgba(34,197,94,0.08);color:#16a34a; }
+.db-action-btn.approve:hover { background:rgba(34,197,94,0.15); }
 .db-action-btn:disabled { opacity:0.4;cursor:not-allowed; }
 .db-empty { padding:2rem;text-align:center;color:#94a3b8;font-size:0.85rem; }
 

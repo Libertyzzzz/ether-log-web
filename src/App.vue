@@ -10,11 +10,11 @@ import AppNavbar from './components/AppNavbar.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
-import GuestbookView from './components/GuestbookView.vue' // Import GuestbookView
+import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
-import AppToast from './components/AppToast.vue' // Import the new Toast component
-import SearchModal from './components/SearchModal.vue' // Import SearchModal
+import AppToast from './components/AppToast.vue'
+import SearchModal from './components/SearchModal.vue'
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
 import QuantLabPage from './components/QuantLabPage.vue'
@@ -23,80 +23,127 @@ import type {
   ArticleListItem,
   ArticlePublishRequest,
   Category,
-  CommentItem,
-  LoginData,
-  LoginUser,
-  PageResponse,
   ResultResponse,
-  UploadImageData
+  UploadImageData,
 } from './types/blog'
 import { renderMarkdown } from './utils/markdown'
+import { getUploadedImageUrl } from './utils/format'
+import { useAuth, hasAuthToken, getAuthHeaders } from './composables/useAuth'
+import { useArticles } from './composables/useArticles'
+import { useGate } from './composables/useGate'
+import { useComments } from './composables/useComments'
 
 const route = useRoute()
 const router = useRouter()
 
+// ── Composables ──
+const {
+  isLoggedIn,
+  loginUser,
+  isLoggingIn,
+  loginError: authLoginError,
+  initFromLocalStorage,
+  clearLoginState,
+  login: authLogin,
+  logout: authLogout,
+  fetchUserProfile,
+  updateUserProfile,
+} = useAuth()
+
+const {
+  articles,
+  articleError,
+  isLoadingArticles,
+  selectedArticle,
+  selectedArticlePreview,
+  isLoadingArticleDetail,
+  fetchArticles,
+  openArticleDetail,
+  closeArticleDetail,
+} = useArticles()
+
+const { accessGranted, isCheckingGate, checkGateStatus, validateAccessCode } = useGate()
+
+const {
+  pendingComments,
+  isLoadingPending,
+  fetchPendingComments,
+  reviewComment,
+  deleteComment: deleteCommentApi,
+} = useComments()
+
+// ── Static categories ──
 const categories = ref<Category[]>([
   { id: 1, label: 'Thought' },
   { id: 2, label: 'Code' },
   { id: 3, label: 'Design' },
-  { id: 4, label: 'Guide' }
+  { id: 4, label: 'Guide' },
 ])
 
-const loginForm = reactive({
-  email: '',
-  password: ''
+// ── Login form state ──
+const loginForm = reactive({ email: '', password: '' })
+
+// ── Filter / UI state ──
+const activeCategoryId = ref<number | null>(null)
+const showFeaturedOnly = ref(false)
+
+const filteredArticles = computed(() => {
+  let list = articles.value
+  if (showFeaturedOnly.value) list = list.filter((a) => a.isTop === 1)
+  if (!activeCategoryId.value) return list
+  const activeCategory = categories.value.find((c) => c.id === activeCategoryId.value)
+  return list.filter((article) => article.categoryName === activeCategory?.label)
 })
 
-const emptyLoginUser: Partial<LoginUser> = {
-  nickname: '',
-  username: '',
-  email: ''
+function toggleCategory(categoryId: number) {
+  activeCategoryId.value = activeCategoryId.value === categoryId ? null : categoryId
 }
 
-const loginError = ref('')
-const isLoggedIn = ref(false)
-const loginUser = ref<Partial<LoginUser>>(emptyLoginUser)
-const showLoginModal = ref(false)
-const isLoggingIn = ref(false)
-const articles = ref<ArticleListItem[]>([])
-const activeCategoryId = ref<number | null>(null)
-const articleError = ref('')
-const isLoadingArticles = ref(false)
-const selectedArticle = ref<ArticleDetail | null>(null)
-const showSearchModal = ref(false) // 搜索模态框状态
-const selectedArticlePreview = ref<ArticleListItem | null>(null)
-const showFeaturedOnly = ref(false)
-const isLoadingArticleDetail = ref(false)
+// ── Derived view state ──
+const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
+const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
+const currentPage = computed(() => (route.meta.page as string) || 'home')
+const showActionsOnPage = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
+const totalViews = computed(() =>
+  articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0)
+)
+
+// ── Pending comments (real data from backend) ──
+const commentCount = computed(() => pendingComments.value.length)
+
+async function handleApproveComment(commentId: number) {
+  const originalList = [...pendingComments.value]
+  pendingComments.value = pendingComments.value.filter((c) => c.id !== commentId)
+  const success = await reviewComment(commentId, 1)
+  if (!success) {
+    pendingComments.value = originalList
+    showAppToast('审核失败，请稍后重试', 'error')
+    return
+  }
+  showAppToast('评论已通过审核', 'success')
+}
+
+async function handleDeleteComment(commentId: number) {
+  const confirmed = window.confirm('确认删除这条评论？此操作不可恢复。')
+  if (!confirmed) return
+  const originalList = [...pendingComments.value]
+  pendingComments.value = pendingComments.value.filter((c) => c.id !== commentId)
+  const success = await deleteCommentApi(commentId)
+  if (!success) {
+    pendingComments.value = originalList
+    showAppToast('删除失败，请稍后重试', 'error')
+    return
+  }
+  showAppToast('评论已删除', 'success')
+}
+
+// ── Publish modal state ──
 const showPublishModal = ref(false)
 const publishError = ref('')
 const isPublishing = ref(false)
 const editingArticleId = ref<number | null>(null)
-const isDeletingArticle = ref(false)
-const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图文件输入框的引用
-const contentTextarea = ref<HTMLTextAreaElement | null>(null)
-const imageInput = ref<HTMLInputElement | null>(null)
+const isEditing = computed(() => editingArticleId.value !== null)
 const isPreviewingMarkdown = ref(false)
-const isUploadingImage = ref(false)
-const pendingMarkdownImage = ref<{ id: number; src: string; alt: string } | null>(null)
-const showUserMenu = ref(false)
-const accessCodeInput = ref('')
-const showToast = ref(false)
-const isCheckingGate = ref(true) // 初始进入时的门禁校验状态
-const toastMessage = ref('')
-const toastType = ref<'success' | 'error' | 'info'>('info')
-let toastTimeout: number | undefined
-
-// 打赏功能状态
-const isDonateOpen = ref(false)
-// 检测是否手机端（复用 Assessment 的逻辑）
-const checkIsMobile = () => /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
-const donateQrCanvasRef = ref<HTMLCanvasElement | null>(null)
-const ALIPAY_URL = 'https://qr.alipay.com/fkx15570bli95fl5zczgq60'
-
-const accessCodeError = ref('')
-const accessGranted = ref(false) // 默认不放行，由后端逻辑决定
-// const mainAccessCode = import.meta.env.VITE_MAIN_ACCESS_CODE || 'nextify-private'
-const isVerifyingAccessCode = ref(false)
 const publishForm = reactive<ArticlePublishRequest>({
   title: '',
   subtitle: '',
@@ -109,385 +156,10 @@ const publishForm = reactive<ArticlePublishRequest>({
   isTop: 0,
   categoryId: 1,
   tagIds: [],
-  imageIds: [] // 新增字段，用于接收文章中使用的图片ID
+  imageIds: [],
 })
-
-const myComments = ref<CommentItem[]>([
-  { id: 1, author: 'Alice', articleTitle: '深度学习与架构优化', content: '这篇文章很有洞见，尤其是最后的性能建议。', status: '已审核', createTime: '2026-04-28 14:12' },
-  { id: 2, author: 'Bob', articleTitle: '前端性能优化技巧', content: '图例部分可以加一个真实案例。', status: '待审核', createTime: '2026-04-29 09:23' },
-  { id: 3, author: 'Carol', articleTitle: '系统设计与扩展性', content: '很喜欢这种模块化的落地方式。', status: '已审核', createTime: '2026-04-30 20:05' }
-])
-
-// 用于存储已上传图片 URL 到其后端 ID 的映射
-const uploadedImageMap = reactive<Map<string, number>>(new Map());
-
-const filteredArticles = computed(() => {
-  let list = articles.value
-
-  if (showFeaturedOnly.value) {
-    list = list.filter(a => a.isTop === 1)
-  }
-
-  if (!activeCategoryId.value) {
-    return list
-  }
-
-  const activeCategory = categories.value.find(category => category.id === activeCategoryId.value)
-  return list.filter(article => article.categoryName === activeCategory?.label)
-})
-
-const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
-const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
-const isEditMode = computed(() => editingArticleId.value !== null)
-const currentPage = computed(() => (route.meta.page as string) || 'home')
-const showActionsInCurrentView = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
-const totalViews = computed(() => articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0))
-const commentCount = computed(() => myComments.value.length)
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
-
-function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
-  if (toastTimeout) clearTimeout(toastTimeout)
-  toastMessage.value = message
-  toastType.value = type
-  showToast.value = true
-  toastTimeout = setTimeout(() => {
-    showToast.value = false
-  }, 3000) as unknown as number // Cast to number for consistency
-}
-
-/**
- * 打开打赏：网页端弹出二维码 + 彩带特效，移动端直接跳转支付宝
- */
-async function openDonate() {
-  if (checkIsMobile()) {
-    // 移动端直接跳转支付宝（复用 Assessment 逻辑）
-    window.open(ALIPAY_URL, '_blank')
-  } else {
-    // PC 端触发全屏彩带碎屑效果，增加趣味性
-    confetti({
-      particleCount: 150,
-      spread: 70,
-      origin: { y: 0.7 },
-      colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'],
-      zIndex: 9999
-    })
-
-    isDonateOpen.value = true
-    await nextTick()
-    if (donateQrCanvasRef.value) {
-      await QRCode.toCanvas(donateQrCanvasRef.value, ALIPAY_URL, {
-        width: 188,
-        margin: 2,
-        color: { dark: '#0f172a', light: '#ffffff' }
-      })
-    }
-  }
-}
-
-async function validateMainAccessCode(code: string) {
-  const response = await axios.get<ResultResponse<boolean>>('/api/access-code/verify', { 
-    params: { 
-      id: 1,
-      accessCode: code
-    } 
-  })
-  if(response.data.code !== 200)
-    throw new Error(response.data.message || "access code 验证失败")
-  return response.data.data == true
-}
-
-async function verifyMainAccess() {
-  accessCodeError.value = ''
-  const code = accessCodeInput.value.trim()
-
-  if (!code) {
-    accessCodeError.value = '请输入 access code。'
-    return
-  }
-
-  isVerifyingAccessCode.value = true
-
-  try {
-    const isValid = await validateMainAccessCode(code)
-    if (!isValid) {
-      accessCodeError.value = 'access code 不正确，请重新输入。'
-      return
-    }
-
-    accessGranted.value = true
-    accessCodeInput.value = ''
-    sessionStorage.setItem('mainSiteAccessGranted', 'true')
-  } catch (error) {
-    accessCodeError.value = error instanceof Error ? error.message : 'Access code 校验失败，请稍后重试。'
-  } finally {
-    isVerifyingAccessCode.value = false
-  }
-}
-
-function toggleCategory(categoryId: number) {
-  activeCategoryId.value = activeCategoryId.value === categoryId ? null : categoryId
-}
-
-function getAuthHeaders() {
-  const token = localStorage.getItem('authToken')
-  return token ? { Authorization: token } : {}
-}
-
-async function insertMarkdown(before: string, after = '', placeholder = '文本') {
-  const textarea = contentTextarea.value
-  const start = textarea?.selectionStart ?? publishForm.content.length
-  const end = textarea?.selectionEnd ?? publishForm.content.length
-  const selectedText = publishForm.content.slice(start, end) || placeholder
-  const nextValue = `${publishForm.content.slice(0, start)}${before}${selectedText}${after}${publishForm.content.slice(end)}`
-  publishForm.content = nextValue
-
-  await nextTick()
-  contentTextarea.value?.focus()
-  const cursor = start + before.length + selectedText.length + after.length
-  contentTextarea.value?.setSelectionRange(cursor, cursor)
-}
-
-function getUploadedImageUrl(data: UploadImageData | Record<string, unknown> | string | null | undefined) {
-  if (!data) return ''
-  if (typeof data === 'string') return data
-
-  const values = data as Record<string, unknown>
-
-  return [values.url, values.fullUrl, values.fileUrl, values.imageUrl, values.path]
-    .find(value => typeof value === 'string' && value.trim().length > 0) as string || ''
-}
-
-function clearStoredLogin() {
-  isLoggedIn.value = false
-  loginUser.value = emptyLoginUser
-  localStorage.removeItem('authToken')
-  localStorage.removeItem('authUser')
-}
-
-/**
- * 检查后端门禁状态
- * status: 0-关闭(放行), 1-开启(校验)
- */
-async function checkGateStatus() {
-  try {
-    const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
-    if (response.data.code === 200 && response.data.data) {
-      const status = response.data.data.status
-      if (status === 0) {
-        // 门禁已关闭，直接进入
-        accessGranted.value = true
-      } else {
-        // 门禁开启，检查本地会话是否曾验证通过
-        accessGranted.value = sessionStorage.getItem('mainSiteAccessGranted') === 'true'
-      }
-    }
-  } catch (error) {
-    console.error('门禁状态获取失败:', error)
-    // 兜底：接口失败时维持 sessionStorage 验证逻辑
-    accessGranted.value = sessionStorage.getItem('mainSiteAccessGranted') === 'true'
-  } finally {
-    isCheckingGate.value = false
-  }
-}
-
-/**
- * 从后端获取最新的用户信息，确保数据真实性
- * 复用你提供的获取资料接口 /api/user/{id}
- */
-async function fetchUserProfile() {
-  if (!localStorage.getItem('authToken')) return
-
-  try {
-    // 根据用户提供的最新接口定义，获取用户信息的接口为 /api/user/{id}
-    const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${loginUser.value.id || 0}`, {
-      headers: getAuthHeaders()
-    })
-
-    if (response.data.code === 200 && response.data.data) {
-      const freshUser = response.data.data
-      // 更新本地响应式状态并同步到 localStorage，确保全站展示最新资料
-      loginUser.value = freshUser
-      localStorage.setItem('authUser', JSON.stringify(freshUser))
-    }
-  } catch (error) {
-    console.error('无法同步最新用户信息:', error)
-  }
-}
-
-/**
- * 调用后端保存更新用户数据接口 api/user/save
- * 用于同步修改昵称、格言、邮箱、头像等个人信息
- */
-async function updateUserProfile(data: any, silent = false) {
-  if (!isLoggedIn.value || !loginUser.value.id) {
-    if (!silent) showAppToast('请登录后再修改个人信息', 'error')
-    return
-  }
-
-  try {
-    // 根据后端 SysUserSaveDto 定义构造请求体
-    const payload = {
-      id: loginUser.value.id,
-      nickname: data.nickname !== undefined ? data.nickname : loginUser.value.nickname,
-      motto: data.motto !== undefined ? data.motto : loginUser.value.motto,
-      email: data.email !== undefined ? data.email : loginUser.value.email,
-      avatar: data.avatar !== undefined ? data.avatar : loginUser.value.avatar,
-      lastLoginTime: data.lastLoginTime || loginUser.value.lastLoginTime,
-      username: loginUser.value.username // 保持用户名不变
-    }
-
-    const response = await axios.post<ResultResponse<any>>('/api/user/save', payload, {
-      headers: getAuthHeaders()
-    })
-
-    if (response.data.code === 200) {
-      // 保存成功后，直接重新获取最新资料，确保前后台完全一致
-      await fetchUserProfile()
-      if (!silent) showAppToast('个人信息已同步至云端', 'success')
-    } else {
-      if (!silent) showAppToast(response.data.message || '信息更新失败', 'error')
-    }
-  } catch (error) {
-    if (!silent) showAppToast('网络异常，无法保存个人信息', 'error')
-  }
-}
-
-function triggerImageUpload(type: 'markdown' | 'cover' | 'avatar') {
-  if (!localStorage.getItem('authToken')) {
-    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
-    openLoginModal()
-    return
-  }
-  if (type === 'markdown') {
-    imageInput.value?.click()
-  } else {
-    coverImageInput.value?.click()
-  }
-}
-
-async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') {
-  const target = event.target as HTMLInputElement
-  const file = target.files?.[0]
-  target.value = ''
-
-  if (!file) {
-    return
-  }
-
-  // [优化] 前端预校验：检查文件大小 (例如 50MB)
-  if (file.size > 50 * 1024 * 1024) {
-    showAppToast('图片大小不能超过 50MB', 'error')
-    return
-  }
-
-  if (!localStorage.getItem('authToken')) {
-    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
-    showAppToast(publishError.value, 'error')
-    openLoginModal()
-    return
-  }
-
-  publishError.value = ''
-  isUploadingImage.value = true
-
-  try {
-    const formData = new FormData()
-    formData.append('file', file)
-
-    // 根据后端新接口要求，添加业务关联参数
-    // 映射关系推断：1-头像, 2-封面, 3-文章内容 4-人间估值评估图像
-    const usageTypeMap = { markdown: '3', cover: '2', avatar: '1' }
-    formData.append('usageType', usageTypeMap[type])
-
-    // 如果当前处于“编辑已有文章”状态，则传递文章 ID 进行关联
-    if (editingArticleId.value && (type === 'markdown' || type === 'cover')) {
-      formData.append('usageId', editingArticleId.value.toString())
-    }
-
-    const response = await axios.post<ResultResponse<UploadImageData>>('/api/admin/upload/image/with-reference', formData, {
-      headers: getAuthHeaders()
-    })
-
-    const imageUrl = getUploadedImageUrl(response.data.data)
-    const imageId = response.data.data?.id // 假设后端返回的图片数据中包含 id 字段
-
-    if (response.data.code !== 200 || !imageUrl || imageId === undefined) {
-      publishError.value = response.data.message || '图片上传失败，请稍后重试。'
-      showAppToast(publishError.value, 'error')
-      return
-    }
-
-    if (type === 'markdown') {
-      // 将图片 URL 和后端 ID 存储起来，以便发布文章时收集
-      uploadedImageMap.set(imageUrl, imageId)
-
-      // 更新 pendingMarkdownImage，用于 Tiptap 编辑器插入图片
-      const altText = response.data.data.name || 'image'
-      pendingMarkdownImage.value = {
-        id: Date.now(),
-        src: imageUrl,
-        alt: altText
-      }
-      showAppToast('图片已插入正文', 'success')
-    } else if (type === 'cover') {
-      publishForm.coverImg = imageUrl
-      showAppToast('封面图上传成功', 'success')
-    } else {
-      // 头像上传：图片服务器返回 URL 后，调用 save 接口持久化到用户表
-      await updateUserProfile({ avatar: imageUrl })
-    }
-  } catch (error) {
-    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-      publishError.value = '图片上传被后端权限拦截，请重新登录后再试。'
-      clearStoredLogin()
-      openLoginModal()
-      showAppToast(publishError.value, 'error')
-      return
-    }
-
-    publishError.value = axios.isAxiosError(error)
-      ? (error.response?.data?.message || `图片上传失败：HTTP ${error.response?.status || '网络错误'}`)
-      : '图片上传失败，请稍后再试。'
-    showAppToast(publishError.value, 'error')
-  } finally {
-    // [修复] 无论哪种类型，完成后都应重置上传状态，避免工具栏按钮锁死
-    isUploadingImage.value = false
-  }
-}
-
-function openLoginModal() {
-  showLoginModal.value = true
-}
-
-function closeLoginModal() {
-  showLoginModal.value = false
-  loginError.value = ''
-}
-
-function openPublishModal(article?: ArticleListItem | ArticleDetail) {
-  if (!isLoggedIn.value || !localStorage.getItem('authToken')) {
-    openLoginModal()
-    return
-  }
-
-  if (!article) {
-    resetPublishForm()
-    editingArticleId.value = null
-    showPublishModal.value = true
-    // [增强] 开启实时预览模式，实现类似知乎的即时反馈体验
-    isPreviewingMarkdown.value = true
-    return
-  }
-
-  editingArticleId.value = article.id
-  loadArticleForEdit(article.id)
-}
-
-function closePublishModal() {
-  showPublishModal.value = false
-  publishError.value = ''
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
+const uploadedImageMap = reactive<Map<string, number>>(new Map())
 
 function resetPublishForm() {
   publishForm.title = ''
@@ -500,10 +172,10 @@ function resetPublishForm() {
   publishForm.status = 1
   publishForm.isTop = 0
   publishForm.categoryId = 1
-  publishForm.coverImg = '' // 新增：重置封面图
   publishForm.tagIds = []
-  isPreviewingMarkdown.value = true // 默认保持预览开启
-  editingArticleId.value = null
+  publishForm.imageIds = []
+  uploadedImageMap.clear()
+  isPreviewingMarkdown.value = true
 }
 
 function fillPublishForm(article: ArticleDetail) {
@@ -518,153 +190,61 @@ function fillPublishForm(article: ArticleDetail) {
   publishForm.isTop = article.isTop || 0
   publishForm.categoryId = article.categoryId || 1
   publishForm.tagIds = article.tagIds || []
+  publishForm.imageIds = []
+  uploadedImageMap.clear()
+}
+
+function closePublishModal() {
+  showPublishModal.value = false
+  publishError.value = ''
+  window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 async function loadArticleForEdit(articleId: number) {
   publishError.value = ''
   showPublishModal.value = true
-
   try {
     const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`)
     if (response.data.code === 200 && response.data.data) {
       fillPublishForm(response.data.data)
-      isPreviewingMarkdown.value = true // 编辑时也默认开启实时预览
+      isPreviewingMarkdown.value = true
       return
     }
-
     publishError.value = response.data.message || '文章读取失败，无法进入编辑模式。'
     editingArticleId.value = null
   } catch (error) {
-    publishError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '文章详情接口暂时不可用，请稍后重试。'
+    publishError.value =
+      axios.isAxiosError(error) && error.response?.data?.message
+        ? error.response.data.message
+        : '文章详情接口暂时不可用，请稍后重试。'
     editingArticleId.value = null
   }
 }
 
-async function fetchArticles() {
-  articleError.value = ''
-  isLoadingArticles.value = true
-
-  try {
-    const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
-      params: {
-        pageNum: 1,
-        pageSize: 10
-      }
-    })
-
-    if (response.data.code !== 200) {
-      articleError.value = response.data.message || '文章列表加载失败。'
-      return
-    }
-
-    articles.value = response.data.data?.records || []
-  } catch (error) {
-    articleError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '文章列表暂时不可用，请确认后端文章接口是否正常。'
-  } finally {
-    isLoadingArticles.value = false
-  }
-}
-
-async function openArticleDetail(article: ArticleListItem) {
-  selectedArticlePreview.value = article
-  selectedArticle.value = null
-  isLoadingArticleDetail.value = true
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-
-  try {
-    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${article.id}`)
-
-    if (response.data.code === 200 && response.data.data) {
-      selectedArticle.value = response.data.data
-    }
-  } finally {
-    isLoadingArticleDetail.value = false
-  }
-}
-
-function closeArticleDetail() {
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-/**
- * 跳转至人间估值页面
- */
-function openAssessment() {
-  router.push({ name: 'assessment-home' })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-}
-
-function handleSearchSelect(article: ArticleListItem) {
-  showSearchModal.value = false
-  openArticleDetail(article)
-}
-
-function openProfile() {
-  router.push({ name: 'profile' })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function openDashboard() {
-  router.push({ name: 'dashboard' })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function openQuantLab() {
-  if (!isLoggedIn.value || !localStorage.getItem('authToken')) {
-    openLoginModal()
+function openPublishModal(article?: ArticleListItem | ArticleDetail) {
+  if (!isLoggedIn.value || !hasAuthToken()) {
+    showLoginModal.value = true
     return
   }
-
-  router.push({ name: 'quant-lab' })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-  window.scrollTo({ top: 0, behavior: 'smooth' })
-}
-
-function navigateToSection(sectionId: string) {
-  router.push({ name: sectionId })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-
-  if (sectionId === 'home') {
-    window.scrollTo({ top: 0, behavior: 'smooth' })
+  if (!article) {
+    resetPublishForm()
+    editingArticleId.value = null
+    isPreviewingMarkdown.value = true
+    showPublishModal.value = true
     return
   }
-
-  // 对于独立页面组件（如留言板、实验室），跳转后直接回顶
-  if (['guestbook', 'quant-lab', 'profile', 'dashboard'].includes(sectionId)) {
-    window.scrollTo({ top: 0, behavior: 'instant' })
-  }
-  requestAnimationFrame(() => {
-    const target = document.getElementById(sectionId)
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  })
+  editingArticleId.value = article.id
+  isPreviewingMarkdown.value = true
+  loadArticleForEdit(article.id)
 }
 
 async function publishArticle() {
   publishError.value = ''
-
-  if (!localStorage.getItem('authToken')) {
+  if (!hasAuthToken()) {
     publishError.value = '登录状态已失效，请重新登录后再发布。'
-    openLoginModal()
+    showLoginModal.value = true
     return
   }
-
   if (!publishForm.title || !publishForm.content || !publishForm.categoryId) {
     publishError.value = '请至少填写标题、正文和分类。'
     return
@@ -673,33 +253,38 @@ async function publishArticle() {
   isPublishing.value = true
   publishForm.contentHtml = publishForm.contentHtml || markdownPreviewHtml.value
 
-  // 从文章内容中提取所有图片 ID
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(publishForm.contentHtml, 'text/html');
-  const imgElements = doc.querySelectorAll('img');
-  const extractedImageIds: number[] = [];
-  imgElements.forEach(img => {
-    const src = img.getAttribute('src');
+  // 从文章内容中提取已上传图片的 id
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(publishForm.contentHtml, 'text/html')
+  const imgElements = doc.querySelectorAll('img')
+  const extractedImageIds: number[] = []
+  imgElements.forEach((img) => {
+    const src = img.getAttribute('src')
     if (src && uploadedImageMap.has(src)) {
-      extractedImageIds.push(uploadedImageMap.get(src)!);
+      extractedImageIds.push(uploadedImageMap.get(src)!)
     }
-  });
-  publishForm.imageIds = extractedImageIds; // 将提取到的图片 ID 赋值给 publishForm
+  })
+  publishForm.imageIds = extractedImageIds
 
   try {
     let response
     if (editingArticleId.value) {
-      response = await axios.put<ResultResponse<number>>(`/api/admin/articles/${editingArticleId.value}`, publishForm, {
-        headers: getAuthHeaders()
-      })
+      response = await axios.put<ResultResponse<number>>(
+        `/api/admin/articles/${editingArticleId.value}`,
+        publishForm,
+        { headers: getAuthHeaders() }
+      )
     } else {
-      response = await axios.post<ResultResponse<number>>('/api/admin/articles', publishForm, {
-        headers: getAuthHeaders()
-      })
+      response = await axios.post<ResultResponse<number>>(
+        '/api/admin/articles',
+        publishForm,
+        { headers: getAuthHeaders() }
+      )
     }
 
     if (response.data.code !== 200) {
-      publishError.value = response.data.message || (editingArticleId.value ? '保存失败，请稍后重试。' : '发布失败，请稍后重试。')
+      publishError.value =
+        response.data.message || (editingArticleId.value ? '保存失败，请稍后重试。' : '发布失败，请稍后重试。')
       return
     }
 
@@ -719,28 +304,25 @@ async function publishArticle() {
       showAppToast(publishError.value, 'error')
       return
     }
-
-    publishError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : (editingArticleId.value ? '保存接口暂时不可用，请稍后再试。' : '发布接口暂时不可用，请稍后再试。')
+    publishError.value =
+      axios.isAxiosError(error) && error.response?.data?.message
+        ? error.response.data.message
+        : editingArticleId.value
+          ? '保存接口暂时不可用，请稍后再试。'
+          : '发布接口暂时不可用，请稍后再试。'
     showAppToast(publishError.value, 'error')
   } finally {
     isPublishing.value = false
-    publishForm.imageIds = []; // 清空图片 ID，避免下次发布时混淆
-    uploadedImageMap.clear(); // 清空映射，释放内存
   }
 }
 
 async function deleteArticle(articleId: number) {
-  if (!isLoggedIn.value || !localStorage.getItem('authToken')) {
-    openLoginModal()
+  if (!isLoggedIn.value || !hasAuthToken()) {
+    showLoginModal.value = true
     return
   }
-
-  const confirmed = window.confirm('确认删除这篇文章？此操作不可恢复。') // Still using confirm for now
-  if (!confirmed) {
-    return
-  }
+  const confirmed = window.confirm('确认删除这篇文章？此操作不可恢复。')
+  if (!confirmed) return
 
   isDeletingArticle.value = true
   showAppToast('正在删除文章...', 'info')
@@ -748,20 +330,17 @@ async function deleteArticle(articleId: number) {
 
   try {
     const response = await axios.delete<ResultResponse<null>>(`/api/admin/articles/${articleId}`, {
-      headers: getAuthHeaders()
+      headers: getAuthHeaders(),
     })
-
     if (response.data.code !== 200) {
       showAppToast(response.data.message || '删除失败，请稍后重试。', 'error')
       publishError.value = response.data.message || '删除失败，请稍后重试。'
       return
     }
-
     if (editingArticleId.value === articleId) {
       resetPublishForm()
       closePublishModal()
     }
-
     if (selectedArticle.value?.id === articleId) {
       closeArticleDetail()
     }
@@ -769,104 +348,199 @@ async function deleteArticle(articleId: number) {
     await fetchArticles()
   } catch (error) {
     showAppToast('删除失败，请稍后重试。', 'error')
-    publishError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '删除接口暂时不可用，请稍后再试。'
-    showAppToast(publishError.value, 'error')
+    publishError.value =
+      axios.isAxiosError(error) && error.response?.data?.message
+        ? error.response.data.message
+        : '删除接口暂时不可用，请稍后再试。'
   } finally {
     isDeletingArticle.value = false
   }
 }
 
-async function login() {
-  loginError.value = ''
+// ── Image upload (markdown editor / cover / avatar) ──
+const isUploadingImage = ref(false)
+const pendingMarkdownImage = ref<{ id: number; src: string; alt: string } | null>(null)
+const contentTextarea = ref<HTMLTextAreaElement | null>(null)
+const coverImageInput = ref<HTMLInputElement | null>(null)
+const imageInput = ref<HTMLInputElement | null>(null)
 
-  if (!loginForm.email || !loginForm.password) {
-    loginError.value = '请输入邮箱和密码后再尝试登录。'
+async function insertMarkdown(before: string, after = '', placeholder = '文本') {
+  const ta = contentTextarea.value
+  const start = ta?.selectionStart ?? publishForm.content.length
+  const end = ta?.selectionEnd ?? publishForm.content.length
+  const selectedText = publishForm.content.slice(start, end) || placeholder
+  const nextValue = `${publishForm.content.slice(0, start)}${before}${selectedText}${after}${publishForm.content.slice(end)}`
+  publishForm.content = nextValue
+
+  await nextTick()
+  contentTextarea.value?.focus()
+  const cursor = start + before.length + selectedText.length + after.length
+  contentTextarea.value?.setSelectionRange(cursor, cursor)
+}
+
+function triggerImageUpload(type: 'markdown' | 'cover' | 'avatar') {
+  if (!hasAuthToken()) {
+    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
+    openLoginModal()
+    return
+  }
+  if (type === 'markdown') {
+    imageInput.value?.click()
+  } else {
+    coverImageInput.value?.click()
+  }
+}
+
+async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') {
+  const target = event.target as HTMLInputElement
+  const file = target.files?.[0]
+  target.value = ''
+
+  if (!file) return
+
+  if (file.size > 50 * 1024 * 1024) {
+    showAppToast('图片大小不能超过 50MB', 'error')
+    return
+  }
+  if (!hasAuthToken()) {
+    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
+    showAppToast(publishError.value, 'error')
+    openLoginModal()
     return
   }
 
-  isLoggingIn.value = true
+  publishError.value = ''
+  isUploadingImage.value = true
 
   try {
-    const response = await axios.post<ResultResponse<LoginData>>('/api/auth/login', {
-      username: loginForm.email,
-      password: loginForm.password
-    })
+    const formData = new FormData()
+    formData.append('file', file)
+    const usageTypeMap = { markdown: '3', cover: '2', avatar: '1' } as const
+    formData.append('usageType', usageTypeMap[type])
+    if (editingArticleId.value && (type === 'markdown' || type === 'cover')) {
+      formData.append('usageId', editingArticleId.value.toString())
+    }
 
-    if (response.data.code !== 200) {
-      loginError.value = response.data.message || '登录失败，请稍后重试。'
+    const response = await axios.post<ResultResponse<UploadImageData>>(
+      '/api/admin/upload/image/with-reference',
+      formData,
+      { headers: getAuthHeaders() }
+    )
+
+    const imageUrl = getUploadedImageUrl(response.data.data)
+    const imageId = response.data.data?.id
+
+    if (response.data.code !== 200 || !imageUrl || imageId === undefined) {
+      publishError.value = response.data.message || '图片上传失败，请稍后重试。'
+      showAppToast(publishError.value, 'error')
       return
     }
 
-    const loginData = response.data.data
-    if (!loginData?.token || !loginData.user) {
-      loginError.value = '登录返回数据格式不正确，请检查后端接口。'
-      return
+    if (type === 'markdown') {
+      uploadedImageMap.set(imageUrl, imageId)
+      const altText = response.data.data.name || 'image'
+      pendingMarkdownImage.value = { id: Date.now(), src: imageUrl, alt: altText }
+      showAppToast('图片已插入正文', 'success')
+    } else if (type === 'cover') {
+      publishForm.coverImg = imageUrl
+      showAppToast('封面图上传成功', 'success')
+    } else {
+      await updateUserProfile({ avatar: imageUrl })
     }
-
-    localStorage.setItem('authToken', loginData.token)
-    localStorage.setItem('authUser', JSON.stringify(loginData.user))
-    loginUser.value = loginData.user
-    isLoggedIn.value = true
-
-    // 登录成功后，复用 save 接口静默更新最后登录时间 (获取用户设备本地时间并格式化)
-    const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000).toISOString().slice(0, 19)
-    updateUserProfile({ lastLoginTime }, true)
-
-    showAppToast('登录成功！', 'success')
-    showLoginModal.value = false
   } catch (error) {
-    if (axios.isAxiosError(error) && error.response?.status === 401) {
-      loginError.value = '账号或密码错误，请重新检查。'
+    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
+      publishError.value = '图片上传被后端权限拦截，请重新登录后再试。'
+      clearLoginState()
+      openLoginModal()
+      showAppToast(publishError.value, 'error')
       return
     }
-
-    if (axios.isAxiosError(error) && error.response?.status === 403) {
-      loginError.value = '登录请求被后端权限配置拦截，请确认登录接口已放行并检查 CSRF 配置。'
-      return
-    }
-
-    if (axios.isAxiosError(error) && error.response?.data?.message) {
-      loginError.value = error.response.data.message
-      return
-    }
-
-    loginError.value = '登录接口暂不可用，请确认后端服务和代理配置是否正常。'
+    publishError.value =
+      axios.isAxiosError(error)
+        ? error.response?.data?.message || `图片上传失败：HTTP ${error.response?.status || '网络错误'}`
+        : '图片上传失败，请稍后再试。'
+    showAppToast(publishError.value, 'error')
   } finally {
-    isLoggingIn.value = false
-    if (loginError.value) {
-      showAppToast(loginError.value, 'error')
-    }
+    isUploadingImage.value = false
   }
 }
 
-function logout() {
-  isLoggedIn.value = false
-  loginUser.value = emptyLoginUser
-  loginForm.email = ''
-  loginForm.password = ''
-  loginError.value = ''
-  router.push({ name: 'home' })
-  selectedArticle.value = null
-  selectedArticlePreview.value = null
-  localStorage.removeItem('authToken')
-  showAppToast('已退出登录。', 'info')
-  localStorage.removeItem('authUser')
+const isDeletingArticle = ref(false)
+
+// ── Login / logout actions ──
+const showLoginModal = ref(false)
+
+function openLoginModal() {
+  showLoginModal.value = true
+}
+function closeLoginModal() {
+  showLoginModal.value = false
 }
 
-function handleStatusClick() {
-  // 无论是否登录，点击都先打开/关闭菜单，由 Navbar 内部渲染具体内容
-  showUserMenu.value = !showUserMenu.value
-}
-
-function closeUserMenu() {
-  showUserMenu.value = false
+async function handleLogin() {
+  const ok = await authLogin(loginForm.email, loginForm.password)
+  if (ok) {
+    loginForm.email = ''
+    loginForm.password = ''
+    showAppToast('登录成功！', 'success')
+    showLoginModal.value = false
+    if (hasAuthToken()) await fetchPendingComments()
+  }
 }
 
 function handleLogout() {
   closeUserMenu()
-  logout()
+  authLogout()
+  loginForm.email = ''
+  loginForm.password = ''
+  router.push({ name: 'home' })
+  closeArticleDetail()
+  showAppToast('已退出登录。', 'info')
+}
+
+// ── Access gate ──
+const accessCodeInput = ref('')
+const accessCodeError = ref('')
+const isVerifyingAccessCode = ref(false)
+
+async function verifyMainAccess() {
+  accessCodeError.value = ''
+  const code = accessCodeInput.value.trim()
+  if (!code) {
+    accessCodeError.value = '请输入 access code。'
+    return
+  }
+  isVerifyingAccessCode.value = true
+  try {
+    const ok = await validateAccessCode(code)
+    if (ok) {
+      accessCodeInput.value = ''
+    } else {
+      accessCodeError.value = 'access code 不正确，请重新输入。'
+    }
+  } catch {
+    accessCodeError.value = 'Access code 校验失败，请稍后重试。'
+  } finally {
+    isVerifyingAccessCode.value = false
+  }
+}
+
+// ── Search modal ──
+const showSearchModal = ref(false)
+
+function handleSearchSelect(article: ArticleListItem) {
+  showSearchModal.value = false
+  openArticleDetail(article)
+}
+
+// ── User menu / navigation ──
+const showUserMenu = ref(false)
+
+function handleStatusClick() {
+  showUserMenu.value = !showUserMenu.value
+}
+function closeUserMenu() {
+  showUserMenu.value = false
 }
 
 function handleClickOutside(event: MouseEvent) {
@@ -876,7 +550,104 @@ function handleClickOutside(event: MouseEvent) {
   }
 }
 
-// 快捷键监听
+function navigateToSection(sectionId: string) {
+  router.push({ name: sectionId })
+  selectedArticle.value = null
+  selectedArticlePreview.value = null
+
+  if (sectionId === 'home') {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+    return
+  }
+  if (['guestbook', 'quant-lab', 'profile', 'dashboard'].includes(sectionId)) {
+    window.scrollTo({ top: 0, behavior: 'instant' })
+  }
+  requestAnimationFrame(() => {
+    const target = document.getElementById(sectionId)
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    }
+  })
+}
+
+function openProfile() {
+  router.push({ name: 'profile' })
+  closeArticleDetail()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function openDashboard() {
+  router.push({ name: 'dashboard' })
+  closeArticleDetail()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function openQuantLab() {
+  if (!isLoggedIn.value || !hasAuthToken()) {
+    openLoginModal()
+    return
+  }
+  router.push({ name: 'quant-lab' })
+  closeArticleDetail()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function openAssessment() {
+  router.push({ name: 'assessment-home' })
+  closeArticleDetail()
+}
+
+// ── Donate modal ──
+const isDonateOpen = ref(false)
+const donateQrCanvasRef = ref<HTMLCanvasElement | null>(null)
+const ALIPAY_URL = 'https://qr.alipay.com/fkx15570bli95fl5zczgq60'
+
+function checkIsMobile() {
+  return /Android|iPhone|iPad|iPod/i.test(navigator.userAgent)
+}
+
+async function openDonate() {
+  if (checkIsMobile()) {
+    window.open(ALIPAY_URL, '_blank')
+  } else {
+    confetti({
+      particleCount: 150,
+      spread: 70,
+      origin: { y: 0.7 },
+      colors: ['#6366f1', '#10b981', '#f59e0b', '#ef4444', '#3b82f6'],
+      zIndex: 9999,
+    })
+    isDonateOpen.value = true
+    await nextTick()
+    if (donateQrCanvasRef.value) {
+      await QRCode.toCanvas(donateQrCanvasRef.value, ALIPAY_URL, {
+        width: 188,
+        margin: 2,
+        color: { dark: '#0f172a', light: '#ffffff' },
+      })
+    }
+  }
+}
+
+// ── Global toast ──
+const showToast = ref(false)
+const toastMessage = ref('')
+const toastType = ref<'success' | 'error' | 'info'>('info')
+let toastTimeout: number | undefined
+
+function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'info') {
+  if (toastTimeout) clearTimeout(toastTimeout)
+  toastMessage.value = message
+  toastType.value = type
+  showToast.value = true
+  toastTimeout = setTimeout(() => {
+    showToast.value = false
+  }, 3000) as unknown as number
+}
+
+// ── Keyboard shortcuts ──
 function handleKeyDown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault()
@@ -884,26 +655,16 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 }
 
+// ── Lifecycle ──
 onMounted(async () => {
   document.title = 'ETHERLOG'
   window.addEventListener('keydown', handleKeyDown)
-  
-  // 1. 优先执行门禁状态同步
+
   await checkGateStatus()
-
-  const storedUser = localStorage.getItem('authUser')
-  const storedToken = localStorage.getItem('authToken')
-  if (storedUser && storedToken) {
-    loginUser.value = JSON.parse(storedUser)
-    isLoggedIn.value = true
-    // 应用启动时，立即从服务器拉取最新数据，防止 localStorage 缓存过期
-    fetchUserProfile()
-  } else {
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('authUser')
-  }
-
+  initFromLocalStorage()
+  fetchUserProfile()
   fetchArticles()
+  if (hasAuthToken()) fetchPendingComments()
 
   if (currentPage.value === 'quant-lab' && !isLoggedIn.value) {
     router.replace({ name: 'home' })
@@ -949,7 +710,7 @@ onUnmounted(() => {
           :article="articleForDetail!"
           :selected-article="selectedArticle"
           :is-loading="isLoadingArticleDetail"
-          :show-actions="showActionsInCurrentView"
+          :show-actions="showActionsOnPage"
           :is-logged-in="isLoggedIn"
           :login-user="loginUser"
           @close="closeArticleDetail"
@@ -964,7 +725,7 @@ onUnmounted(() => {
             :filtered-articles="filteredArticles"
             :article-error="articleError"
             :is-loading-articles="isLoadingArticles"
-            :show-actions="showActionsInCurrentView"
+            :show-actions="showActionsOnPage"
             :show-featured-only="showFeaturedOnly"
             @toggle-category="toggleCategory"
             @open-article="openArticleDetail"
@@ -987,13 +748,16 @@ onUnmounted(() => {
           <DashboardPage
             v-if="currentPage === 'dashboard'"
             :articles="articles"
-            :my-comments="myComments"
+            :pending-comments="pendingComments"
+            :is-loading-pending="isLoadingPending"
             :comment-count="commentCount"
             :total-views="totalViews"
             @new-article="openPublishModal"
             @edit-article="openPublishModal"
             @delete-article="deleteArticle"
             @open-article="openArticleDetail"
+            @approve-comment="handleApproveComment"
+            @delete-comment="handleDeleteComment"
           />
 
           <GuestbookView
@@ -1014,13 +778,13 @@ onUnmounted(() => {
         v-if="showLoginModal"
         v-model:email="loginForm.email"
         v-model:password="loginForm.password"
-        :login-error="loginError"
+        :login-error="authLoginError"
         :is-logged-in="isLoggedIn"
         :is-logging-in="isLoggingIn"
         :login-user="loginUser"
         @close="closeLoginModal"
-        @login="login"
-        @logout="logout"
+        @login="handleLogin"
+        @logout="handleLogout"
       />
 
       <PublishModal
@@ -1030,7 +794,7 @@ onUnmounted(() => {
         :categories="categories"
         :publish-error="publishError"
         :is-publishing="isPublishing"
-        :is-edit-mode="isEditMode"
+        :is-edit-mode="isEditing"
         :is-uploading-image="isUploadingImage"
         :markdown-preview-html="markdownPreviewHtml"
         :pending-markdown-image="pendingMarkdownImage"
@@ -1039,13 +803,13 @@ onUnmounted(() => {
         @insert-markdown="insertMarkdown"
         @trigger-image-upload="triggerImageUpload('markdown')"
         @upload-markdown-image="uploadImage($event, 'markdown')"
-        @upload-cover-image="uploadImage($event, 'cover')" 
-        @remove-cover-image="publishForm.coverImg = ''" 
+        @upload-cover-image="uploadImage($event, 'cover')"
+        @remove-cover-image="publishForm.coverImg = ''"
         @content-textarea-ready="contentTextarea = $event"
         @image-input-ready="imageInput = $event"
       />
 
-      <!-- 打赏模态框（复用 Assessment 的样式逻辑） -->
+      <!-- 打赏模态框 -->
       <Teleport to="body">
         <div v-if="isDonateOpen" class="donate-overlay" @click.self="isDonateOpen = false">
           <div class="donate-dialog">
@@ -1062,12 +826,7 @@ onUnmounted(() => {
         </div>
       </Teleport>
 
-      <SearchModal
-        :show="showSearchModal"
-        :articles="articles"
-        @close="showSearchModal = false"
-        @select="handleSearchSelect"
-      />
+      <SearchModal :show="showSearchModal" :articles="articles" @close="showSearchModal = false" @select="handleSearchSelect" />
 
       <AppToast :message="toastMessage" :type="toastType" :show="showToast" />
     </div>
@@ -1134,13 +893,12 @@ onUnmounted(() => {
 .page-fade-enter-from,
 .page-fade-leave-to {
   opacity: 0;
-  transform: translateY(10px); /* Slight slide effect */
+  transform: translateY(10px);
 }
 
 /* Wrapper for content when ArticleDetailView is not open */
 .main-content-wrapper {
-  /* This ensures the wrapper takes up space and allows transitions */
-  min-height: 1px; /* Or some other minimal height */
+  min-height: 1px;
   display: flex;
   flex-direction: column;
 }

@@ -1,242 +1,117 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import axios from 'axios'
-import type { CommentItem, CommentSubmitRequest, ResultResponse, LoginUser, BackendCommentVO } from '../types/blog'
+import type { LoginUser } from '../types/blog'
 import CommentItemComponent from './CommentItem.vue'
+import { useComments } from '../composables/useComments'
+import { useAnonymousProfile } from '../composables/useAnonymousProfile'
 
 const props = defineProps<{
-  articleId: number | null;
-  isLoggedIn: boolean;
-  loginUser: Partial<LoginUser>;
-  allowAnonymous?: boolean;
-}>();
-const emit = defineEmits<{ (e: 'require-login'): void }>();
+  articleId: number | null
+  isLoggedIn: boolean
+  loginUser: Partial<LoginUser>
+  allowAnonymous?: boolean
+}>()
+const emit = defineEmits<{ (e: 'require-login'): void }>()
 
-const comments = ref<CommentItem[]>([]);
-const newCommentContent = ref('');
-const isLoadingComments = ref(false);
-const isSubmittingComment = ref(false);
-const commentError = ref('');
-const anonymousNickname = ref('');
-const anonymousEmail = ref('');
-const anonymousWebsite = ref('');
-const composerOpen = ref(false);
+const { comments, isLoading: isLoadingComments, error: commentError, fetchComments, submitComment } = useComments()
+const {
+  anonymousNickname,
+  anonymousEmail,
+  anonymousWebsite,
+  profileReady: anonymousProfileReady,
+  anonymousId,
+  loadProfile: loadAnonymousProfile,
+  saveProfile: saveAnonymousProfile,
+  clearProfile: clearAnonymousProfile,
+} = useAnonymousProfile()
+
+const newCommentContent = ref('')
+const composerOpen = ref(false)
+const isSubmitting = ref(false)
 
 const totalComments = computed(() => {
-  function count(list: CommentItem[]): number {
-    let n = list.length;
-    for (const c of list) if (c.children) n += count(c.children);
-    return n;
+  function count(list: typeof comments.value): number {
+    let n = list.length
+    for (const c of list) if (c.children) n += count(c.children)
+    return n
   }
-  return count(comments.value);
-});
-
-function formatTime(t: string | null | undefined): string {
-  if (!t) return '';
-  try {
-    const d = new Date(t);
-    if (isNaN(d.getTime())) return t;
-    const pad = (n: number) => n.toString().padStart(2, '0');
-    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
-  } catch { return t || ''; }
-}
-
-function mapComments(vos: BackendCommentVO[] | null | undefined): CommentItem[] {
-  if (!vos || !Array.isArray(vos)) return [];
-  return vos.map(v => ({
-    id: v.id,
-    author: v.nickname || '匿名用户',
-    nickname: v.nickname || undefined,
-    avatar: v.avatarUrl || undefined,
-    content: v.content,
-    status: 'approved',
-    createTime: formatTime(v.createTime),
-    website: v.website || undefined,
-    parentNickname: v.parentNickname || undefined,
-    children: v.children && v.children.length ? mapComments(v.children) : undefined,
-  }));
-}
-
-function getAnonymousId(): string {
-  let id = localStorage.getItem('anonymousCommentId');
-  if (!id) {
-    id = 'anon_' + Math.random().toString(36).slice(2, 10);
-    localStorage.setItem('anonymousCommentId', id);
-  }
-  return id;
-}
-
-function saveAnonymousProfile(nickname: string, email: string, website: string) {
-  localStorage.setItem('anonymousNickname', nickname);
-  localStorage.setItem('anonymousEmail', email);
-  localStorage.setItem('anonymousWebsite', website || '');
-}
-
-function loadAnonymousProfile() {
-  if (localStorage.getItem('anonymousCommentId')) {
-    const n = localStorage.getItem('anonymousNickname') || '';
-    const e = localStorage.getItem('anonymousEmail') || '';
-    const w = localStorage.getItem('anonymousWebsite') || '';
-    anonymousNickname.value = n;
-    anonymousEmail.value = e;
-    anonymousWebsite.value = w;
-  }
-}
-
-function clearAnonymousProfile() {
-  localStorage.removeItem('anonymousCommentId');
-  localStorage.removeItem('anonymousNickname');
-  localStorage.removeItem('anonymousEmail');
-  localStorage.removeItem('anonymousWebsite');
-  anonymousNickname.value = '';
-  anonymousEmail.value = '';
-  anonymousWebsite.value = '';
-}
-
-const anonymousProfileReady = computed(() => {
-  return !!localStorage.getItem('anonymousCommentId')
-    && !!localStorage.getItem('anonymousNickname')
-    && !!localStorage.getItem('anonymousEmail');
-});
-
-function getAuthHeaders() {
-  const token = localStorage.getItem('authToken');
-  return token ? { Authorization: token } : {};
-}
-
-async function fetchComments() {
-  if (props.articleId === null) {
-    comments.value = [];
-    return;
-  }
-  isLoadingComments.value = true;
-  commentError.value = '';
-  try {
-    const url = props.articleId === 0
-      ? '/api/comment/list/guest-book'
-      : `/api/comment/list/${props.articleId}`;
-    const response = await axios.get<ResultResponse<BackendCommentVO[]>>(url);
-    if (response.data.code === 200) {
-      comments.value = mapComments(response.data.data || []);
-    } else {
-      commentError.value = response.data.message || '评论加载失败。';
-      comments.value = [];
-    }
-  } catch (error) {
-    commentError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '评论接口暂时不可用，请稍后重试。';
-    comments.value = [];
-  } finally {
-    isLoadingComments.value = false;
-  }
-}
-
-async function submitComment(): Promise<boolean> {
-  if (!props.isLoggedIn && props.allowAnonymous === false) {
-    commentError.value = '请登录后发表评论。';
-    emit('require-login');
-    return false;
-  }
-  if (!newCommentContent.value.trim()) {
-    commentError.value = '评论内容不能为空。';
-    return false;
-  }
-  if (props.articleId === null) {
-    commentError.value = '无法获取文章ID，请刷新页面。';
-    return false;
-  }
-  if (!props.isLoggedIn && !anonymousNickname.value.trim()) {
-    commentError.value = '请填写昵称。';
-    return false;
-  }
-  if (!props.isLoggedIn && !anonymousEmail.value.trim()) {
-    commentError.value = '请填写邮箱。';
-    return false;
-  }
-
-  isSubmittingComment.value = true;
-  commentError.value = '';
-
-  try {
-    const payload: CommentSubmitRequest = {
-      articleId: props.articleId,
-      content: newCommentContent.value.trim(),
-    };
-    if (props.isLoggedIn) {
-      payload.nickname = props.loginUser.nickname || props.loginUser.username || undefined;
-      payload.avatarUrl = props.loginUser.avatar || undefined;
-    } else {
-      payload.nickname = anonymousNickname.value.trim();
-      payload.email = anonymousEmail.value.trim();
-      payload.website = anonymousWebsite.value.trim() || undefined;
-      payload.anonymousId = getAnonymousId();
-      saveAnonymousProfile(
-        anonymousNickname.value.trim(),
-        anonymousEmail.value.trim(),
-        anonymousWebsite.value.trim()
-      );
-    }
-
-    const response = await axios.post<ResultResponse<void>>(
-      '/api/comment/publish',
-      payload,
-      { headers: getAuthHeaders() }
-    );
-
-    if (response.data.code === 200) {
-      newCommentContent.value = '';
-      await fetchComments();
-      return true;
-    } else {
-      commentError.value = response.data.message || '评论提交失败。';
-      return false;
-    }
-  } catch (error) {
-    commentError.value = axios.isAxiosError(error) && error.response?.data?.message
-      ? error.response.data.message
-      : '评论提交失败，请稍后重试。';
-  } finally {
-    isSubmittingComment.value = false;
-  }
-  return false;
-}
+  return count(comments.value)
+})
 
 function openComposer() {
-  composerOpen.value = true;
+  composerOpen.value = true
   nextTick(() => {
-    const ta = document.querySelector('.inline-composer textarea') as HTMLTextAreaElement | null;
+    const ta = document.querySelector('.inline-composer textarea') as HTMLTextAreaElement | null
     if (ta) {
-      ta.focus();
-      ta.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      ta.focus()
+      ta.scrollIntoView({ behavior: 'smooth', block: 'center' })
     }
-  });
+  })
 }
 
 function cancelComposer() {
-  composerOpen.value = false;
-  newCommentContent.value = '';
-  commentError.value = '';
+  composerOpen.value = false
+  newCommentContent.value = ''
+  commentError.value = ''
 }
 
 async function submitFromComposer() {
-  const ok = await submitComment();
-  if (ok) composerOpen.value = false;
+  if (!props.isLoggedIn && props.allowAnonymous === false) {
+    commentError.value = '请登录后发表评论。'
+    emit('require-login')
+    return
+  }
+  if (!newCommentContent.value.trim()) {
+    commentError.value = '评论内容不能为空。'
+    return
+  }
+  if (props.articleId === null) {
+    commentError.value = '无法获取文章ID，请刷新页面。'
+    return
+  }
+  if (!props.isLoggedIn && !anonymousNickname.value.trim()) {
+    commentError.value = '请填写昵称。'
+    return
+  }
+  if (!props.isLoggedIn && !anonymousEmail.value.trim()) {
+    commentError.value = '请填写邮箱。'
+    return
+  }
+
+  isSubmitting.value = true
+
+  const ok = await submitComment(
+    { articleId: props.articleId, content: newCommentContent.value.trim() },
+    props.isLoggedIn,
+    props.loginUser,
+    anonymousNickname.value,
+    anonymousEmail.value,
+    anonymousWebsite.value,
+    saveAnonymousProfile,
+    () => anonymousId.value,
+  )
+
+  if (ok) {
+    newCommentContent.value = ''
+    composerOpen.value = false
+    if (props.articleId !== null) fetchComments(props.articleId)
+  }
+
+  isSubmitting.value = false
 }
 
 function handleChildPosted() {
-  fetchComments();
+  if (props.articleId !== null) fetchComments(props.articleId)
 }
 
 watch(() => props.articleId, (newId) => {
-  if (newId !== null) fetchComments();
-  else comments.value = [];
-}, { immediate: true });
+  if (newId !== null) fetchComments(newId)
+  else comments.value = []
+}, { immediate: true })
 
 onMounted(() => {
-  loadAnonymousProfile();
-  if (props.articleId !== null) fetchComments();
-});
+  loadAnonymousProfile()
+})
 </script>
 
 <template>
@@ -268,17 +143,17 @@ onMounted(() => {
       <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">写下你的留言...</div>
       <div v-else class="composer-expanded">
         <div v-if="!isLoggedIn && !anonymousProfileReady" class="anonymous-form">
-          <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmittingComment" />
-          <input v-model="anonymousEmail" type="email" placeholder="邮箱（必填）" :disabled="isSubmittingComment" />
-          <input v-model="anonymousWebsite" type="text" placeholder="个人网站（选填）" :disabled="isSubmittingComment" />
+          <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
+          <input v-model="anonymousEmail" type="email" placeholder="邮箱（必填）" :disabled="isSubmitting" />
+          <input v-model="anonymousWebsite" type="text" placeholder="个人网站（选填）" :disabled="isSubmitting" />
         </div>
         <div v-else-if="!isLoggedIn && anonymousProfileReady" class="anonymous-identity-hint">
           <span>以 <b>{{ anonymousNickname }}</b> 身份发表</span>
           <span class="identity-switch" @click="clearAnonymousProfile">切换身份</span>
         </div>
-        <textarea v-model="newCommentContent" placeholder="发表你的评论..." rows="4" :disabled="isSubmittingComment"></textarea>
+        <textarea v-model="newCommentContent" placeholder="发表你的评论..." rows="4" :disabled="isSubmitting"></textarea>
         <div class="composer-actions">
-          <button @click="submitFromComposer" :disabled="isSubmittingComment || !newCommentContent.trim()">发布</button>
+          <button @click="submitFromComposer" :disabled="isSubmitting || !newCommentContent.trim()">发布</button>
           <button @click="cancelComposer" type="button">取消</button>
         </div>
         <div v-if="commentError" class="comment-error">{{ commentError }}</div>

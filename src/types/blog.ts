@@ -99,11 +99,13 @@ export interface BackendCommentVO {
   id: number
   parentId: number | null
   articleId: number | null
+  articleTitle?: string | null
   nickname: string | null
   avatarUrl: string | null
   content: string
   website: string | null
   isAdmin: number | null
+  status: number | null
   createTime: string
   children: BackendCommentVO[] | null
   parentNickname: string | null
