@@ -7,6 +7,7 @@ import confetti from 'canvas-confetti'
 import AboutSection from './components/AboutSection.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
+import SidebarNav from './components/SidebarNav.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
@@ -97,6 +98,19 @@ const filteredArticles = computed(() => {
 
 function toggleCategory(categoryId: number) {
   activeCategoryId.value = activeCategoryId.value === categoryId ? null : categoryId
+}
+
+function handleFilterCategory(label: string) {
+  // find category by label; if missing, add a transient category entry
+  let found = categories.value.find((c) => c.label === label)
+  if (!found) {
+    const nextId = Date.now()
+    found = { id: nextId, label }
+    categories.value.push(found)
+  }
+  activeCategoryId.value = found.id
+  // ensure we navigate to posts view
+  navigateToSection('posts')
 }
 
 // ── Derived view state ──
@@ -673,6 +687,12 @@ onMounted(async () => {
   }
 
   document.addEventListener('click', handleClickOutside)
+  // global toast bridge: listen to CustomEvent dispatched from anywhere
+  window.addEventListener('app-toast', (e: Event) => {
+    const ev = e as CustomEvent
+    const detail = ev.detail || {}
+    showAppToast(detail.message || '', detail.type || 'info')
+  })
 })
 
 onUnmounted(() => {
@@ -704,6 +724,9 @@ onUnmounted(() => {
         @logout="handleLogout"
       />
 
+      <!-- Global sidebar (hover from left edge) -->
+      <SidebarNav :articles="articles" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView
           v-if="isArticleDetailOpen && !showPublishModal"
@@ -722,6 +745,7 @@ onUnmounted(() => {
             v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
             :categories="categories"
             :active-category-id="activeCategoryId"
+            :articles="articles"
             :filtered-articles="filteredArticles"
             :article-error="articleError"
             :is-loading-articles="isLoadingArticles"

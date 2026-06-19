@@ -129,7 +129,7 @@ onUnmounted(() => {
 
         <div class="nav-actions desktop-only">
           <button v-if="isLoggedIn" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
-          <button v-if="isLoggedIn" class="nav-action-button" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
+          <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
           <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
         </div>
 

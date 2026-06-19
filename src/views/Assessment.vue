@@ -6,6 +6,7 @@ import axios from 'axios'
 import * as echarts from 'echarts'
 import html2canvas from 'html2canvas'
 import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck, ExternalLink, Camera } from 'lucide-vue-next'
+import { toast } from '../utils/toast'
 import QRCode from 'qrcode'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
 
@@ -71,7 +72,7 @@ const handleImageUpload = async (event: Event) => {
       }
     } catch (error) {
       console.error('采样图片上传异常:', error)
-      alert('图片上传失败，请稍后重试') // [优化] 增加基础用户反馈
+      toast('图片上传失败，请稍后重试', 'error') // [优化] 增加基础用户反馈
     } finally {
       isUploadingValuationImage.value = false
     }
@@ -262,12 +263,12 @@ const openDonate = async () => {
 
 const copyShareLink = async () => {
   if (!assessmentShareUrl.value) return
-  try {
+    try {
     await writeClipboardText(assessmentShareText.value)
-    alert('分享文案已复制到剪贴板, 去惊艳朋友圈吧')
+    toast('分享文案已复制到剪贴板, 去惊艳朋友圈吧', 'success')
   } catch (error) {
     console.error('复制分享链接失败:', error)
-    window.prompt('复制失败，请手动复制分享文案', assessmentShareText.value)
+    toast('复制失败，请手动复制分享文案', 'error')
   } finally {
     closeShareMenu()
     isWechatShareOpen.value = false
@@ -276,12 +277,12 @@ const copyShareLink = async () => {
 
 const copyAssessmentInviteLink = async () => {
   const inviteText = `人间估值｜快来市场测试一下吧\n${window.location.origin}/assessment`
-  try {
-    await writeClipboardText(inviteText)
-    alert('测试邀请已复制到剪贴板')
-  } catch (error) {
-    console.error('复制测试邀请失败:', error)
-    window.prompt('复制失败，请手动复制测试邀请', inviteText)
+    try {
+      await writeClipboardText(inviteText)
+      toast('测试邀请已复制到剪贴板', 'success')
+    } catch (error) {
+      console.error('复制测试邀请失败:', error)
+      toast('复制失败，请手动复制测试邀请', 'error')
   }
 }
 
@@ -372,7 +373,7 @@ const radarLabelPositions = (cx: number, cy: number, r: number) =>
 const savePoster = async () => {
   if (!posterRef.value) {
     console.error('posterRef 为空，DOM 未挂载')
-    alert('海报容器未找到，请稍后重试')
+    toast('海报容器未找到，请稍后重试', 'error')
     return
   }
   isGenerating.value = true
@@ -411,7 +412,7 @@ const savePoster = async () => {
       backgroundColor: '#ffffff'
     }).catch(error => {
       console.error('html2canvas 错误:', error)
-      alert('海报生成失败：' + (error?.message || '未知错误'))
+      toast('海报生成失败：' + (error?.message || '未知错误'), 'error')
       return null
     })
     if (!canvas) return

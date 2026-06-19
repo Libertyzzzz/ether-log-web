@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
+import axios from 'axios'
 import type { LoginUser } from '../types/blog'
 import CommentItemComponent from './CommentItem.vue'
 import { useComments } from '../composables/useComments'
@@ -28,6 +29,8 @@ const {
 const newCommentContent = ref('')
 const composerOpen = ref(false)
 const isSubmitting = ref(false)
+const anonymousChecked = ref(false)
+const anonymousHasCommented = ref(false)
 
 const totalComments = computed(() => {
   function count(list: typeof comments.value): number {
@@ -69,13 +72,16 @@ async function submitFromComposer() {
     commentError.value = '无法获取文章ID，请刷新页面。'
     return
   }
-  if (!props.isLoggedIn && !anonymousNickname.value.trim()) {
-    commentError.value = '请填写昵称。'
-    return
-  }
-  if (!props.isLoggedIn && !anonymousEmail.value.trim()) {
-    commentError.value = '请填写邮箱。'
-    return
+  // If not logged in, consult backend check: only require nickname/email when backend indicates user hasn't commented before
+  if (!props.isLoggedIn && anonymousChecked.value && anonymousHasCommented.value === false) {
+    if (!anonymousNickname.value.trim()) {
+      commentError.value = '请填写昵称。'
+      return
+    }
+    if (!anonymousEmail.value.trim()) {
+      commentError.value = '请填写邮箱。'
+      return
+    }
   }
 
   isSubmitting.value = true
@@ -110,7 +116,34 @@ watch(() => props.articleId, (newId) => {
 }, { immediate: true })
 
 onMounted(() => {
-  loadAnonymousProfile()
+  // When user is not logged in, ask backend for anonymous identity
+  if (!props.isLoggedIn) {
+    (async () => {
+      try {
+        const resp = await axios.get('/api/anonymous/user')
+        // backend may return { anonymousId, hasCommented } or wrapped in data
+        const payload = resp.data && resp.data.data ? resp.data.data : resp.data
+        const anonId = payload?.anonymousId || payload?.id || null
+        const hasCommented = payload?.hasCommented === true
+        if (anonId) {
+          try { localStorage.setItem('anonymousCommentId', anonId) } catch (e) {}
+        }
+        anonymousHasCommented.value = hasCommented
+        // if backend says user has commented before, reuse stored profile if any
+        if (hasCommented) {
+          loadAnonymousProfile()
+        }
+      } catch (err) {
+        // ignore — fallback to local profile/id generation
+        loadAnonymousProfile()
+      } finally {
+        anonymousChecked.value = true
+      }
+    })()
+  } else {
+    loadAnonymousProfile()
+    anonymousChecked.value = true
+  }
 })
 </script>
 
@@ -142,12 +175,12 @@ onMounted(() => {
     <div class="inline-composer">
       <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">写下你的留言...</div>
       <div v-else class="composer-expanded">
-        <div v-if="!isLoggedIn && !anonymousProfileReady" class="anonymous-form">
+        <div v-if="!isLoggedIn && anonymousChecked && anonymousHasCommented === false" class="anonymous-form">
           <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
           <input v-model="anonymousEmail" type="email" placeholder="邮箱（必填）" :disabled="isSubmitting" />
           <input v-model="anonymousWebsite" type="text" placeholder="个人网站（选填）" :disabled="isSubmitting" />
         </div>
-        <div v-else-if="!isLoggedIn && anonymousProfileReady" class="anonymous-identity-hint">
+        <div v-else-if="!isLoggedIn && (anonymousProfileReady || anonymousHasCommented)" class="anonymous-identity-hint">
           <span>以 <b>{{ anonymousNickname }}</b> 身份发表</span>
           <span class="identity-switch" @click="clearAnonymousProfile">切换身份</span>
         </div>

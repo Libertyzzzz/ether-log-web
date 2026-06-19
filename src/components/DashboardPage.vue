@@ -1,8 +1,13 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check } from 'lucide-vue-next'
-import type { ArticleListItem, CommentItem } from '../types/blog'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder } from 'lucide-vue-next'
+import { ref, onMounted } from 'vue'
+import axios from 'axios'
+import { hasAuthToken, getAuthHeaders } from '../composables/useAuth'
+import AppConfirmDialog from './AppConfirmDialog.vue'
+import { toast } from '../utils/toast'
+import type { ArticleListItem, CommentItem, Tag } from '../types/blog'
 
-defineProps<{
+const props = defineProps<{
   articles: ArticleListItem[]
   pendingComments: CommentItem[]
   isLoadingPending: boolean
@@ -18,6 +23,179 @@ defineEmits<{
   approveComment: [commentId: number]
   deleteComment: [commentId: number]
 }>()
+
+// categories management state (for control panel)
+const categoriesList = ref<{ id: number; name: string; sort?: number }[]>([])
+const isLoadingCategories = ref(false)
+const newCategoryName = ref('')
+const newCategorySort = ref<number | null>(null)
+const showCreateCategoryDialog = ref(false)
+const deletingCategory = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
+// tags management state
+const tagsList = ref<Tag[]>([])
+const isLoadingTags = ref(false)
+const newTagName = ref('')
+const newTagColor = ref('#7c3aed')
+const deletingTag = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
+const showCreateTagDialog = ref(false)
+
+// dialog-driven create flows (open on header button)
+function openCreateTagDialog() {
+  showCreateTagDialog.value = true
+}
+
+async function fetchTagsForAdmin() {
+  isLoadingTags.value = true
+  try {
+    // backend provides paged tags at /tags/page
+    const resp = await axios.get('/api/tags/page?pageNum=1&pageSize=200', hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    const data = resp.data && resp.data.data ? resp.data.data : resp.data
+    // data may be a page response with records
+    const records = Array.isArray(data?.records) ? data.records : Array.isArray(data) ? data : []
+    tagsList.value = records.map((t: any) => ({ id: t.id, name: t.name || t.label, color: t.color }))
+  } catch (e) {
+    console.info('加载标签失败或端点不存在', e)
+  } finally {
+    isLoadingTags.value = false
+  }
+}
+
+async function createTagAdmin() {
+  if (!newTagName.value.trim()) {
+    toast('请输入标签名称', 'error')
+    return
+  }
+  try {
+    const payload: any = { name: newTagName.value.trim(), color: newTagColor.value }
+    const resp = await axios.post('/api/tags', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    const p = resp.data && resp.data.data ? resp.data.data : resp.data
+    const id = p?.id || Date.now()
+    tagsList.value.push({ id, name: payload.name, color: payload.color })
+    newTagName.value = ''
+    newTagColor.value = '#7c3aed'
+    showCreateTagDialog.value = false
+    toast('标签已创建', 'success')
+  } catch (e) {
+    console.error('创建标签失败', e)
+    toast('创建标签失败', 'error')
+  }
+}
+
+function confirmDeleteTag(tag: { id: number; name: string }) {
+  deletingTag.value = { show: true, id: tag.id, name: tag.name }
+}
+
+async function performDeleteTag() {
+  const id = deletingTag.value.id
+  if (!id) { deletingTag.value.show = false; return }
+  try {
+    await axios.delete(`/api/tags/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    tagsList.value = tagsList.value.filter((t) => t.id !== id)
+    toast('标签已删除', 'success')
+  } catch (e) {
+    console.error('删除标签失败', e)
+    toast('删除标签失败', 'error')
+  } finally {
+    deletingTag.value.show = false
+    await fetchTagsForAdmin()
+  }
+}
+
+async function fetchCategoriesForAdmin() {
+  isLoadingCategories.value = true
+  try {
+    const resp = await axios.get('/api/categories/list', hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    const data = resp.data && resp.data.data ? resp.data.data : resp.data
+    if (Array.isArray(data)) {
+      categoriesList.value = data.map((c: any) => ({ id: c.id, name: c.name || c.label, sort: c.sort }))
+    }
+  } catch (e) {
+    console.error('加载分类失败', e)
+  } finally {
+    isLoadingCategories.value = false
+  }
+}
+
+async function createCategoryAdmin() {
+  if (!newCategoryName.value.trim()) {
+    toast('请输入分类名称', 'error')
+    return
+  }
+  try {
+    const payload: any = { name: newCategoryName.value.trim() }
+    if (newCategorySort.value !== null) payload.sort = Number(newCategorySort.value)
+    const resp = await axios.post('/api/categories', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    const p = resp.data && resp.data.data ? resp.data.data : resp.data
+    const id = p?.id || Date.now()
+    categoriesList.value.push({ id, name: payload.name, sort: payload.sort })
+    newCategoryName.value = ''
+    newCategorySort.value = null
+    toast('分类已创建', 'success')
+    showCreateCategoryDialog.value = false
+  } catch (e) {
+    console.error('创建分类失败', e)
+    toast('创建分类失败', 'error')
+  }
+}
+
+function openCreateCategoryDialog() {
+  showCreateCategoryDialog.value = true
+}
+
+function confirmDeleteCategory(cat: { id: number; name: string }) {
+  deletingCategory.value = { show: true, id: cat.id, name: cat.name }
+}
+
+async function performDeleteCategoryAdmin() {
+  const id = deletingCategory.value.id
+  const name = deletingCategory.value.name
+  if (!id) {
+    deletingCategory.value.show = false
+    return
+  }
+  try {
+    // ensure general category
+    let general = categoriesList.value.find((c) => c.name === '通用目录')
+    if (!general) {
+      const resp = await axios.post('/api/categories', { name: '通用目录', sort: 0 }, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+      const p = resp.data && resp.data.data ? resp.data.data : resp.data
+      general = { id: p?.id || Date.now(), name: '通用目录', sort: 0 }
+      categoriesList.value.push(general)
+    }
+
+    // reassign articles locally and backend
+    const toMove = props.articles.filter((a: ArticleListItem) => a.categoryName === name)
+    for (const a of toMove) {
+      try {
+        await axios.put(`/api/articles/${a.id}`, { categoryId: general.id }, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+      } catch (e) {
+        console.error('移动文章失败', a.id, e)
+      }
+    }
+
+    // delete category
+    try {
+      await axios.delete(`/api/categories/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    } catch (e) {
+      console.error('删除分类失败', e)
+    }
+
+    categoriesList.value = categoriesList.value.filter((c) => c.id !== id)
+    toast('分类已删除并将文章移至通用目录', 'success')
+  } catch (e) {
+    console.error('删除分类失败', e)
+    toast('删除分类失败', 'error')
+  } finally {
+    deletingCategory.value.show = false
+    await fetchCategoriesForAdmin()
+  }
+}
+
+// fetch categories when dashboard mounts
+onMounted(() => {
+  fetchCategoriesForAdmin()
+  fetchTagsForAdmin()
+})
 
 const coverGradients = [
   'linear-gradient(135deg,#1e1b4b,#4338ca)',
@@ -100,7 +278,7 @@ function getCover(post: ArticleListItem, i: number) {
               <h2 class="db-card-title">我的文章</h2>
             </div>
             <button class="db-btn-sm" type="button" @click="$emit('newArticle')">
-              <Plus :size="13" /> 新建
+              <Plus :size="13" /> 发布文章
             </button>
           </div>
 
@@ -134,6 +312,119 @@ function getCover(post: ArticleListItem, i: number) {
               </button>
             </div>
           </div>
+        </div>
+
+        <!-- 分类管理 -->
+        <div class="db-card">
+          <div class="db-card-header">
+            <div class="db-card-title-row">
+              <Folder :size="15" class="db-card-icon" />
+              <h2 class="db-card-title">分类管理</h2>
+            </div>
+            <button class="db-btn-sm" type="button" @click="openCreateCategoryDialog" v-if="hasAuthToken()">
+              <Plus :size="13" /> 新增
+            </button>
+          </div>
+
+          <div class="db-card-body">
+            <div v-if="isLoadingCategories" class="db-empty">加载中...</div>
+            <div v-else>
+              <div class="cat-list">
+                  <div v-for="cat in categoriesList" :key="cat.id" class="cat-row">
+                    <span class="cat-name">{{ cat.name }}</span>
+                    <div class="cat-actions">
+                    <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteCategory(cat)">删除</button>
+                    </div>
+                  </div>
+                </div>
+
+              <!-- creation handled via AppConfirmDialog in header -->
+            </div>
+          </div>
+
+          <AppConfirmDialog
+            :show="deletingCategory.show"
+            title="确认删除分类"
+            :message="`删除分类 “${deletingCategory.name || ''}” 将把其文章移至通用目录，确定吗？`"
+            confirmText="删除"
+            cancelText="取消"
+            tone="danger"
+            @confirm="performDeleteCategoryAdmin"
+            @cancel="deletingCategory.show = false"
+          />
+
+          <!-- 创建分类弹窗（复用 AppConfirmDialog） -->
+          <AppConfirmDialog
+            :show="showCreateCategoryDialog"
+            title="新建分类"
+            confirmText="创建"
+            cancelText="取消"
+            @confirm="createCategoryAdmin"
+            @cancel="showCreateCategoryDialog = false"
+          >
+            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
+              <input v-model="newCategoryName" placeholder="分类名称" aria-label="分类名称" />
+              <input v-model.number="newCategorySort" placeholder="排序 (sort)" type="number" />
+            </div>
+          </AppConfirmDialog>
+        </div>
+
+        <!-- 标签管理 -->
+        <div class="db-card">
+          <div class="db-card-header">
+            <div class="db-card-title-row">
+              <BookOpen :size="15" class="db-card-icon" />
+              <h2 class="db-card-title">标签管理</h2>
+            </div>
+            <button class="db-btn-sm" type="button" @click="openCreateTagDialog" v-if="hasAuthToken()">
+              <Plus :size="13" /> 新增
+            </button>
+          </div>
+
+          <div class="db-card-body">
+            <div v-if="isLoadingTags" class="db-empty">加载中...</div>
+            <div v-else>
+              <div class="cat-list">
+                <div v-for="tag in tagsList" :key="tag.id" class="cat-row">
+                  <div style="display:flex;align-items:center;gap:0.6rem">
+                    <span class="tag-badge" :style="{background: tag.color || '#e6eef6'}"></span>
+                    <span class="cat-name">{{ tag.name }}</span>
+                  </div>
+                  <div class="cat-actions">
+                    <button class="db-action-btn view" type="button" @click="confirmDeleteTag(tag)">删除</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- creation handled via AppConfirmDialog in header -->
+            </div>
+          </div>
+
+          <AppConfirmDialog
+            :show="deletingTag.show"
+            title="确认删除标签"
+            :message="`删除标签 “${deletingTag.name || ''}” 将会移除该标签，确定吗？`"
+            confirmText="删除"
+            cancelText="取消"
+            tone="danger"
+            @confirm="performDeleteTag"
+            @cancel="deletingTag.show = false"
+          />
+
+          <!-- 创建标签弹窗（复用 AppConfirmDialog） -->
+          <AppConfirmDialog
+            :show="showCreateTagDialog"
+            title="新建标签"
+            confirmText="创建"
+            cancelText="取消"
+            @confirm="createTagAdmin"
+            @cancel="showCreateTagDialog = false"
+          >
+            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
+              <input v-model="newTagName" placeholder="标签名称" aria-label="标签名称" />
+              <label style="display:flex;gap:0.6rem;align-items:center"><span style="font-size:0.85rem;color:#64748b">颜色</span><input type="color" v-model="newTagColor" style="width:2.2rem;height:2.2rem;border:0;padding:0;background:transparent"/></label>
+            </div>
+          </AppConfirmDialog>
         </div>
 
         <!-- 待审核评论 -->
@@ -279,6 +570,15 @@ function getCover(post: ArticleListItem, i: number) {
 .db-action-btn.approve:hover { background:rgba(34,197,94,0.15); }
 .db-action-btn:disabled { opacity:0.4;cursor:not-allowed; }
 .db-empty { padding:2rem;text-align:center;color:#94a3b8;font-size:0.85rem; }
+
+/* Category/Tag management UI tweaks */
+.cat-row { display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0.5rem; border-bottom:1px solid #f1f5f9; }
+.cat-actions { opacity: 0; transition: opacity 0.12s ease; }
+.cat-row:hover .cat-actions { opacity: 1; }
+.cat-create-row { display:flex; gap:0.5rem; align-items:center; }
+.cat-create-row input { padding:0.45rem 0.6rem; border-radius:0.6rem; border:1px solid #e6eef6; }
+.cat-create-row button { white-space:nowrap }
+.tag-badge { width:0.8rem; height:0.8rem; display:inline-block; border-radius:0.2rem; border:1px solid rgba(0,0,0,0.06) }
 
 /* 评论 */
 .db-comment-item { padding:1rem;border-radius:1rem;background:#f8fafc;margin-bottom:0.75rem;display:flex;flex-direction:column;gap:0.4rem; }

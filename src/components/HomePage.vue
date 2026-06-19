@@ -1,11 +1,12 @@
 <script setup lang="ts">
-import { BookOpen, ArrowRight, ArrowUpRight, Lightbulb, Code2, Palette, BookMarked, MessageCircle } from 'lucide-vue-next'
+import { BookOpen, ArrowRight, ArrowUpRight, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 
 defineProps<{
   categories: Category[]
   activeCategoryId: number | null
+  articles: ArticleListItem[]
   filteredArticles: ArticleListItem[]
   articleError: string
   isLoadingArticles: boolean
@@ -61,6 +62,7 @@ function formatDate(dateStr: string) {
 
 <template>
   <div class="home-page">
+    <!-- global SidebarNav mounted in App.vue; local instance removed -->
 
     <!-- ── Hero ── -->
     <section class="hp-hero">
@@ -86,16 +88,16 @@ function formatDate(dateStr: string) {
               开始阅读
             </button>
             <button class="hp-btn-ghost" :class="{ active: showFeaturedOnly }" type="button" @click="$emit('toggleFeatured', !showFeaturedOnly)">
-              {{ showFeaturedOnly ? '查看全部' : '☆ 精选文章' }}
+              <Star :size="15" />
+              <span>{{ showFeaturedOnly ? '查看全部' : '精选文章' }}</span>
             </button>
-            <!-- 新增：人间估值入口 -->
             <button class="hp-btn-ghost" type="button" @click="$emit('openAssessment')">
-              ✨ 人间估值
+              <Sparkles :size="15" />
+              <span>人间估值</span>
             </button>
-            <!-- 新增：留言板入口 -->
             <button class="hp-btn-ghost" type="button" @click="$emit('navigate', 'guestbook')">
               <MessageCircle :size="15" />
-              留言板
+              <span>留言板</span>
             </button>
           </div>
         </div>
@@ -127,7 +129,7 @@ function formatDate(dateStr: string) {
           :key="cat.id"
           class="hp-cat-card"
           :class="{ active: activeCategoryId === cat.id }"
-          @click="$emit('toggleCategory', cat.id)"
+          @click="$emit('toggleCategory', cat.id); $emit('scrollToPosts')"
         >
           <div class="hp-cat-icon">
             <component :is="categoryIconMap[cat.label] || BookMarked" :size="20" />
@@ -149,7 +151,11 @@ function formatDate(dateStr: string) {
             最新文章
             <span class="hp-section-dot"></span>
           </h2>
-          <button class="hp-view-all" type="button">
+          <button
+            class="hp-view-all"
+            type="button"
+            @click="showFeaturedOnly && $emit('toggleFeatured', false); activeCategoryId && $emit('toggleCategory', activeCategoryId); $emit('scrollToPosts')"
+          >
             查看全部文章 <ArrowUpRight :size="13" />
           </button>
         </div>
@@ -235,7 +241,7 @@ function formatDate(dateStr: string) {
             <cite class="hp-quote-author">— Ether</cite>
             <div class="hp-quote-action">
               <button class="hp-btn-donate" type="button" @click="$emit('openDonate')">
-                <span class="hp-btn-donate-icon">☕</span>
+                <Coffee class="hp-btn-donate-icon" :size="16" />
                 <span class="hp-btn-donate-text">来杯咖啡吧</span>
               </button>
             </div>
@@ -248,7 +254,6 @@ function formatDate(dateStr: string) {
         </div>
       </div>
     </section>
-
   </div>
 </template>
 
@@ -382,6 +387,11 @@ function formatDate(dateStr: string) {
   transition: background 0.2s, border-color 0.2s;
 }
 .hp-btn-ghost:hover { background: rgba(59, 130, 246, 0.16); border-color: rgba(167, 139, 250, 0.42); }
+.hp-btn-ghost.active {
+  background: rgba(79, 124, 255, 0.22);
+  border-color: rgba(147, 197, 253, 0.46);
+  color: #ffffff;
+}
 
 /* 右侧装饰 */
 .hp-hero-visual {
@@ -454,7 +464,7 @@ function formatDate(dateStr: string) {
 ════════════════════════════════ */
 .hp-categories {
   background: transparent;
-  padding: 2.5rem 0;
+  padding: 2.25rem 0 1rem;
 }
 .hp-categories-inner {
   max-width: 64rem;
@@ -469,7 +479,7 @@ function formatDate(dateStr: string) {
   align-items: center;
   gap: 0.85rem;
   padding: 1rem 1.1rem;
-  border-radius: 1.25rem;
+  border-radius: 1rem;
   background: rgba(255,255,255,0.78);
   border: 1px solid rgba(191,219,254,0.32);
   cursor: pointer;
@@ -482,7 +492,7 @@ function formatDate(dateStr: string) {
   transform: translateY(-2px);
 }
 .hp-cat-card.active {
-  background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%);
+  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
   border-color: rgba(147,197,253,0.46);
   box-shadow: 0 14px 34px rgba(37,99,235,0.26);
 }
@@ -494,7 +504,7 @@ function formatDate(dateStr: string) {
 .hp-cat-icon {
   width: 2.5rem;
   height: 2.5rem;
-  border-radius: 0.75rem;
+  border-radius: 0.7rem;
   background: #eff6ff;
   color: #3b82f6;
   display: flex;
@@ -772,17 +782,19 @@ function formatDate(dateStr: string) {
 .hp-quote-content {
   position: relative;
   background:
-    radial-gradient(circle at 84% 18%, rgba(245,158,11,0.12), transparent 16rem),
-    radial-gradient(circle at 20% 10%, rgba(59,130,246,0.12), transparent 14rem),
-    linear-gradient(135deg, #090e18 0%, #111827 100%);
-  padding: 2.2rem 3rem; /* 显著减少上下内边距，压缩高度 */
+    radial-gradient(circle at 88% 0%, rgba(79,124,255,0.12), transparent 16rem),
+    radial-gradient(circle at 14% 100%, rgba(240,171,252,0.12), transparent 14rem),
+    rgba(255, 255, 255, 0.74);
+  padding: 2rem 2.5rem;
   display: flex;
   flex-direction: column;
-  gap: 0.75rem; /* 缩小元素间距 */
-  border-radius: 1.75rem;
+  gap: 0.75rem;
+  border-radius: 1.25rem;
+  border: 1px solid rgba(203, 213, 225, 0.62);
+  box-shadow: 0 14px 36px rgba(70,91,128,0.08);
 }
 .hp-quote-mark {
-  font-size: 3.5rem; /* 减小引号尺寸 */
+  font-size: 3rem;
   line-height: 0.8;
   color: #4f7cff;
   font-family: Georgia, serif;
@@ -791,9 +803,9 @@ function formatDate(dateStr: string) {
 }
 .hp-quote-text {
   margin: 0;
-  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
+  font-size: clamp(1.05rem, 2vw, 1.35rem);
   font-weight: 700;
-  color: #f1f5f9;
+  color: #1e293b;
   line-height: 1.65;
   font-style: normal;
 }
@@ -818,9 +830,9 @@ function formatDate(dateStr: string) {
 }
 .hp-btn-donate {
   display: inline-flex; align-items: center; gap: 0.6rem;
-  padding: 0.5rem 1.25rem; /* 缩小按钮尺寸 */
-  border-radius: 999px; /* 改为全圆角，更显灵动 */
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  padding: 0.5rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(203, 213, 225, 0.72);
   background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
   color: #334155; cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
@@ -831,7 +843,7 @@ function formatDate(dateStr: string) {
   transform: translateY(-0.5px);
   box-shadow: 0 6px 18px rgba(0, 0, 0, 0.25);
 }
-.hp-btn-donate-icon { font-size: 1rem; }
+.hp-btn-donate-icon { flex-shrink: 0; }
 .hp-btn-donate-text { font-size: 0.85rem; font-weight: 800; letter-spacing: 0.02em; }
 
 /* ════════════════════════════════
@@ -843,173 +855,6 @@ function formatDate(dateStr: string) {
 }
 @media (max-width: 768px) {
   .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; } /* 移动端切回垂直排列 */
-  .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
-  .hp-hero-visual { display: none; }
-  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
-  .hp-posts-grid { grid-template-columns: 1fr; }
-  .hp-quote-content { padding: 2rem 1.5rem; }
-}
-
-.hp-card-admin-actions {
-  position: absolute;
-  bottom: 0.75rem;
-  right: 0.75rem;
-  display: flex;
-  gap: 0.4rem;
-}
-.hp-admin-btn {
-  padding: 0.25rem 0.65rem;
-  border-radius: 9999px;
-  border: none;
-  background: rgba(255,255,255,0.85);
-  color: #334155;
-  font-size: 0.7rem;
-  font-weight: 700;
-  cursor: pointer;
-  backdrop-filter: blur(8px);
-  transition: background 0.2s;
-}
-.hp-admin-btn:hover { background: white; }
-.hp-admin-btn.danger { color: #dc2626; }
-.hp-admin-btn.danger:hover { background: #fee2e2; }
-
-/* 卡片文字区 */
-.hp-card-body {
-  padding: 1.1rem 1.25rem 1.25rem;
-}
-.hp-card-title {
-  margin: 0 0 0.5rem;
-  font-size: 0.95rem;
-  font-weight: 800;
-  color: #0f172a;
-  line-height: 1.4;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.hp-card-summary {
-  margin: 0 0 0.85rem;
-  font-size: 0.8rem;
-  color: #64748b;
-  line-height: 1.6;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
-.hp-card-meta {
-  display: flex;
-  align-items: center;
-  gap: 0.6rem;
-  font-size: 0.72rem;
-  color: #94a3b8;
-  font-weight: 600;
-}
-.hp-card-author { color: #475569; font-weight: 700; }
-.hp-card-date::before,
-.hp-card-views::before { content: '·'; margin-right: 0.6rem; }
-
-/* 状态卡片 */
-.hp-state-card {
-  padding: 2.5rem;
-  border-radius: 1.5rem;
-  background: white;
-  border: 1px solid rgba(226,232,240,0.8);
-  text-align: center;
-  color: #64748b;
-}
-.hp-state-tag {
-  display: inline-block;
-  padding: 0.2rem 0.65rem;
-  border-radius: 9999px;
-  background: #f1f5f9;
-  color: #94a3b8;
-  font-size: 0.7rem;
-  font-weight: 800;
-  letter-spacing: 0.1em;
-  text-transform: uppercase;
-  margin-bottom: 0.75rem;
-}
-
-/* 骨架屏 */
-.hp-skeleton .hp-skeleton-cover {
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-}
-.hp-skeleton-line {
-  height: 0.85rem;
-  border-radius: 0.4rem;
-  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
-  background-size: 200% 100%;
-  animation: shimmer 1.4s infinite;
-  margin-bottom: 0.5rem;
-}
-.hp-skeleton-line.short { width: 60%; }
-@keyframes shimmer {
-  0%   { background-position: 200% 0; }
-  100% { background-position: -200% 0; }
-}
-
-/* ════════════════════════════════
-   引言 Banner（固定静态）
-════════════════════════════════ */
-.hp-quote {
-  padding: 0 0 3rem;
-}
-.hp-quote-inner {
-  max-width: 64rem;
-  margin: 0 auto;
-  padding: 0 1.5rem;
-}
-.hp-quote-inner > * {
-  border-radius: 1.75rem;
-  overflow: hidden;
-}
-.hp-quote-content {
-  position: relative;
-  background:
-    radial-gradient(circle at 84% 18%, rgba(245,158,11,0.12), transparent 16rem),
-    radial-gradient(circle at 20% 10%, rgba(59,130,246,0.12), transparent 14rem),
-    linear-gradient(135deg, #090e18 0%, #111827 100%);
-  padding: 3rem 3.5rem;
-  display: flex;
-  flex-direction: column;
-  gap: 1rem;
-  border-radius: 1.75rem;
-}
-.hp-quote-mark {
-  font-size: 5rem;
-  line-height: 0.8;
-  color: #4f7cff;
-  font-family: Georgia, serif;
-  font-weight: 900;
-  opacity: 0.8;
-}
-.hp-quote-text {
-  margin: 0;
-  font-size: clamp(1.2rem, 2.5vw, 1.6rem);
-  font-weight: 700;
-  color: #f1f5f9;
-  line-height: 1.65;
-  font-style: normal;
-}
-.hp-quote-author {
-  font-size: 0.88rem;
-  color: #64748b;
-  font-style: normal;
-  font-weight: 600;
-}
-
-/* ════════════════════════════════
-   响应式
-════════════════════════════════ */
-@media (max-width: 1024px) {
-  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
-  .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
-}
-@media (max-width: 768px) {
   .hp-hero { padding-left: 1rem; padding-right: 1rem; }
   .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
   .hp-hero-visual { display: none; }

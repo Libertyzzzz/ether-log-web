@@ -18,6 +18,14 @@ export interface Category {
   label: string
 }
 
+export interface ArticleDirectory {
+  id: number
+  name: string
+  description: string
+  articleIds: number[]
+  sortOrder: number
+}
+
 export interface ArticleListItem {
   id: number
   title: string
@@ -120,4 +128,11 @@ export interface CommentSubmitRequest {
   avatarUrl?: string
   website?: string
   anonymousId?: string
+}
+
+export interface Tag {
+  id: number
+  name: string
+  color?: string
+  createTime?: string
 }
