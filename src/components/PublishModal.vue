@@ -8,7 +8,7 @@ import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
 import TurndownService from 'turndown'
 import type { ComponentPublicInstance } from 'vue'
-import type { ArticlePublishRequest, Category } from '../types/blog'
+import type { ArticlePublishRequest, Category, Tag } from '../types/blog'
 import { renderMarkdown } from '../utils/markdown'
 
 type PendingMarkdownImage = {
@@ -20,6 +20,7 @@ type PendingMarkdownImage = {
 const props = defineProps<{
   publishForm: ArticlePublishRequest
   categories: Category[]
+  tags: Tag[]
   publishError: string
   isPublishing: boolean
   isEditMode: boolean
@@ -158,6 +159,17 @@ function setCoverImageInput(element: Element | ComponentPublicInstance | null) {
 
 function triggerCoverImageUpload() {
   coverImageInput.value?.click()
+}
+
+function toggleTag(tagId: number) {
+  const idx = props.publishForm.tagIds.indexOf(tagId)
+  if (idx >= 0) props.publishForm.tagIds.splice(idx, 1)
+  else props.publishForm.tagIds.push(tagId)
+}
+
+function tagChipStyle(tag: Tag): Record<string, string> {
+  if (!props.publishForm.tagIds.includes(tag.id) || !tag.color) return {}
+  return { background: tag.color, borderColor: tag.color, color: '#fff' }
 }
 
 function handleCoverImageChange(event: Event) {
@@ -299,8 +311,24 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
           <label class="sidebar-field">
             <span>分类</span>
             <select class="sidebar-input" v-model.number="publishForm.categoryId">
-              <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.label }}</option>
+              <option v-for="cat in categories" :key="cat.id" :value="cat.id">{{ cat.name }}</option>
             </select>
+          </label>
+
+          <label class="sidebar-field">
+            <span>标签</span>
+            <div class="tag-selector">
+              <span
+                v-for="t in tags"
+                :key="t.id"
+                class="tag-chip"
+                :class="{ active: publishForm.tagIds.includes(t.id) }"
+                :style="tagChipStyle(t)"
+                @click="toggleTag(t.id)"
+              >{{ t.name }}</span>
+              <span v-if="!tags.length" class="tag-empty">暂无标签，可在控制面板中添加</span>
+            </div>
+            <span class="tag-hint">点击选择或取消选择</span>
           </label>
 
           <label class="sidebar-checkbox">
@@ -721,6 +749,51 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   color: #dc2626;
   font-size: 0.8rem;
   line-height: 1.5;
+}
+
+.tag-selector {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  padding: 0.55rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  background: #ffffff;
+  min-height: 2.5rem;
+}
+.tag-chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.18rem 0.65rem;
+  border-radius: 9999px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #475569;
+  background: #f1f5f9;
+  border: 1px solid #e2e8f0;
+  cursor: pointer;
+  transition: all 0.15s;
+  user-select: none;
+}
+.tag-chip:hover {
+  background: #e2e8f0;
+}
+.tag-chip.active {
+  background: #4f46e5;
+  color: #ffffff;
+  border-color: #4f46e5;
+}
+.tag-empty {
+  font-size: 0.72rem;
+  color: #94a3b8;
+  font-style: italic;
+  padding: 0.25rem 0.35rem;
+}
+.tag-hint {
+  font-size: 0.65rem;
+  color: #94a3b8;
+  font-weight: 500;
+  margin-top: 0.25rem;
 }
 
 /* 右侧编辑区（和 article-main 完全对应） */

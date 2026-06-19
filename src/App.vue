@@ -24,7 +24,9 @@ import type {
   ArticleListItem,
   ArticlePublishRequest,
   Category,
+  PageResponse,
   ResultResponse,
+  Tag,
   UploadImageData,
 } from './types/blog'
 import { renderMarkdown } from './utils/markdown'
@@ -73,13 +75,50 @@ const {
   deleteComment: deleteCommentApi,
 } = useComments()
 
-// ── Static categories ──
-const categories = ref<Category[]>([
-  { id: 1, label: 'Thought' },
-  { id: 2, label: 'Code' },
-  { id: 3, label: 'Design' },
-  { id: 4, label: 'Guide' },
-])
+// ── Categories & Tags (real data from backend) ──
+const categories = ref<Category[]>([])
+const tags = ref<Tag[]>([])
+
+async function fetchCategories() {
+  try {
+    const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list', {
+      headers: hasAuthToken() ? getAuthHeaders() : undefined,
+    })
+    const data = Array.isArray(response.data) ? response.data : response.data?.data
+    if (Array.isArray(data)) {
+      const mapped: Category[] = data.map((c: any) => ({
+        id: c.id,
+        name: c.name || c.label || String(c.id),
+        sort: typeof c.sort === 'number' ? c.sort : 0,
+      }))
+      categories.value = mapped.sort((a, b) => (a.sort || 0) - (b.sort || 0))
+    }
+  } catch (err) {
+    console.warn('加载分类失败', err)
+    if (!categories.value.length) {
+      categories.value = [{ id: 1, name: '未分类', sort: 0 }]
+    }
+  }
+}
+
+async function fetchTags() {
+  try {
+    const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
+      '/api/tags/page?pageNum=1&pageSize=200',
+      { headers: hasAuthToken() ? getAuthHeaders() : undefined },
+    )
+    const payload = response.data?.data || response.data
+    const records: any[] = Array.isArray(payload?.records) ? payload.records : []
+    tags.value = records.map((t: any) => ({
+      id: t.id,
+      name: t.name || t.label || String(t.id),
+      color: t.color,
+    }))
+  } catch (err) {
+    console.warn('加载标签失败', err)
+    tags.value = []
+  }
+}
 
 // ── Login form state ──
 const loginForm = reactive({ email: '', password: '' })
@@ -93,7 +132,7 @@ const filteredArticles = computed(() => {
   if (showFeaturedOnly.value) list = list.filter((a) => a.isTop === 1)
   if (!activeCategoryId.value) return list
   const activeCategory = categories.value.find((c) => c.id === activeCategoryId.value)
-  return list.filter((article) => article.categoryName === activeCategory?.label)
+  return list.filter((article) => article.categoryName === activeCategory?.name)
 })
 
 function toggleCategory(categoryId: number) {
@@ -101,11 +140,11 @@ function toggleCategory(categoryId: number) {
 }
 
 function handleFilterCategory(label: string) {
-  // find category by label; if missing, add a transient category entry
-  let found = categories.value.find((c) => c.label === label)
+  // find category by name; if missing, add a transient category entry
+  let found = categories.value.find((c) => c.name === label)
   if (!found) {
     const nextId = Date.now()
-    found = { id: nextId, label }
+    found = { id: nextId, name: label, sort: 999 }
     categories.value.push(found)
   }
   activeCategoryId.value = found.id
@@ -185,7 +224,7 @@ function resetPublishForm() {
   publishForm.cardStyle = 1
   publishForm.status = 1
   publishForm.isTop = 0
-  publishForm.categoryId = 1
+  publishForm.categoryId = categories.value[0]?.id || 1
   publishForm.tagIds = []
   publishForm.imageIds = []
   uploadedImageMap.clear()
@@ -202,7 +241,7 @@ function fillPublishForm(article: ArticleDetail) {
   publishForm.cardStyle = article.cardStyle || 1
   publishForm.status = article.status || 1
   publishForm.isTop = article.isTop || 0
-  publishForm.categoryId = article.categoryId || 1
+  publishForm.categoryId = article.categoryId || categories.value[0]?.id || 1
   publishForm.tagIds = article.tagIds || []
   publishForm.imageIds = []
   uploadedImageMap.clear()
@@ -498,7 +537,7 @@ async function handleLogin() {
     loginForm.password = ''
     showAppToast('登录成功！', 'success')
     showLoginModal.value = false
-    if (hasAuthToken()) await fetchPendingComments()
+    await Promise.all([fetchCategories(), fetchTags(), fetchPendingComments()])
   }
 }
 
@@ -526,11 +565,11 @@ async function verifyMainAccess() {
   }
   isVerifyingAccessCode.value = true
   try {
-    const ok = await validateAccessCode(code)
-    if (ok) {
+    const result = await validateAccessCode(code)
+    if (result?.success) {
       accessCodeInput.value = ''
     } else {
-      accessCodeError.value = 'access code 不正确，请重新输入。'
+      accessCodeError.value = result?.message || 'access code 不正确，请重新输入。'
     }
   } catch {
     accessCodeError.value = 'Access code 校验失败，请稍后重试。'
@@ -677,6 +716,8 @@ onMounted(async () => {
   await checkGateStatus()
   initFromLocalStorage()
   fetchUserProfile()
+  await fetchCategories()
+  fetchTags()
   fetchArticles()
   if (hasAuthToken()) fetchPendingComments()
 
@@ -816,6 +857,7 @@ onUnmounted(() => {
         v-model:is-previewing-markdown="isPreviewingMarkdown"
         :publish-form="publishForm"
         :categories="categories"
+        :tags="tags"
         :publish-error="publishError"
         :is-publishing="isPublishing"
         :is-edit-mode="isEditing"

@@ -132,11 +132,11 @@ function formatDate(dateStr: string) {
           @click="$emit('toggleCategory', cat.id); $emit('scrollToPosts')"
         >
           <div class="hp-cat-icon">
-            <component :is="categoryIconMap[cat.label] || BookMarked" :size="20" />
+            <component :is="categoryIconMap[cat.name] || BookMarked" :size="20" />
           </div>
           <div class="hp-cat-info">
-            <strong>{{ cat.label }}</strong>
-            <span>{{ categoryDescMap[cat.label] || cat.label }}</span>
+            <strong>{{ cat.name }}</strong>
+            <span>{{ categoryDescMap[cat.name] || cat.name }}</span>
           </div>
           <ArrowRight class="hp-cat-arrow" :size="14" />
         </div>

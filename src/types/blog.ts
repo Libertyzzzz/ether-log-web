@@ -15,7 +15,8 @@ export interface PageResponse<T> {
 
 export interface Category {
   id: number
-  label: string
+  name: string
+  sort?: number
 }
 
 export interface ArticleDirectory {
