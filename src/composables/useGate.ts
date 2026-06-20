@@ -1,6 +1,5 @@
 import { ref } from 'vue'
-import axios from 'axios'
-import type { ResultResponse } from '../types/blog'
+import { checkGateStatus as apiCheckGateStatus, verifyAccessCode as apiVerifyAccessCode } from '../api'
 
 export function useGate() {
   const accessGranted = ref(false)
@@ -8,9 +7,9 @@ export function useGate() {
 
   async function checkGateStatus() {
     try {
-      const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
-      if (response.data.code === 200 && response.data.data) {
-        const status = response.data.data.status
+      const data = await apiCheckGateStatus()
+      if (data) {
+        const status = data.status
         if (status === 0) {
           accessGranted.value = true
         } else {
@@ -27,13 +26,8 @@ export function useGate() {
 
   async function validateAccessCode(code: string): Promise<{ success: boolean; message: string }> {
     try {
-      const response = await axios.get<ResultResponse<boolean>>('/api/access-code/verify', {
-        params: { id: 1, accessCode: code },
-      })
-      if (response.data.code !== 200) {
-        return { success: false, message: response.data.message || 'access code 验证失败' }
-      }
-      if (response.data.data !== true) {
+      const ok = await apiVerifyAccessCode(code)
+      if (!ok) {
         return { success: false, message: 'access code 不正确，请重新输入。' }
       }
       accessGranted.value = true

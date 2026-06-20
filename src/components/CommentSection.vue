@@ -1,10 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, nextTick } from 'vue'
-import axios from 'axios'
 import type { LoginUser } from '../types/blog'
 import CommentItemComponent from './CommentItem.vue'
 import { useComments } from '../composables/useComments'
 import { useAnonymousProfile } from '../composables/useAnonymousProfile'
+import { fetchAnonymousUser } from '../api'
 
 const props = defineProps<{
   articleId: number | null
@@ -120,9 +120,7 @@ onMounted(() => {
   if (!props.isLoggedIn) {
     (async () => {
       try {
-        const resp = await axios.get('/api/anonymous/user')
-        // backend may return { anonymousId, hasCommented } or wrapped in data
-        const payload = resp.data && resp.data.data ? resp.data.data : resp.data
+        const payload = await fetchAnonymousUser()
         const anonId = payload?.anonymousId || payload?.id || null
         const hasCommented = payload?.hasCommented === true
         if (anonId) {

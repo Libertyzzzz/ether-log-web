@@ -3,6 +3,14 @@ import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from
 import * as echarts from 'echarts'
 import { Activity, BarChart3, Database, Download, Play, Save, Settings2, TrendingDown, TrendingUp } from 'lucide-vue-next'
 
+const props = defineProps<{
+  isLoggedIn: boolean
+}>()
+
+const emit = defineEmits<{
+  openLogin: []
+}>()
+
 type StrategyType = 'ma-cross' | 'momentum' | 'rsi' | 'custom'
 type ChartMode = 'equity' | 'drawdown'
 
@@ -116,6 +124,7 @@ const isRunning = ref(false)
 const chartRef = ref<HTMLDivElement | null>(null)
 let chart: echarts.ECharts | null = null
 
+const isLocked = computed(() => !props.isLoggedIn)
 const activeStrategy = computed(() => strategies.find(item => item.type === form.strategyType) || strategies[0])
 
 const overviewCards = computed(() => [
@@ -209,6 +218,10 @@ async function saveStrategy(payload: BacktestRequest) {
 // }
 
 async function handleRunBacktest() {
+  if (isLocked.value) {
+    emit('openLogin')
+    return
+  }
   isRunning.value = true
   const result = await runBacktest({ ...form })
   summary.value = result.summary
@@ -218,6 +231,14 @@ async function handleRunBacktest() {
   isRunning.value = false
   await nextTick()
   renderChart()
+}
+
+function handleSaveStrategy() {
+  if (isLocked.value) {
+    emit('openLogin')
+    return
+  }
+  saveStrategy({ ...form })
 }
 
 function handleResize() {
@@ -241,17 +262,17 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="quant-page">
+  <section class="quant-page" :class="{ locked: isLocked }">
     <div class="quant-inner">
       <header class="quant-hero">
         <div>
           <span class="quant-kicker">PRIVATE / QUANT LAB</span>
           <h1>量化实验室</h1>
-          <p>把交易想法拆成参数、回测与记录。先用模拟数据跑通流程，后面再接入真实行情和策略接口。</p>
+          <p>{{ isLocked ? '这里是量化实验室的预览模式：可以先看策略工作台、回测摘要和交易记录的结构，登录后解锁运行与保存。' : '把交易想法拆成参数、回测与记录。先用模拟数据跑通流程，后面再接入真实行情和策略接口。' }}</p>
         </div>
         <div class="quant-status">
           <span></span>
-          Sandbox Ready
+          {{ isLocked ? 'Preview Mode' : 'Sandbox Ready' }}
         </div>
       </header>
 
@@ -265,6 +286,12 @@ onUnmounted(() => {
 
       <div class="quant-workbench">
         <aside class="quant-panel config-panel">
+          <div v-if="isLocked" class="locked-callout">
+            <strong>登录后解锁实验台</strong>
+            <span>运行回测、保存策略和导出结果会在这里接入后端接口。</span>
+            <button type="button" @click="$emit('openLogin')">登录账户</button>
+          </div>
+
           <div class="panel-title">
             <Settings2 :size="17" />
             <h2>策略配置</h2>
@@ -287,11 +314,11 @@ onUnmounted(() => {
           <div class="config-grid">
             <label>
               <span>标的代码</span>
-              <input v-model="form.symbol" type="text" />
+              <input v-model="form.symbol" type="text" :disabled="isLocked" />
             </label>
             <label>
               <span>周期</span>
-              <select v-model="form.timeframe">
+              <select v-model="form.timeframe" :disabled="isLocked">
                 <option>15m</option>
                 <option>1H</option>
                 <option>4H</option>
@@ -300,36 +327,36 @@ onUnmounted(() => {
             </label>
             <label>
               <span>初始资金</span>
-              <input v-model.number="form.initialCapital" type="number" min="1000" />
+              <input v-model.number="form.initialCapital" type="number" min="1000" :disabled="isLocked" />
             </label>
             <label>
               <span>仓位比例 %</span>
-              <input v-model.number="form.positionRatio" type="number" min="1" max="100" />
+              <input v-model.number="form.positionRatio" type="number" min="1" max="100" :disabled="isLocked" />
             </label>
             <label>
               <span>止盈 %</span>
-              <input v-model.number="form.takeProfit" type="number" min="0" />
+              <input v-model.number="form.takeProfit" type="number" min="0" :disabled="isLocked" />
             </label>
             <label>
               <span>止损 %</span>
-              <input v-model.number="form.stopLoss" type="number" min="0" />
+              <input v-model.number="form.stopLoss" type="number" min="0" :disabled="isLocked" />
             </label>
             <label>
               <span>开始日期</span>
-              <input v-model="form.startDate" type="date" />
+              <input v-model="form.startDate" type="date" :disabled="isLocked" />
             </label>
             <label>
               <span>结束日期</span>
-              <input v-model="form.endDate" type="date" />
+              <input v-model="form.endDate" type="date" :disabled="isLocked" />
             </label>
           </div>
 
           <div class="config-actions">
             <button class="run-btn" type="button" :disabled="isRunning" @click="handleRunBacktest">
               <Play :size="15" />
-              {{ isRunning ? '回测中...' : '运行回测' }}
+              {{ isLocked ? '登录运行' : isRunning ? '回测中...' : '运行回测' }}
             </button>
-            <button class="soft-btn" type="button" @click="saveStrategy({ ...form })">
+            <button class="soft-btn" type="button" @click="handleSaveStrategy">
               <Save :size="15" />
               保存策略
             </button>
@@ -374,9 +401,9 @@ onUnmounted(() => {
         <div class="panel-title">
           <Activity :size="17" />
           <h2>交易记录</h2>
-          <button class="export-btn" type="button">
+          <button class="export-btn" type="button" @click="isLocked ? $emit('openLogin') : undefined">
             <Download :size="14" />
-            导出结果
+            {{ isLocked ? '登录导出' : '导出结果' }}
           </button>
         </div>
         <div class="trade-table">
@@ -465,6 +492,29 @@ onUnmounted(() => {
   box-shadow: 0 14px 36px rgba(70,91,128,0.08);
 }
 .config-panel, .result-panel, .chart-panel, .trades-panel { padding: 1.25rem; }
+.locked-callout {
+  margin-bottom: 1rem;
+  padding: 0.9rem;
+  border-radius: 0.9rem;
+  background: rgba(15,23,42,0.92);
+  color: #f8fafc;
+  display: grid;
+  gap: 0.45rem;
+}
+.locked-callout strong { font-size: 0.9rem; }
+.locked-callout span { color: #cbd5e1; font-size: 0.78rem; line-height: 1.55; font-weight: 650; }
+.locked-callout button {
+  width: max-content;
+  min-height: 2.2rem;
+  padding: 0 0.85rem;
+  border: 0;
+  border-radius: 999px;
+  background: #f8fafc;
+  color: #0f172a;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 900;
+}
 .panel-title { display: flex; align-items: center; gap: 0.55rem; margin-bottom: 1rem; }
 .panel-title h2 { margin: 0; color: #0f172a; font-size: 1rem; font-weight: 900; }
 .panel-title svg { color: #3b82f6; }
@@ -496,6 +546,11 @@ onUnmounted(() => {
   outline: none;
 }
 .config-grid input:focus, .config-grid select:focus { border-color: #3b82f6; box-shadow: 0 0 0 4px rgba(59,130,246,0.12); }
+.config-grid input:disabled, .config-grid select:disabled {
+  cursor: not-allowed;
+  background: rgba(241,245,249,0.82);
+  color: #94a3b8;
+}
 .config-actions { display: flex; gap: 0.7rem; margin-top: 1rem; }
 .run-btn, .soft-btn, .export-btn {
   min-height: 2.65rem;

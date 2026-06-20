@@ -5,10 +5,15 @@ import type {
   CommentItem,
   CommentSubmitRequest,
   LoginUser,
-  ResultResponse,
 } from '../types/blog'
 import { formatTime } from '../utils/format'
-import { getAuthHeaders } from './useAuth'
+import {
+  fetchComments as apiFetchComments,
+  fetchPendingComments as apiFetchPendingComments,
+  reviewComment as apiReviewComment,
+  deleteComment as apiDeleteComment,
+  submitComment as apiSubmitComment,
+} from '../api'
 
 const LS_KEY_ID = 'anonymousCommentId'
 const LS_KEY_NICK = 'anonymousNickname'
@@ -89,14 +94,8 @@ export function useComments() {
     isLoading.value = true
     error.value = ''
     try {
-      const url = articleId === 0 ? '/api/comment/list/guest-book' : `/api/comment/list/${articleId}`
-      const response = await axios.get<ResultResponse<BackendCommentVO[]>>(url)
-      if (response.data.code === 200) {
-        comments.value = mapComments(response.data.data || [])
-      } else {
-        error.value = response.data.message || '评论加载失败。'
-        comments.value = []
-      }
+      const data = await apiFetchComments(articleId)
+      comments.value = mapComments(data)
     } catch (err) {
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message
@@ -112,19 +111,8 @@ export function useComments() {
     isLoadingPending.value = true
     error.value = ''
     try {
-      const response = await axios.get<ResultResponse<BackendCommentVO[]>>(
-        '/api/comment/list/guest-book',
-        {
-          headers: getAuthHeaders(),
-          params: { status: 0 },
-        },
-      )
-      if (response.data.code === 200) {
-        pendingComments.value = mapComments(response.data.data || [])
-      } else {
-        error.value = response.data.message || '待审核评论加载失败。'
-        pendingComments.value = []
-      }
+      const data = await apiFetchPendingComments()
+      pendingComments.value = mapComments(data)
     } catch (err) {
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message
@@ -138,15 +126,7 @@ export function useComments() {
 
   async function reviewComment(commentId: number, status: number): Promise<boolean> {
     try {
-      const response = await axios.put<ResultResponse<boolean>>(
-        '/api/comment/review',
-        null,
-        {
-          headers: getAuthHeaders(),
-          params: { commentId, status },
-        },
-      )
-      return response.data.code === 200 && response.data.data === true
+      return await apiReviewComment(commentId, status)
     } catch (err) {
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message
@@ -158,11 +138,7 @@ export function useComments() {
 
   async function deleteComment(commentId: number): Promise<boolean> {
     try {
-      const response = await axios.delete<ResultResponse<boolean>>('/api/comment/delete', {
-        headers: getAuthHeaders(),
-        params: { commentId },
-      })
-      return response.data.code === 200 && response.data.data === true
+      return await apiDeleteComment(commentId)
     } catch (err) {
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message
@@ -210,10 +186,7 @@ export function useComments() {
     }
 
     try {
-      const response = await axios.post<ResultResponse<void>>('/api/comment/publish', body, {
-        headers: getAuthHeaders(),
-      })
-      return response.data.code === 200
+      return await apiSubmitComment(body)
     } catch (err) {
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message

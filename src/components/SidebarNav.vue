@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import axios from 'axios'
-import { hasAuthToken, getAuthHeaders } from '../composables/useAuth'
+import { fetchCategories as apiFetchCategories } from '../api'
 import {
   FileText,
   Folder,
@@ -45,8 +44,7 @@ const directories = ref<ArticleDirectory[]>([])
 
 async function fetchCategories() {
   try {
-    const resp = await axios.get('/api/categories/list', hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-    const data = resp.data && resp.data.data ? resp.data.data : resp.data
+    const data = await apiFetchCategories()
     if (Array.isArray(data)) {
       // map backend categories to local directory shape and include article ids by matching category name
       const mapped = data.map((c: any) => ({

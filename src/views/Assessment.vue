@@ -8,6 +8,7 @@ import html2canvas from 'html2canvas'
 import { Link, MessageCircle, Share2, X, Sparkles, Zap, ChevronLeft, Send, MapPin, ShieldCheck, ExternalLink, Camera } from 'lucide-vue-next'
 import { toast } from '../utils/toast'
 import QRCode from 'qrcode'
+import { uploadImage, fetchAssessmentShare, evaluateAssessment } from '../api'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
 
 
@@ -58,17 +59,11 @@ const handleImageUpload = async (event: Event) => {
       formData.append('file', file)
       formData.append('usageType', 'OTHER')
       
-      const response = await axios.post('/api/admin/upload/image/with-reference', formData, {
-        headers: {
-          Authorization: localStorage.getItem('authToken') || ''
-        }
-      })
+      const data = await uploadImage(formData)
 
-      if (response.data.code === 200 && response.data.data?.name) {
-        // 保存后端返回的 name，用于评估接口提交，后端会自行拼接路径
-        valuationImageServerName.value = response.data.data.name
-        // 更新预览地址为远程全路径，确保 UI 显示正常
-        valuationImage.value = response.data.data.url
+      if (data?.name) {
+        valuationImageServerName.value = data.name
+        valuationImage.value = data.url
       }
     } catch (error) {
       console.error('采样图片上传异常:', error)
@@ -954,8 +949,7 @@ async function loadSharedAssessment(shareId: string) {
   step.value = 'loading'
 
   try {
-    const res = await axios.get(`/api/v2/assessment/share/${shareId}`)
-    result.value = normalizeResult(res.data.data)
+    result.value = normalizeResult(await fetchAssessmentShare(shareId))
     step.value = 'result'
     await nextTick()
     renderRadar()
@@ -1061,19 +1055,7 @@ async function startAnalysis() {
   await router.push({ name: 'assessment-processing' })
 
   try {
-    const response = await axios.post<ApiResponse<AssessmentResult> | AssessmentResult>(
-      '/api/v2/assessment/evaluate',
-      buildAssessmentPayload(),
-      { params: { gender: form.gender } }
-    )
-    const responseData = response.data as ApiResponse<AssessmentResult>
-    const payload = 'data' in responseData ? responseData.data : response.data
-
-    if ('code' in responseData && responseData.code && responseData.code !== 200) {
-      throw new Error(responseData.message || '评估接口返回失败')
-    }
-
-    result.value = normalizeResult(payload)
+    result.value = normalizeResult(await evaluateAssessment(buildAssessmentPayload(), form.gender))
   } catch (error) {
     step.value = 'input'
     if (route.name !== 'assessment-evaluate') {

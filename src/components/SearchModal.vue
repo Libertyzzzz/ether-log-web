@@ -2,7 +2,7 @@
 import { ref, watch } from 'vue'
 import { Search, FileText, CornerDownLeft, Command, Loader2 } from 'lucide-vue-next'
 import type { ArticleListItem } from '../types/blog'
-import axios from 'axios'
+import { searchArticles } from '../api'
 
 const props = defineProps<{
   show: boolean
@@ -32,16 +32,8 @@ const performSearch = async (query: string) => {
   isLoading.value = true
 
   try {
-    // 2. 接入后端接口 (这里预留了你的接口地址)
-    // 假设接口为 GET /api/articles/search?keyword=xxx
-    const response = await axios.get('/api/articles/search', {
-      params: { keyword: query }
-    })
-
-    if (response.data.code === 200) {
-      results.value = response.data.data.slice(0, 8)
-      selectedIndex.value = 0
-    }
+    results.value = await searchArticles(query)
+    selectedIndex.value = 0
   } catch (error) {
     console.error('即时搜索失败:', error)
     // 报错时清空结果或保持不变

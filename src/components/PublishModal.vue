@@ -28,6 +28,8 @@ const props = defineProps<{
   isUploadingImage: boolean
   markdownPreviewHtml: string
   pendingMarkdownImage: PendingMarkdownImage | null
+  draftStatus: string
+  hasSavedDraft: boolean
 }>()
 
 const emit = defineEmits<{
@@ -41,6 +43,8 @@ const emit = defineEmits<{
   imageInputReady: [input: HTMLInputElement | null]
   uploadCoverImage: [event: Event] // 新增：上传封面图事件
   removeCoverImage: [] // 新增：移除封面图事件
+  discardDraft: []
+  saveDraft: []
 }>()
 
 function setImageInput(element: Element | ComponentPublicInstance | null) {
@@ -261,12 +265,24 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 
         <div class="breadcrumb-spacer"></div>
         <div class="breadcrumb-actions">
+          <span v-if="draftStatus" class="draft-status">{{ draftStatus }}</span>
+          <button
+            v-if="hasSavedDraft"
+            class="btn-discard-draft"
+            type="button"
+            @click="$emit('discardDraft')"
+          >
+            清除备份
+          </button>
           <span class="word-count">{{ wordCount }} 字</span>
           <button class="btn-cancel" type="button" @click="$emit('close')">取消</button>
+          <button class="btn-save-draft" type="button" :disabled="isPublishing" @click="$emit('saveDraft')">
+            保存草稿
+          </button>
           <button class="btn-publish" type="button" :disabled="isPublishing" @click="$emit('publish')">
             {{ isPublishing
               ? (isEditMode ? '保存中...' : '发布中...')
-              : (isEditMode ? '保存文章' : '发布文章') }}
+              : '发布文章' }}
           </button>
         </div>
       </div>
@@ -614,6 +630,39 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   flex-shrink: 0;
 }
 .word-count { font-size: 0.72rem; color: #94a3b8; font-weight: 600; }
+.draft-status {
+  max-width: 8rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 750;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.btn-discard-draft {
+  padding: 0.35rem 0.75rem;
+  border: 1px solid rgba(245, 158, 11, 0.24);
+  border-radius: 9999px;
+  background: rgba(245, 158, 11, 0.08);
+  color: #b45309;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+}
+.btn-discard-draft:hover { background: rgba(245, 158, 11, 0.14); }
+.btn-save-draft {
+  padding: 0.35rem 0.85rem;
+  border: 1px solid rgba(37, 99, 235, 0.22);
+  border-radius: 9999px;
+  background: rgba(37, 99, 235, 0.08);
+  color: #2563eb;
+  font-size: 0.78rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, transform 0.15s;
+}
+.btn-save-draft:hover:not(:disabled) { background: rgba(37, 99, 235, 0.14); transform: translateY(-1px); }
+.btn-save-draft:disabled { opacity: 0.55; cursor: not-allowed; }
 .btn-cancel {
   padding: 0.35rem 0.8rem;
   border: 1px solid rgba(226, 232, 240, 0.9);

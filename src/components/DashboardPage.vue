@@ -1,14 +1,23 @@
 <script setup lang="ts">
 import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder } from 'lucide-vue-next'
-import { ref, onMounted } from 'vue'
-import axios from 'axios'
-import { hasAuthToken, getAuthHeaders } from '../composables/useAuth'
+import { computed, ref, onMounted } from 'vue'
+import { hasAuthToken } from '../composables/useAuth'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 import { toast } from '../utils/toast'
 import type { ArticleListItem, CommentItem, Tag } from '../types/blog'
+import {
+  fetchTags as apiFetchTags,
+  createTag as apiCreateTag,
+  deleteTag as apiDeleteTag,
+  fetchCategories as apiFetchCategories,
+  createCategory as apiCreateCategory,
+  deleteCategory as apiDeleteCategory,
+  updateArticleField,
+} from '../api'
 
 const props = defineProps<{
   articles: ArticleListItem[]
+  isLoadingArticles: boolean
   pendingComments: CommentItem[]
   isLoadingPending: boolean
   commentCount: number
@@ -47,12 +56,7 @@ function openCreateTagDialog() {
 async function fetchTagsForAdmin() {
   isLoadingTags.value = true
   try {
-    // backend provides paged tags at /tags/page
-    const resp = await axios.get('/api/tags/page?pageNum=1&pageSize=200', hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-    const data = resp.data && resp.data.data ? resp.data.data : resp.data
-    // data may be a page response with records
-    const records = Array.isArray(data?.records) ? data.records : Array.isArray(data) ? data : []
-    tagsList.value = records.map((t: any) => ({ id: t.id, name: t.name || t.label, color: t.color }))
+    tagsList.value = await apiFetchTags()
   } catch (e) {
     console.info('加载标签失败或端点不存在', e)
   } finally {
@@ -66,11 +70,8 @@ async function createTagAdmin() {
     return
   }
   try {
-    const payload: any = { name: newTagName.value.trim(), color: newTagColor.value }
-    const resp = await axios.post('/api/tags', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-    const p = resp.data && resp.data.data ? resp.data.data : resp.data
-    const id = p?.id || Date.now()
-    tagsList.value.push({ id, name: payload.name, color: payload.color })
+    const tag = await apiCreateTag({ name: newTagName.value.trim(), color: newTagColor.value })
+    tagsList.value.push(tag)
     newTagName.value = ''
     newTagColor.value = '#7c3aed'
     showCreateTagDialog.value = false
@@ -89,7 +90,7 @@ async function performDeleteTag() {
   const id = deletingTag.value.id
   if (!id) { deletingTag.value.show = false; return }
   try {
-    await axios.delete(`/api/tags/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+    await apiDeleteTag(id)
     tagsList.value = tagsList.value.filter((t) => t.id !== id)
     toast('标签已删除', 'success')
   } catch (e) {
@@ -104,11 +105,7 @@ async function performDeleteTag() {
 async function fetchCategoriesForAdmin() {
   isLoadingCategories.value = true
   try {
-    const resp = await axios.get('/api/categories/list', hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-    const data = resp.data && resp.data.data ? resp.data.data : resp.data
-    if (Array.isArray(data)) {
-      categoriesList.value = data.map((c: any) => ({ id: c.id, name: c.name || c.label, sort: c.sort }))
-    }
+    categoriesList.value = await apiFetchCategories()
   } catch (e) {
     console.error('加载分类失败', e)
   } finally {
@@ -124,10 +121,8 @@ async function createCategoryAdmin() {
   try {
     const payload: any = { name: newCategoryName.value.trim() }
     if (newCategorySort.value !== null) payload.sort = Number(newCategorySort.value)
-    const resp = await axios.post('/api/categories', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-    const p = resp.data && resp.data.data ? resp.data.data : resp.data
-    const id = p?.id || Date.now()
-    categoriesList.value.push({ id, name: payload.name, sort: payload.sort })
+    const cat = await apiCreateCategory(payload)
+    categoriesList.value.push(cat)
     newCategoryName.value = ''
     newCategorySort.value = null
     toast('分类已创建', 'success')
@@ -157,9 +152,8 @@ async function performDeleteCategoryAdmin() {
     // ensure general category
     let general = categoriesList.value.find((c) => c.name === '通用目录')
     if (!general) {
-      const resp = await axios.post('/api/categories', { name: '通用目录', sort: 0 }, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
-      const p = resp.data && resp.data.data ? resp.data.data : resp.data
-      general = { id: p?.id || Date.now(), name: '通用目录', sort: 0 }
+      const cat = await apiCreateCategory({ name: '通用目录', sort: 0 })
+      general = cat
       categoriesList.value.push(general)
     }
 
@@ -167,7 +161,7 @@ async function performDeleteCategoryAdmin() {
     const toMove = props.articles.filter((a: ArticleListItem) => a.categoryName === name)
     for (const a of toMove) {
       try {
-        await axios.put(`/api/articles/${a.id}`, { categoryId: general.id }, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+        await updateArticleField(a.id, { categoryId: general.id })
       } catch (e) {
         console.error('移动文章失败', a.id, e)
       }
@@ -175,7 +169,7 @@ async function performDeleteCategoryAdmin() {
 
     // delete category
     try {
-      await axios.delete(`/api/categories/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+      await apiDeleteCategory(id)
     } catch (e) {
       console.error('删除分类失败', e)
     }
@@ -208,6 +202,23 @@ function getCover(post: ArticleListItem, i: number) {
   return post.coverImg
     ? `background-image:url('${post.coverImg}')`
     : `background:${coverGradients[i % coverGradients.length]}`
+}
+
+const draftArticles = computed(() => props.articles.filter((article) => article.status === 0))
+const publishedArticles = computed(() => props.articles.filter((article) => article.status === 1 || article.status === undefined))
+const visibleArticles = computed(() => props.articles.filter((article) => article.status !== 0))
+
+function getArticleStatusLabel(post: ArticleListItem) {
+  if (post.status === 0) return '草稿'
+  if (post.status === 2) return '私密'
+  if (post.isTop) return '置顶'
+  return '公开'
+}
+
+function getArticleStatusClass(post: ArticleListItem) {
+  if (post.status === 0) return 'draft'
+  if (post.status === 2) return 'private'
+  return post.isTop ? 'top' : 'pub'
 }
 </script>
 
@@ -244,7 +255,7 @@ function getCover(post: ArticleListItem, i: number) {
         <div class="db-stat-card">
           <div class="db-stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1"><FileText :size="18"/></div>
           <span class="db-stat-label">文章总数</span>
-          <strong class="db-stat-value">{{ articles.length }}</strong>
+          <strong class="db-stat-value">{{ publishedArticles.length }}</strong>
           <div class="db-stat-wave db-wave-blue"></div>
         </div>
         <div class="db-stat-card">
@@ -262,7 +273,7 @@ function getCover(post: ArticleListItem, i: number) {
         <div class="db-stat-card">
           <div class="db-stat-icon" style="background:rgba(168,85,247,0.1);color:#a855f7"><BookOpen :size="18"/></div>
           <span class="db-stat-label">草稿</span>
-          <strong class="db-stat-value">0</strong>
+          <strong class="db-stat-value">{{ draftArticles.length }}</strong>
           <div class="db-stat-wave db-wave-purple"></div>
         </div>
       </div>
@@ -282,6 +293,34 @@ function getCover(post: ArticleListItem, i: number) {
             </button>
           </div>
 
+          <section class="draft-box">
+            <div class="draft-box-header">
+              <div>
+                <span class="draft-kicker">DRAFTS</span>
+                <h3>草稿箱</h3>
+              </div>
+              <strong>{{ draftArticles.length }}</strong>
+            </div>
+            <div v-if="isLoadingArticles" class="draft-empty">草稿加载中...</div>
+            <div v-else-if="!draftArticles.length" class="draft-empty">暂无草稿</div>
+            <div v-else class="draft-list">
+              <article v-for="draft in draftArticles" :key="draft.id" class="draft-item">
+                <div class="draft-info">
+                  <strong>{{ draft.title || '未命名草稿' }}</strong>
+                  <span>{{ draft.updateTime?.slice(0, 16) || draft.createTime?.slice(0, 16) || '刚刚保存' }}</span>
+                </div>
+                <div class="draft-actions">
+                  <button type="button" class="db-action-btn edit" @click="$emit('editArticle', draft)">
+                    <Edit3 :size="11" /> 继续写
+                  </button>
+                  <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', draft.id)">
+                    <Trash2 :size="11" />
+                  </button>
+                </div>
+              </article>
+            </div>
+          </section>
+
           <div class="db-table-head">
             <span>标题</span>
             <span>分类</span>
@@ -289,22 +328,23 @@ function getCover(post: ArticleListItem, i: number) {
             <span>操作</span>
           </div>
 
-          <div v-if="!articles.length" class="db-empty">暂无文章，点击新建开始写作</div>
+          <div v-if="isLoadingArticles" class="db-empty">文章加载中...</div>
+          <div v-else-if="!visibleArticles.length" class="db-empty">暂无已发布文章，点击新建开始写作</div>
 
-          <div v-for="(post, i) in articles" :key="post.id" class="db-table-row">
+          <div v-for="(post, i) in visibleArticles" :key="post.id" class="db-table-row">
             <div class="db-row-title">
               <div class="db-row-cover" :style="getCover(post, i)"></div>
               <span>{{ post.title }}</span>
             </div>
             <span class="db-row-cat">{{ post.categoryName || '—' }}</span>
-            <span class="db-row-status" :class="post.isTop ? 'top' : 'pub'">
-              {{ post.isTop ? '置顶' : '公开' }}
+            <span class="db-row-status" :class="getArticleStatusClass(post)">
+              {{ getArticleStatusLabel(post) }}
             </span>
             <div class="db-row-actions">
               <button type="button" class="db-action-btn edit" @click="$emit('editArticle', post)">
-                <Edit3 :size="11" /> 编辑
+                <Edit3 :size="11" /> {{ post.status === 0 ? '继续写' : '编辑' }}
               </button>
-              <button type="button" class="db-action-btn view" @click="$emit('openArticle', post)">
+              <button v-if="post.status !== 0" type="button" class="db-action-btn view" @click="$emit('openArticle', post)">
                 <ArrowUpRight :size="11" /> 查看
               </button>
               <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', post.id)">
@@ -534,6 +574,73 @@ function getCover(post: ArticleListItem, i: number) {
 }
 .db-btn-sm:hover { background:#4338ca; }
 
+/* 草稿箱 */
+.draft-box {
+  margin-bottom:1rem;
+  padding:1rem;
+  border-radius:1rem;
+  background:#fffbeb;
+  border:1px solid rgba(245,158,11,0.22);
+}
+.draft-box-header {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:1rem;
+  margin-bottom:0.75rem;
+}
+.draft-kicker {
+  display:block;
+  color:#d97706;
+  font-size:0.62rem;
+  font-weight:900;
+  letter-spacing:0.16em;
+}
+.draft-box h3 {
+  margin:0.15rem 0 0;
+  color:#78350f;
+  font-size:0.95rem;
+  font-weight:900;
+}
+.draft-box-header strong {
+  width:2rem;
+  height:2rem;
+  border-radius:999px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  background:#f59e0b;
+  color:white;
+  font-size:0.9rem;
+}
+.draft-empty {
+  padding:0.75rem 0;
+  color:#b45309;
+  font-size:0.8rem;
+  font-weight:650;
+}
+.draft-list { display:flex; flex-direction:column; gap:0.55rem; }
+.draft-item {
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:0.75rem;
+  padding:0.7rem;
+  border-radius:0.8rem;
+  background:rgba(255,255,255,0.76);
+  border:1px solid rgba(245,158,11,0.18);
+}
+.draft-info { min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
+.draft-info strong {
+  color:#0f172a;
+  font-size:0.84rem;
+  overflow:hidden;
+  text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.draft-info span { color:#92400e; font-size:0.7rem; font-weight:700; }
+.draft-actions { display:flex; flex-shrink:0; gap:0.35rem; }
+
 /* 表格 */
 .db-table-head {
   display:grid;grid-template-columns:2fr 1fr 0.7fr 1.4fr;
@@ -554,6 +661,8 @@ function getCover(post: ArticleListItem, i: number) {
 .db-row-status { display:inline-flex;padding:0.15rem 0.55rem;border-radius:9999px;font-size:0.68rem;font-weight:800; }
 .db-row-status.top { background:#eff6ff;color:#2563eb; }
 .db-row-status.pub { background:#f0fdf4;color:#16a34a; }
+.db-row-status.draft { background:#fffbeb;color:#d97706; }
+.db-row-status.private { background:#f1f5f9;color:#475569; }
 .db-row-actions { display:flex;gap:0.3rem;flex-wrap:wrap; }
 .db-action-btn {
   display:inline-flex;align-items:center;gap:0.2rem;

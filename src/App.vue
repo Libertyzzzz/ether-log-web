@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref } from 'vue'
+import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import QRCode from 'qrcode'
@@ -15,6 +15,7 @@ import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
 import AppToast from './components/AppToast.vue'
+import AppConfirmDialog from './components/AppConfirmDialog.vue'
 import SearchModal from './components/SearchModal.vue'
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
@@ -24,17 +25,25 @@ import type {
   ArticleListItem,
   ArticlePublishRequest,
   Category,
-  PageResponse,
-  ResultResponse,
   Tag,
-  UploadImageData,
 } from './types/blog'
 import { renderMarkdown } from './utils/markdown'
 import { getUploadedImageUrl } from './utils/format'
-import { useAuth, hasAuthToken, getAuthHeaders } from './composables/useAuth'
+import { useAuth, hasAuthToken } from './composables/useAuth'
 import { useArticles } from './composables/useArticles'
 import { useGate } from './composables/useGate'
 import { useComments } from './composables/useComments'
+import {
+  fetchCategories as apiFetchCategories,
+  fetchTags as apiFetchTags,
+  fetchAdminArticles as apiFetchAdminArticles,
+  fetchAdminArticleDetail,
+  fetchArticleDetail,
+  createArticle,
+  updateArticle,
+  deleteArticle as apiDeleteArticle,
+  uploadImage as apiUploadImage,
+} from './api'
 
 const route = useRoute()
 const router = useRouter()
@@ -65,6 +74,9 @@ const {
   closeArticleDetail,
 } = useArticles()
 
+const adminArticles = ref<ArticleListItem[]>([])
+const isLoadingAdminArticles = ref(false)
+
 const { accessGranted, isCheckingGate, checkGateStatus, validateAccessCode } = useGate()
 
 const {
@@ -81,17 +93,9 @@ const tags = ref<Tag[]>([])
 
 async function fetchCategories() {
   try {
-    const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list', {
-      headers: hasAuthToken() ? getAuthHeaders() : undefined,
-    })
-    const data = Array.isArray(response.data) ? response.data : response.data?.data
-    if (Array.isArray(data)) {
-      const mapped: Category[] = data.map((c: any) => ({
-        id: c.id,
-        name: c.name || c.label || String(c.id),
-        sort: typeof c.sort === 'number' ? c.sort : 0,
-      }))
-      categories.value = mapped.sort((a, b) => (a.sort || 0) - (b.sort || 0))
+    const data = await apiFetchCategories()
+    if (data.length) {
+      categories.value = data.sort((a, b) => (a.sort || 0) - (b.sort || 0))
     }
   } catch (err) {
     console.warn('加载分类失败', err)
@@ -103,21 +107,32 @@ async function fetchCategories() {
 
 async function fetchTags() {
   try {
-    const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
-      '/api/tags/page?pageNum=1&pageSize=200',
-      { headers: hasAuthToken() ? getAuthHeaders() : undefined },
-    )
-    const payload = response.data?.data || response.data
-    const records: any[] = Array.isArray(payload?.records) ? payload.records : []
-    tags.value = records.map((t: any) => ({
-      id: t.id,
-      name: t.name || t.label || String(t.id),
-      color: t.color,
-    }))
+    tags.value = await apiFetchTags()
   } catch (err) {
     console.warn('加载标签失败', err)
     tags.value = []
   }
+}
+
+async function fetchAdminArticles() {
+  if (!hasAuthToken()) {
+    adminArticles.value = []
+    return
+  }
+  isLoadingAdminArticles.value = true
+  try {
+    adminArticles.value = await apiFetchAdminArticles()
+  } catch (err) {
+    console.warn('加载管理端文章列表失败', err)
+    adminArticles.value = []
+  } finally {
+    isLoadingAdminArticles.value = false
+  }
+}
+
+async function refreshArticleData() {
+  await fetchArticles()
+  if (hasAuthToken()) await fetchAdminArticles()
 }
 
 // ── Login form state ──
@@ -160,6 +175,17 @@ const showActionsOnPage = computed(() => currentPage.value === 'profile' || curr
 const totalViews = computed(() =>
   articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0)
 )
+const currentArticleIndex = computed(() => {
+  const id = articleForDetail.value?.id
+  return id ? articles.value.findIndex((item) => item.id === id) : -1
+})
+const previousArticle = computed(() =>
+  currentArticleIndex.value >= 0 ? articles.value[currentArticleIndex.value + 1] || null : null
+)
+const nextArticle = computed(() =>
+  currentArticleIndex.value > 0 ? articles.value[currentArticleIndex.value - 1] || null : null
+)
+const dashboardArticles = computed(() => (adminArticles.value.length ? adminArticles.value : articles.value))
 
 // ── Pending comments (real data from backend) ──
 const commentCount = computed(() => pendingComments.value.length)
@@ -213,43 +239,293 @@ const publishForm = reactive<ArticlePublishRequest>({
 })
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
 const uploadedImageMap = reactive<Map<string, number>>(new Map())
+const LOCAL_DRAFT_PREFIX = 'etherlog:publish-local-backup:'
+const publishReturnRoute = ref<string | null>(null)
+const draftStatus = ref('')
+const hasSavedPublishDraft = ref(false)
+const lastSavedPublishSnapshot = ref('')
+const isSavingDraft = ref(false)
+let isApplyingPublishSnapshot = false
+
+type PublishDraftPayload = {
+  articleId: number | null
+  savedAt: string
+  form: ArticlePublishRequest
+}
+
+function clonePublishForm(): ArticlePublishRequest {
+  return {
+    title: publishForm.title,
+    subtitle: publishForm.subtitle,
+    summary: publishForm.summary,
+    content: publishForm.content,
+    contentHtml: publishForm.contentHtml,
+    coverImg: publishForm.coverImg,
+    cardStyle: publishForm.cardStyle,
+    status: publishForm.status,
+    isTop: publishForm.isTop,
+    categoryId: publishForm.categoryId,
+    tagIds: [...publishForm.tagIds],
+    imageIds: [...publishForm.imageIds],
+  }
+}
+
+function applyPublishFormSnapshot(snapshot: ArticlePublishRequest) {
+  isApplyingPublishSnapshot = true
+  publishForm.title = snapshot.title || ''
+  publishForm.subtitle = snapshot.subtitle || ''
+  publishForm.summary = snapshot.summary || ''
+  publishForm.content = snapshot.content || ''
+  publishForm.contentHtml = snapshot.contentHtml || ''
+  publishForm.coverImg = snapshot.coverImg || ''
+  publishForm.cardStyle = snapshot.cardStyle || 1
+  publishForm.status = snapshot.status ?? 0
+  publishForm.isTop = snapshot.isTop || 0
+  publishForm.categoryId = snapshot.categoryId || categories.value[0]?.id || 1
+  publishForm.tagIds = Array.isArray(snapshot.tagIds) ? [...snapshot.tagIds] : []
+  publishForm.imageIds = Array.isArray(snapshot.imageIds) ? [...snapshot.imageIds] : []
+  nextTick(() => {
+    lastSavedPublishSnapshot.value = JSON.stringify(clonePublishForm())
+    isApplyingPublishSnapshot = false
+  })
+}
+
+function getLocalDraftKey(articleId = editingArticleId.value) {
+  return `${LOCAL_DRAFT_PREFIX}${articleId ?? 'new'}`
+}
+
+function loadPublishDraft(articleId = editingArticleId.value): PublishDraftPayload | null {
+  try {
+    const raw = localStorage.getItem(getLocalDraftKey(articleId))
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as PublishDraftPayload
+    if (!parsed?.form) return null
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function refreshPublishDraftState() {
+  hasSavedPublishDraft.value = Boolean(loadPublishDraft())
+}
+
+function clearPublishDraft(articleId = editingArticleId.value) {
+  localStorage.removeItem(getLocalDraftKey(articleId))
+  hasSavedPublishDraft.value = false
+}
+
+function hasAnyPublishContent() {
+  return Boolean(
+    publishForm.title.trim() ||
+      publishForm.subtitle.trim() ||
+      publishForm.summary.trim() ||
+      publishForm.content.trim() ||
+      publishForm.contentHtml.trim() ||
+      publishForm.coverImg.trim() ||
+      publishForm.tagIds.length
+  )
+}
+
+function canSaveBackendDraft() {
+  return Boolean(publishForm.title.trim() && publishForm.content.trim() && publishForm.categoryId)
+}
+
+function saveLocalPublishBackup(message = '已保留本地备份') {
+  const savedAt = new Date().toISOString()
+  const payload: PublishDraftPayload = {
+    articleId: editingArticleId.value,
+    savedAt,
+    form: clonePublishForm(),
+  }
+  localStorage.setItem(getLocalDraftKey(), JSON.stringify(payload))
+  hasSavedPublishDraft.value = true
+  lastSavedPublishSnapshot.value = JSON.stringify(payload.form)
+  draftStatus.value = message
+}
+
+function collectPublishImageIds() {
+  publishForm.contentHtml = publishForm.contentHtml || markdownPreviewHtml.value
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(publishForm.contentHtml, 'text/html')
+  const imgElements = doc.querySelectorAll('img')
+  const extractedImageIds: number[] = []
+  imgElements.forEach((img) => {
+    const src = img.getAttribute('src')
+    if (src && uploadedImageMap.has(src)) {
+      extractedImageIds.push(uploadedImageMap.get(src)!)
+    }
+  })
+  publishForm.imageIds = extractedImageIds
+}
+
+async function saveArticleWithStatus(status: 0 | 1 | 2) {
+  collectPublishImageIds()
+  const payload: ArticlePublishRequest = { ...clonePublishForm(), status }
+  if (editingArticleId.value) {
+    return updateArticle(editingArticleId.value, payload)
+  }
+  return createArticle(payload)
+}
+
+async function savePublishDraft(options: { silent?: boolean } = {}) {
+  if (!showPublishModal.value || isPublishing.value || isSavingDraft.value || isApplyingPublishSnapshot) return false
+  if (!hasAuthToken()) {
+    saveLocalPublishBackup('登录状态异常，已保留本地备份')
+    return false
+  }
+
+  const snapshot = JSON.stringify(clonePublishForm())
+  if (snapshot === lastSavedPublishSnapshot.value) return true
+
+  if (!hasAnyPublishContent()) {
+    clearPublishDraft()
+    lastSavedPublishSnapshot.value = snapshot
+    return true
+  }
+
+  if (!canSaveBackendDraft()) {
+    saveLocalPublishBackup('输入标题和正文后自动保存到后端')
+    return true
+  }
+
+  if (!options.silent) draftStatus.value = '保存草稿中...'
+  isSavingDraft.value = true
+  try {
+    const createdArticleId = await saveArticleWithStatus(0)
+
+    if (!editingArticleId.value && createdArticleId) {
+      clearPublishDraft(null)
+      editingArticleId.value = createdArticleId
+      router.replace({ name: 'publish-edit', params: { articleId: createdArticleId } })
+    }
+
+    publishForm.status = 0
+    clearPublishDraft()
+    hasSavedPublishDraft.value = false
+    lastSavedPublishSnapshot.value = JSON.stringify(clonePublishForm())
+    const savedAt = new Date()
+    draftStatus.value = `草稿已保存 ${savedAt.toLocaleTimeString('zh-CN', {
+      hour: '2-digit',
+      minute: '2-digit',
+    })}`
+    await fetchAdminArticles()
+    return true
+  } catch (error) {
+    const errMsg = axios.isAxiosError(error) && error.response?.data?.message
+      ? error.response.data.message
+      : '后端保存失败，已保留本地备份'
+    saveLocalPublishBackup(errMsg)
+    if (!options.silent) {
+      showAppToast(errMsg, 'error')
+    }
+    return false
+  } finally {
+    isSavingDraft.value = false
+  }
+}
+
+async function saveDraftManually() {
+  if (!canSaveBackendDraft()) {
+    saveLocalPublishBackup('请先填写标题和正文')
+    showAppToast('请先填写标题和正文，再保存到后端草稿。', 'error')
+    return
+  }
+  const ok = await savePublishDraft()
+  if (ok) showAppToast('草稿已保存', 'success')
+}
+
+function savePublishDraftBackupOnly() {
+  if (!showPublishModal.value || isPublishing.value || isApplyingPublishSnapshot) return
+  if (!hasAnyPublishContent()) {
+    clearPublishDraft()
+    lastSavedPublishSnapshot.value = JSON.stringify(clonePublishForm())
+    return
+  }
+  const savedAt = new Date()
+  saveLocalPublishBackup(`本地备份 ${savedAt.toLocaleTimeString('zh-CN', {
+    hour: '2-digit',
+    minute: '2-digit',
+  })}`)
+}
+
+function hasUnsavedPublishChanges() {
+  if (!showPublishModal.value) return false
+  return JSON.stringify(clonePublishForm()) !== lastSavedPublishSnapshot.value
+}
+
+async function discardPublishDraft() {
+  const confirmed = window.confirm(
+    editingArticleId.value
+      ? '确认清除本地草稿？当前编辑内容会恢复为服务器上的文章内容。'
+      : '确认清除本地草稿？当前编辑内容会回到空白新文章。',
+  )
+  if (!confirmed) return
+  clearPublishDraft()
+  if (editingArticleId.value) {
+    await loadArticleForEdit(editingArticleId.value)
+  } else {
+    resetPublishForm()
+  }
+  lastSavedPublishSnapshot.value = JSON.stringify(clonePublishForm())
+  showAppToast('本地草稿已清除', 'info')
+}
 
 function resetPublishForm() {
-  publishForm.title = ''
-  publishForm.subtitle = ''
-  publishForm.summary = ''
-  publishForm.content = ''
-  publishForm.contentHtml = ''
-  publishForm.coverImg = ''
-  publishForm.cardStyle = 1
-  publishForm.status = 1
-  publishForm.isTop = 0
-  publishForm.categoryId = categories.value[0]?.id || 1
-  publishForm.tagIds = []
-  publishForm.imageIds = []
+  applyPublishFormSnapshot({
+    title: '',
+    subtitle: '',
+    summary: '',
+    content: '',
+    contentHtml: '',
+    coverImg: '',
+    cardStyle: 1,
+    status: 0,
+    isTop: 0,
+    categoryId: categories.value[0]?.id || 1,
+    tagIds: [],
+    imageIds: [],
+  })
   uploadedImageMap.clear()
   isPreviewingMarkdown.value = true
 }
 
 function fillPublishForm(article: ArticleDetail) {
-  publishForm.title = article.title || ''
-  publishForm.subtitle = article.subtitle || ''
-  publishForm.summary = article.summary || ''
-  publishForm.content = article.content || ''
-  publishForm.contentHtml = article.contentHtml || article.renderContent || ''
-  publishForm.coverImg = article.coverImg || ''
-  publishForm.cardStyle = article.cardStyle || 1
-  publishForm.status = article.status || 1
-  publishForm.isTop = article.isTop || 0
-  publishForm.categoryId = article.categoryId || categories.value[0]?.id || 1
-  publishForm.tagIds = article.tagIds || []
-  publishForm.imageIds = []
+  applyPublishFormSnapshot({
+    title: article.title || '',
+    subtitle: article.subtitle || '',
+    summary: article.summary || '',
+    content: article.content || '',
+    contentHtml: article.contentHtml || article.renderContent || '',
+    coverImg: article.coverImg || '',
+    cardStyle: article.cardStyle || 1,
+    status: typeof article.status === 'number' ? article.status : 1,
+    isTop: typeof article.isTop === 'number' ? article.isTop : article.isTop ? 1 : 0,
+    categoryId: article.categoryId || categories.value[0]?.id || 1,
+    tagIds: Array.isArray(article.tagIds) ? article.tagIds : [],
+    imageIds: [],
+  })
   uploadedImageMap.clear()
 }
 
-function closePublishModal() {
+async function closePublishModal(force = false) {
+  if (!force) {
+    await savePublishDraft({ silent: true })
+  }
+  if (!force && hasUnsavedPublishChanges()) {
+    const confirmed = window.confirm('当前文章有未自动保存的修改，确认离开编辑页？')
+    if (!confirmed) return
+  }
   showPublishModal.value = false
   publishError.value = ''
+  editingArticleId.value = null
+  draftStatus.value = ''
+  lastSavedPublishSnapshot.value = ''
+  const targetRoute = publishReturnRoute.value || 'home'
+  publishReturnRoute.value = null
+  if (currentPage.value === 'publish') {
+    router.push({ name: targetRoute })
+  }
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
@@ -257,13 +533,22 @@ async function loadArticleForEdit(articleId: number) {
   publishError.value = ''
   showPublishModal.value = true
   try {
-    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`)
-    if (response.data.code === 200 && response.data.data) {
-      fillPublishForm(response.data.data)
+    let article = await fetchAdminArticleDetail(articleId, 0)
+    if (!article) {
+      article = await fetchAdminArticleDetail(articleId, 1)
+    }
+    if (!article) {
+      article = await fetchArticleDetail(articleId, true, 0)
+    }
+    if (!article) {
+      article = await fetchArticleDetail(articleId, true, 1)
+    }
+    if (article) {
+      fillPublishForm(article)
       isPreviewingMarkdown.value = true
       return
     }
-    publishError.value = response.data.message || '文章读取失败，无法进入编辑模式。'
+    publishError.value = '文章读取失败，无法进入编辑模式。'
     editingArticleId.value = null
   } catch (error) {
     publishError.value =
@@ -274,21 +559,54 @@ async function loadArticleForEdit(articleId: number) {
   }
 }
 
+async function startPublishPage(articleId?: number) {
+  if (!isLoggedIn.value || !hasAuthToken()) {
+    showLoginModal.value = true
+    return
+  }
+  closeArticleDetail()
+  publishError.value = ''
+  showPublishModal.value = true
+  isPreviewingMarkdown.value = true
+  refreshPublishDraftState()
+
+  if (articleId) {
+    editingArticleId.value = articleId
+    await loadArticleForEdit(articleId)
+    const draft = loadPublishDraft(articleId)
+    if (draft?.articleId === articleId) {
+      const confirmed = window.confirm('检测到这篇文章的本地草稿，是否恢复草稿内容？')
+      if (confirmed) {
+        applyPublishFormSnapshot(draft.form)
+        draftStatus.value = '已恢复本地草稿'
+      }
+    }
+    return
+  }
+
+  editingArticleId.value = null
+  const draft = loadPublishDraft(null)
+  if (draft && draft.articleId === null) {
+    applyPublishFormSnapshot(draft.form)
+    draftStatus.value = '已恢复本地草稿'
+  } else {
+    resetPublishForm()
+  }
+}
+
 function openPublishModal(article?: ArticleListItem | ArticleDetail) {
   if (!isLoggedIn.value || !hasAuthToken()) {
     showLoginModal.value = true
     return
   }
-  if (!article) {
-    resetPublishForm()
-    editingArticleId.value = null
-    isPreviewingMarkdown.value = true
-    showPublishModal.value = true
-    return
+  if (currentPage.value !== 'publish') {
+    publishReturnRoute.value = (route.name as string) || 'home'
   }
-  editingArticleId.value = article.id
-  isPreviewingMarkdown.value = true
-  loadArticleForEdit(article.id)
+  const nextRoute = article
+    ? { name: 'publish-edit', params: { articleId: article.id } }
+    : { name: 'publish' }
+  router.push(nextRoute)
+  startPublishPage(article?.id)
 }
 
 async function publishArticle() {
@@ -304,49 +622,17 @@ async function publishArticle() {
   }
 
   isPublishing.value = true
-  publishForm.contentHtml = publishForm.contentHtml || markdownPreviewHtml.value
-
-  // 从文章内容中提取已上传图片的 id
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(publishForm.contentHtml, 'text/html')
-  const imgElements = doc.querySelectorAll('img')
-  const extractedImageIds: number[] = []
-  imgElements.forEach((img) => {
-    const src = img.getAttribute('src')
-    if (src && uploadedImageMap.has(src)) {
-      extractedImageIds.push(uploadedImageMap.get(src)!)
-    }
-  })
-  publishForm.imageIds = extractedImageIds
 
   try {
-    let response
-    if (editingArticleId.value) {
-      response = await axios.put<ResultResponse<number>>(
-        `/api/admin/articles/${editingArticleId.value}`,
-        publishForm,
-        { headers: getAuthHeaders() }
-      )
-    } else {
-      response = await axios.post<ResultResponse<number>>(
-        '/api/admin/articles',
-        publishForm,
-        { headers: getAuthHeaders() }
-      )
-    }
+    const savedArticleId = await saveArticleWithStatus(1)
 
-    if (response.data.code !== 200) {
-      publishError.value =
-        response.data.message || (editingArticleId.value ? '保存失败，请稍后重试。' : '发布失败，请稍后重试。')
-      return
-    }
-
-    const savedArticleId = editingArticleId.value
+    const finalArticleId = editingArticleId.value || savedArticleId || null
+    clearPublishDraft()
     resetPublishForm()
-    closePublishModal()
-    showAppToast(savedArticleId ? '文章保存成功！' : '文章发布成功！', 'success')
-    await fetchArticles()
-    if (savedArticleId && selectedArticle.value?.id === savedArticleId) {
+    await closePublishModal(true)
+    showAppToast(finalArticleId ? '文章保存成功！' : '文章发布成功！', 'success')
+    await refreshArticleData()
+    if (finalArticleId && selectedArticle.value?.id === finalArticleId) {
       await openArticleDetail(selectedArticle.value)
     }
   } catch (error) {
@@ -374,31 +660,31 @@ async function deleteArticle(articleId: number) {
     showLoginModal.value = true
     return
   }
-  const confirmed = window.confirm('确认删除这篇文章？此操作不可恢复。')
-  if (!confirmed) return
+  pendingDeleteArticleId.value = articleId
+  showDeleteConfirm.value = true
+}
+
+async function confirmDeleteArticle() {
+  const articleId = pendingDeleteArticleId.value
+  if (articleId === null) return
+  showDeleteConfirm.value = false
+  pendingDeleteArticleId.value = null
 
   isDeletingArticle.value = true
   showAppToast('正在删除文章...', 'info')
   publishError.value = ''
 
   try {
-    const response = await axios.delete<ResultResponse<null>>(`/api/admin/articles/${articleId}`, {
-      headers: getAuthHeaders(),
-    })
-    if (response.data.code !== 200) {
-      showAppToast(response.data.message || '删除失败，请稍后重试。', 'error')
-      publishError.value = response.data.message || '删除失败，请稍后重试。'
-      return
-    }
+    await apiDeleteArticle(articleId)
     if (editingArticleId.value === articleId) {
       resetPublishForm()
-      closePublishModal()
+      await closePublishModal(true)
     }
     if (selectedArticle.value?.id === articleId) {
       closeArticleDetail()
     }
     showAppToast('文章删除成功！', 'success')
-    await fetchArticles()
+    await refreshArticleData()
   } catch (error) {
     showAppToast('删除失败，请稍后重试。', 'error')
     publishError.value =
@@ -474,24 +760,26 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
       formData.append('usageId', editingArticleId.value.toString())
     }
 
-    const response = await axios.post<ResultResponse<UploadImageData>>(
-      '/api/admin/upload/image/with-reference',
-      formData,
-      { headers: getAuthHeaders() }
-    )
+    const data = await apiUploadImage(formData)
 
-    const imageUrl = getUploadedImageUrl(response.data.data)
-    const imageId = response.data.data?.id
+    if (!data) {
+      publishError.value = '图片上传失败，请稍后重试。'
+      showAppToast(publishError.value, 'error')
+      return
+    }
 
-    if (response.data.code !== 200 || !imageUrl || imageId === undefined) {
-      publishError.value = response.data.message || '图片上传失败，请稍后重试。'
+    const imageUrl = getUploadedImageUrl(data)
+    const imageId = data?.id
+
+    if (!imageUrl || imageId === undefined) {
+      publishError.value = '图片上传失败，请稍后重试。'
       showAppToast(publishError.value, 'error')
       return
     }
 
     if (type === 'markdown') {
       uploadedImageMap.set(imageUrl, imageId)
-      const altText = response.data.data.name || 'image'
+      const altText = data.name || 'image'
       pendingMarkdownImage.value = { id: Date.now(), src: imageUrl, alt: altText }
       showAppToast('图片已插入正文', 'success')
     } else if (type === 'cover') {
@@ -519,6 +807,8 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
 }
 
 const isDeletingArticle = ref(false)
+const showDeleteConfirm = ref(false)
+const pendingDeleteArticleId = ref<number | null>(null)
 
 // ── Login / logout actions ──
 const showLoginModal = ref(false)
@@ -538,12 +828,18 @@ async function handleLogin() {
     showAppToast('登录成功！', 'success')
     showLoginModal.value = false
     await Promise.all([fetchCategories(), fetchTags(), fetchPendingComments()])
+    await fetchAdminArticles()
+    if (currentPage.value === 'publish') {
+      const articleId = Number(route.params.articleId)
+      await startPublishPage(Number.isFinite(articleId) ? articleId : undefined)
+    }
   }
 }
 
 function handleLogout() {
   closeUserMenu()
   authLogout()
+  adminArticles.value = []
   loginForm.email = ''
   loginForm.password = ''
   router.push({ name: 'home' })
@@ -607,6 +903,9 @@ function navigateToSection(sectionId: string) {
   router.push({ name: sectionId })
   selectedArticle.value = null
   selectedArticlePreview.value = null
+  if (sectionId === 'dashboard') {
+    fetchAdminArticles()
+  }
 
   if (sectionId === 'home') {
     window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -634,14 +933,11 @@ function openProfile() {
 function openDashboard() {
   router.push({ name: 'dashboard' })
   closeArticleDetail()
+  fetchAdminArticles()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function openQuantLab() {
-  if (!isLoggedIn.value || !hasAuthToken()) {
-    openLoginModal()
-    return
-  }
   router.push({ name: 'quant-lab' })
   closeArticleDetail()
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -708,23 +1004,44 @@ function handleKeyDown(e: KeyboardEvent) {
   }
 }
 
+let publishDraftTimer: number | undefined
+
+watch(
+  publishForm,
+  () => {
+    if (!showPublishModal.value || isApplyingPublishSnapshot || isSavingDraft.value) return
+    if (publishDraftTimer) clearTimeout(publishDraftTimer)
+    publishDraftTimer = setTimeout(savePublishDraft, 1500) as unknown as number
+  },
+  { deep: true },
+)
+
+function handleBeforeUnload(event: BeforeUnloadEvent) {
+  if (!showPublishModal.value) return
+  savePublishDraftBackupOnly()
+  if (!hasUnsavedPublishChanges()) return
+  event.preventDefault()
+  event.returnValue = ''
+}
+
 // ── Lifecycle ──
 onMounted(async () => {
   document.title = 'ETHERLOG'
   window.addEventListener('keydown', handleKeyDown)
+  window.addEventListener('beforeunload', handleBeforeUnload)
 
   await checkGateStatus()
   initFromLocalStorage()
   fetchUserProfile()
   await fetchCategories()
   fetchTags()
-  fetchArticles()
+  await refreshArticleData()
   if (hasAuthToken()) fetchPendingComments()
+  refreshPublishDraftState()
 
-  if (currentPage.value === 'quant-lab' && !isLoggedIn.value) {
-    router.replace({ name: 'home' })
-    openLoginModal()
-    showAppToast('请登录后进入量化实验室。', 'info')
+  if (currentPage.value === 'publish') {
+    const articleId = Number(route.params.articleId)
+    await startPublishPage(Number.isFinite(articleId) ? articleId : undefined)
   }
 
   document.addEventListener('click', handleClickOutside)
@@ -737,7 +1054,9 @@ onMounted(async () => {
 })
 
 onUnmounted(() => {
+  if (publishDraftTimer) clearTimeout(publishDraftTimer)
   window.removeEventListener('keydown', handleKeyDown)
+  window.removeEventListener('beforeunload', handleBeforeUnload)
   document.removeEventListener('click', handleClickOutside)
 })
 </script>
@@ -775,11 +1094,14 @@ onUnmounted(() => {
           :selected-article="selectedArticle"
           :is-loading="isLoadingArticleDetail"
           :show-actions="showActionsOnPage"
+          :previous-article="previousArticle"
+          :next-article="nextArticle"
           :is-logged-in="isLoggedIn"
           :login-user="loginUser"
           @close="closeArticleDetail"
           @edit="openPublishModal"
           @delete="deleteArticle"
+          @open-article="openArticleDetail"
         />
         <div v-else-if="!showPublishModal" class="main-content-wrapper">
           <HomePage
@@ -812,7 +1134,8 @@ onUnmounted(() => {
 
           <DashboardPage
             v-if="currentPage === 'dashboard'"
-            :articles="articles"
+            :articles="dashboardArticles"
+            :is-loading-articles="isLoadingAdminArticles"
             :pending-comments="pendingComments"
             :is-loading-pending="isLoadingPending"
             :comment-count="commentCount"
@@ -831,7 +1154,11 @@ onUnmounted(() => {
             :login-user="loginUser"
           />
 
-          <QuantLabPage v-if="currentPage === 'quant-lab' && isLoggedIn" />
+          <QuantLabPage
+            v-if="currentPage === 'quant-lab'"
+            :is-logged-in="isLoggedIn"
+            @open-login="openLoginModal"
+          />
 
           <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
           <ContactSection v-if="currentPage === 'home'" />
@@ -864,8 +1191,12 @@ onUnmounted(() => {
         :is-uploading-image="isUploadingImage"
         :markdown-preview-html="markdownPreviewHtml"
         :pending-markdown-image="pendingMarkdownImage"
+        :draft-status="draftStatus"
+        :has-saved-draft="hasSavedPublishDraft"
         @close="closePublishModal"
         @publish="publishArticle"
+        @save-draft="saveDraftManually"
+        @discard-draft="discardPublishDraft"
         @insert-markdown="insertMarkdown"
         @trigger-image-upload="triggerImageUpload('markdown')"
         @upload-markdown-image="uploadImage($event, 'markdown')"
@@ -895,6 +1226,16 @@ onUnmounted(() => {
       <SearchModal :show="showSearchModal" :articles="articles" @close="showSearchModal = false" @select="handleSearchSelect" />
 
       <AppToast :message="toastMessage" :type="toastType" :show="showToast" />
+      <AppConfirmDialog
+        :show="showDeleteConfirm"
+        title="确认删除"
+        message="确认删除这篇文章？此操作不可恢复。"
+        confirm-text="删除"
+        cancel-text="取消"
+        tone="danger"
+        @confirm="confirmDeleteArticle"
+        @cancel="showDeleteConfirm = false"
+      />
     </div>
 
     <div v-if="!accessGranted && !isCheckingGate" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">
@@ -1000,5 +1341,5 @@ onUnmounted(() => {
   100% { left: 100%; }
 }
 
-.gate-pending { overflow: hidden; height: 100vh; }
+.gate-pending { overflow: hidden; height: 100vh;}
 </style>

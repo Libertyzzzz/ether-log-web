@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
-import { ArrowLeft, Edit3, Trash2, Clock, Eye, Tag, BookOpen } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen } from 'lucide-vue-next'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
 
@@ -9,12 +9,15 @@ const props = defineProps<{
   selectedArticle: ArticleDetail | null
   isLoading: boolean
   showActions: boolean
+  previousArticle: ArticleListItem | null
+  nextArticle: ArticleListItem | null
 }>()
 
 defineEmits<{
   close: []
   edit: [article: ArticleDetail | ArticleListItem]
   delete: [articleId: number]
+  openArticle: [article: ArticleListItem]
 }>()
 
 // 从正文中提取标题生成目录
@@ -30,6 +33,12 @@ const headings = computed(() => {
 })
 
 const activeHeadingId = ref('')
+
+const readingMinutes = computed(() => {
+  const source = props.selectedArticle?.content || props.selectedArticle?.renderContent || props.article.summary || ''
+  const text = source.replace(/<[^>]+>/g, '').replace(/\s+/g, '')
+  return Math.max(1, Math.ceil(text.length / 450))
+})
 
 // 注入锚点 id 到正文标题
 const processedContent = computed(() => {
@@ -123,6 +132,10 @@ onUnmounted(() => {
               <Eye :size="11" />
               {{ article.viewCount || 0 }} views
             </span>
+            <span class="sidebar-stat">
+              <BookOpen :size="11" />
+              {{ readingMinutes }} min
+            </span>
           </div>
 
           <div v-if="article.tagNames?.length" class="sidebar-tags">
@@ -207,6 +220,7 @@ onUnmounted(() => {
             <span class="article-main-category">{{ getArticleCategory(article) }}</span>
             <span class="article-main-date">{{ article.createTime?.slice(0, 10) }}</span>
             <span class="article-main-views">{{ article.viewCount || 0 }} views</span>
+            <span class="article-main-views">{{ readingMinutes }} min read</span>
           </div>
           <div v-if="article.tagNames?.length" class="article-main-tags">
             <span v-for="tag in article.tagNames" :key="tag" class="article-main-tag">{{ tag }}</span>
@@ -236,6 +250,30 @@ onUnmounted(() => {
         <div v-else class="article-body article-plain">
           {{ selectedArticle?.content || '文章正文为空。' }}
         </div>
+
+        <nav v-if="previousArticle || nextArticle" class="article-neighbors" aria-label="文章前后导航">
+          <button
+            v-if="previousArticle"
+            class="neighbor-card"
+            type="button"
+            @click="$emit('openArticle', previousArticle)"
+          >
+            <span><ArrowLeft :size="14" />上一篇</span>
+            <strong>{{ previousArticle.title }}</strong>
+          </button>
+          <span v-else class="neighbor-card placeholder"></span>
+
+          <button
+            v-if="nextArticle"
+            class="neighbor-card next"
+            type="button"
+            @click="$emit('openArticle', nextArticle)"
+          >
+            <span>下一篇<ArrowRight :size="14" /></span>
+            <strong>{{ nextArticle.title }}</strong>
+          </button>
+          <span v-else class="neighbor-card placeholder"></span>
+        </nav>
       </main>
 
     </div>
@@ -645,12 +683,62 @@ onUnmounted(() => {
 }
 .article-plain { white-space: pre-wrap; }
 
+.article-neighbors {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem;
+  margin-top: 3.5rem;
+}
+.neighbor-card {
+  min-height: 6.25rem;
+  padding: 1rem;
+  border-radius: 0.85rem;
+  border: 1px solid rgba(226, 232, 240, 0.95);
+  background: rgba(255, 255, 255, 0.72);
+  color: #0f172a;
+  text-align: left;
+  cursor: pointer;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 0.55rem;
+  transition: border-color 0.2s, box-shadow 0.2s, transform 0.2s;
+}
+.neighbor-card:hover {
+  border-color: rgba(37, 99, 235, 0.32);
+  box-shadow: 0 16px 36px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+.neighbor-card span {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 850;
+}
+.neighbor-card strong {
+  color: #0f172a;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+.neighbor-card.next {
+  text-align: right;
+  align-items: flex-end;
+}
+.neighbor-card.placeholder {
+  visibility: hidden;
+  pointer-events: none;
+}
+
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .article-layout { padding-top: 4.5rem; }
   .article-layout-inner { padding: 0 1rem; }
   .article-sidebar { display: none; }
   .article-main { padding: 1.5rem 0 4rem; }
+  .article-neighbors { grid-template-columns: 1fr; }
+  .neighbor-card.placeholder { display: none; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
 }

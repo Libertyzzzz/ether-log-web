@@ -38,6 +38,8 @@ export interface ArticleListItem {
   categoryName: string | null
   tagNames: string[]
   createTime: string
+  updateTime?: string | null
+  status?: number
 }
 
 export interface ArticleDetail extends ArticleListItem {

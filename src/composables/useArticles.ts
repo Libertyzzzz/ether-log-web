@@ -1,6 +1,7 @@
 import { ref } from 'vue'
 import axios from 'axios'
-import type { ArticleDetail, ArticleListItem, PageResponse, ResultResponse } from '../types/blog'
+import type { ArticleDetail, ArticleListItem } from '../types/blog'
+import { fetchPublicArticles, fetchArticleDetail } from '../api'
 
 export function useArticles() {
   const articles = ref<ArticleListItem[]>([])
@@ -14,14 +15,7 @@ export function useArticles() {
     articleError.value = ''
     isLoadingArticles.value = true
     try {
-      const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
-        params: { pageNum: 1, pageSize: 10 },
-      })
-      if (response.data.code === 200) {
-        articles.value = response.data.data?.records || []
-      } else {
-        articleError.value = response.data.message || '文章列表加载失败。'
-      }
+      articles.value = await fetchPublicArticles()
     } catch (error) {
       articleError.value =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -37,9 +31,9 @@ export function useArticles() {
     selectedArticle.value = null
     isLoadingArticleDetail.value = true
     try {
-      const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${article.id}`)
-      if (response.data.code === 200 && response.data.data) {
-        selectedArticle.value = response.data.data
+      const detail = await fetchArticleDetail(article.id)
+      if (detail) {
+        selectedArticle.value = detail
       }
     } finally {
       isLoadingArticleDetail.value = false

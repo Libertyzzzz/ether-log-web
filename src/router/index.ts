@@ -43,10 +43,22 @@ const router = createRouter({
       meta: { page: 'dashboard' }
     },
     {
+      path: '/publish',
+      name: 'publish',
+      component: App,
+      meta: { page: 'publish', requiresAuth: true }
+    },
+    {
+      path: '/publish/:articleId',
+      name: 'publish-edit',
+      component: App,
+      meta: { page: 'publish', requiresAuth: true }
+    },
+    {
       path: '/quant-lab',
       name: 'quant-lab',
       component: App,
-      meta: { page: 'quant-lab', requiresAuth: true }
+      meta: { page: 'quant-lab' }
     },
     {
       path: '/assessment',

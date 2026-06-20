@@ -1,6 +1,13 @@
 import { ref, computed } from 'vue'
 import axios from 'axios'
-import type { LoginUser, LoginData, ResultResponse } from '../types/blog'
+import type { LoginUser } from '../types/blog'
+import {
+  hasAuthToken,
+  getAuthHeaders,
+  login as apiLogin,
+  fetchUserProfile as apiFetchUserProfile,
+  updateUserProfile as apiUpdateUserProfile,
+} from '../api'
 
 const emptyLoginUser: Partial<LoginUser> = {
   nickname: '',
@@ -8,14 +15,7 @@ const emptyLoginUser: Partial<LoginUser> = {
   email: '',
 }
 
-export function hasAuthToken(): boolean {
-  return !!localStorage.getItem('authToken')
-}
-
-export function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('authToken')
-  return token ? { Authorization: token } : {}
-}
+export { hasAuthToken, getAuthHeaders } from '../api'
 
 export function useAuth() {
   const isLoggedIn = ref(false)
@@ -61,21 +61,7 @@ export function useAuth() {
     loginError.value = ''
 
     try {
-      const response = await axios.post<ResultResponse<LoginData>>('/api/auth/login', {
-        username: email,
-        password,
-      })
-
-      if (response.data.code !== 200) {
-        loginError.value = response.data.message || '登录失败，请稍后重试。'
-        return false
-      }
-
-      const loginData = response.data.data
-      if (!loginData?.token || !loginData.user) {
-        loginError.value = '登录返回数据格式不正确，请检查后端接口。'
-        return false
-      }
+      const loginData = await apiLogin(email, password)
 
       localStorage.setItem('authToken', loginData.token)
       localStorage.setItem('authUser', JSON.stringify(loginData.user))
@@ -96,6 +82,8 @@ export function useAuth() {
         loginError.value = '登录请求被后端权限配置拦截，请确认登录接口已放行并检查 CSRF 配置。'
       } else if (axios.isAxiosError(error) && error.response?.data?.message) {
         loginError.value = error.response.data.message
+      } else if (error instanceof Error) {
+        loginError.value = error.message
       } else {
         loginError.value = '登录接口暂不可用，请确认后端服务和代理配置是否正常。'
       }
@@ -112,13 +100,10 @@ export function useAuth() {
   async function fetchUserProfile(): Promise<void> {
     if (!hasAuthToken()) return
     try {
-      const response = await axios.get<ResultResponse<LoginUser>>(
-        `/api/user/${loginUser.value.id || 0}`,
-        { headers: getAuthHeaders() }
-      )
-      if (response.data.code === 200 && response.data.data) {
-        loginUser.value = response.data.data
-        localStorage.setItem('authUser', JSON.stringify(response.data.data))
+      const user = await apiFetchUserProfile(loginUser.value.id || 0)
+      if (user) {
+        loginUser.value = user
+        localStorage.setItem('authUser', JSON.stringify(user))
       }
     } catch (error) {
       console.error('无法同步最新用户信息:', error)
@@ -145,15 +130,12 @@ export function useAuth() {
         username: loginUser.value.username,
       }
 
-      const response = await axios.post<ResultResponse<any>>('/api/user/save', payload, {
-        headers: getAuthHeaders(),
-      })
-
-      if (response.data.code === 200) {
+      const ok = await apiUpdateUserProfile(payload)
+      if (ok) {
         await fetchUserProfile()
         return true
       }
-      if (!silent) loginError.value = response.data.message || '信息更新失败'
+      if (!silent) loginError.value = '信息更新失败'
       return false
     } catch {
       if (!silent) loginError.value = '网络异常，无法保存个人信息'
