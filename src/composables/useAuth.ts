@@ -3,7 +3,6 @@ import axios from 'axios'
 import type { LoginUser } from '../types/blog'
 import {
   hasAuthToken,
-  getAuthHeaders,
   login as apiLogin,
   fetchUserProfile as apiFetchUserProfile,
   updateUserProfile as apiUpdateUserProfile,

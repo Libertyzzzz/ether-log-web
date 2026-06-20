@@ -121,7 +121,7 @@ onMounted(() => {
     (async () => {
       try {
         const payload = await fetchAnonymousUser()
-        const anonId = payload?.anonymousId || payload?.id || null
+        const anonId = payload?.anonymousId || null
         const hasCommented = payload?.hasCommented === true
         if (anonId) {
           try { localStorage.setItem('anonymousCommentId', anonId) } catch (e) {}

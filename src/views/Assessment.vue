@@ -490,12 +490,6 @@ interface AssessmentResult {
   }
 }
 
-interface ApiResponse<T> {
-  code?: number
-  message?: string
-  data?: T
-}
-
 const router = useRouter()
 const step = ref<AssessmentStep>(route.params.shareId || route.query.id ? 'loading' : 'intro')
 const loadingMsg = ref('正在校对输入指标...')
