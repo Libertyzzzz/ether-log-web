@@ -216,7 +216,6 @@ function scrollToSection(id: string) {
 }
 
 const draftArticles = computed(() => props.articles.filter((article) => article.status === 0))
-const publishedArticles = computed(() => props.articles.filter((article) => article.status === 1 || article.status === undefined))
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
 
 const articleSearch = ref('')
