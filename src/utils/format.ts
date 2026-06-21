@@ -16,3 +16,11 @@ export function getUploadedImageUrl(data: { url?: string; fullUrl?: string; file
   return [data.url, data.fullUrl, data.fileUrl, data.imageUrl, data.path]
     .find(v => typeof v === 'string' && v.trim().length > 0) as string || ''
 }
+
+const CHARS_PER_MINUTE = 450
+
+export function getReadingTime(content: string | null | undefined): number {
+  if (!content) return 1
+  const text = content.replace(/<[^>]+>/g, '').replace(/\s+/g, '')
+  return Math.max(1, Math.ceil(text.length / CHARS_PER_MINUTE))
+}

@@ -1,9 +1,11 @@
 <script setup lang="ts">
-import { BookOpen, ArrowRight, ArrowUpRight, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee } from 'lucide-vue-next'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee, Clock } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
+import { getReadingTime } from '../utils/format'
 
-defineProps<{
+const props = defineProps<{
   categories: Category[]
   activeCategoryId: number | null
   articles: ArticleListItem[]
@@ -25,6 +27,51 @@ defineEmits<{
   openDonate: []
   navigate: [page: string]
 }>()
+
+const PAGE_SIZE = 9
+const displayedCount = ref(PAGE_SIZE)
+const isLoadingMore = ref(false)
+
+const displayedArticles = computed(() =>
+  props.filteredArticles.slice(0, displayedCount.value)
+)
+
+const hasMore = computed(() =>
+  displayedCount.value < props.filteredArticles.length
+)
+
+const remainingCount = computed(() =>
+  props.filteredArticles.length - displayedCount.value
+)
+
+function loadMore() {
+  if (!hasMore.value || isLoadingMore.value) return
+  isLoadingMore.value = true
+  setTimeout(() => {
+    displayedCount.value += PAGE_SIZE
+    isLoadingMore.value = false
+  }, 350)
+}
+
+let sentinelObserver: IntersectionObserver | null = null
+const sentinelRef = ref<HTMLElement | null>(null)
+
+onMounted(() => {
+  if (typeof IntersectionObserver === 'undefined') return
+  sentinelObserver = new IntersectionObserver(
+    (entries) => {
+      if (entries[0].isIntersecting && hasMore.value && !isLoadingMore.value) {
+        loadMore()
+      }
+    },
+    { rootMargin: '120px' }
+  )
+  if (sentinelRef.value) sentinelObserver.observe(sentinelRef.value)
+})
+
+onUnmounted(() => {
+  sentinelObserver?.disconnect()
+})
 
 // 分类图标映射（固定静态，和后端 label 对应）
 const categoryIconMap: Record<string, any> = {
@@ -166,7 +213,7 @@ function formatDate(dateStr: string) {
           <p>{{ articleError }}</p>
         </div>
         <div v-else-if="isLoadingArticles" class="hp-posts-grid">
-          <div v-for="i in 3" :key="i" class="hp-article-card hp-skeleton">
+          <div v-for="i in 9" :key="i" class="hp-article-card hp-skeleton">
             <div class="hp-skeleton-cover"></div>
             <div class="hp-skeleton-body">
               <div class="hp-skeleton-line title"></div>
@@ -194,7 +241,7 @@ function formatDate(dateStr: string) {
         <!-- 文章卡片列表（3 列） -->
         <div v-else class="hp-posts-grid">
           <article
-            v-for="(post, index) in filteredArticles"
+            v-for="(post, index) in displayedArticles"
             :key="post.id"
             class="hp-article-card"
             @click="$emit('openArticle', post)"
@@ -220,10 +267,45 @@ function formatDate(dateStr: string) {
               <div class="hp-card-meta">
                 <span class="hp-card-author">Ether</span>
                 <span class="hp-card-date">{{ formatDate(post.createTime) }}</span>
+                <span class="hp-card-reading-time"><Clock :size="10" /> {{ getReadingTime(post.summary || '') }} min read</span>
                 <span class="hp-card-views">{{ post.viewCount }} views</span>
               </div>
             </div>
           </article>
+
+          <template v-if="isLoadingMore">
+            <div v-for="i in 3" :key="'more-skel-' + i" class="hp-article-card hp-skeleton">
+              <div class="hp-skeleton-cover"></div>
+              <div class="hp-skeleton-body">
+                <div class="hp-skeleton-line title"></div>
+                <div class="hp-skeleton-line summary"></div>
+                <div class="hp-skeleton-line meta"></div>
+              </div>
+            </div>
+          </template>
+        </div>
+
+        <!-- 加载更多 / 底部结束线 -->
+        <div v-if="hasMore && !isLoadingArticles && !articleError && filteredArticles.length" class="hp-load-more-area">
+          <div ref="sentinelRef" class="hp-sentinel"></div>
+          <button class="hp-load-more-btn" type="button" @click="loadMore()" :disabled="isLoadingMore">
+            <template v-if="isLoadingMore">
+              <span class="hp-load-more-dot"></span>
+              <span class="hp-load-more-dot"></span>
+              <span class="hp-load-more-dot"></span>
+            </template>
+            <template v-else>
+              <ArrowDown :size="14" />
+              加载更多文章
+              <span class="hp-load-more-count">（还剩 {{ remainingCount }} 篇）</span>
+            </template>
+          </button>
+        </div>
+
+        <div v-if="!hasMore && !isLoadingArticles && !articleError && filteredArticles.length" class="hp-end-divider">
+          <span class="hp-end-line"></span>
+          <span class="hp-end-text">已经到底啦</span>
+          <span class="hp-end-line"></span>
         </div>
       </div>
     </section>
@@ -686,7 +768,14 @@ function formatDate(dateStr: string) {
 }
 .hp-card-author { color: #475569; font-weight: 700; }
 .hp-card-date::before,
+.hp-card-reading-time::before,
 .hp-card-views::before { content: '·'; margin-right: 0.6rem; }
+.hp-card-reading-time {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: #94a3b8;
+}
 
 /* 状态卡片 */
 .hp-state-card {
@@ -762,6 +851,81 @@ function formatDate(dateStr: string) {
   font-size: 1rem;
   color: #94a3b8;
   font-weight: 600;
+}
+
+.hp-load-more-area {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 2rem 0 1rem;
+  gap: 0.5rem;
+}
+.hp-sentinel {
+  height: 1px;
+  width: 100%;
+}
+.hp-load-more-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.6rem 1.4rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.55);
+  color: #64748b;
+  font-size: 0.82rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+  backdrop-filter: blur(6px);
+}
+.hp-load-more-btn:hover {
+  background: #ffffff;
+  border-color: #c7d2fe;
+  color: #4f46e5;
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.15);
+}
+.hp-load-more-btn:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.hp-load-more-count {
+  font-weight: 500;
+  opacity: 0.55;
+  font-size: 0.75rem;
+}
+
+.hp-load-more-dot {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: currentColor;
+  animation: dotPulse 1.2s infinite;
+}
+.hp-load-more-dot:nth-child(2) { animation-delay: 0.2s; }
+.hp-load-more-dot:nth-child(3) { animation-delay: 0.4s; }
+@keyframes dotPulse {
+  0%, 80%, 100% { opacity: 0.3; transform: scale(0.8); }
+  40% { opacity: 1; transform: scale(1); }
+}
+
+.hp-end-divider {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  padding: 2.5rem 0 1rem;
+}
+.hp-end-line {
+  flex: 0 0 60px;
+  height: 1px;
+  background: #e2e8f0;
+}
+.hp-end-text {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: #94a3b8;
+  white-space: nowrap;
 }
 
 /* ════════════════════════════════
@@ -865,4 +1029,6 @@ function formatDate(dateStr: string) {
 @media (max-width: 480px) {
   .hp-categories-inner { grid-template-columns: 1fr 1fr; }
 }
+
+/* 暗色模式 */
 </style>

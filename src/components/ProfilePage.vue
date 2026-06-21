@@ -395,4 +395,5 @@ const toggleEmailNotifications = (event: Event) => {
   .pp-social { justify-content: center; }
   .pp-form-row { grid-template-columns: 1fr; }
 }
+
 </style>

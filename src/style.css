@@ -5,13 +5,14 @@
 /* 1. 彻底清除 Vite 默认模板带来的布局干扰 */
 :root {
   font-family: Inter, system-ui, Avenir, Helvetica, Arial, sans-serif;
-  background-color: #eef3fb; /* 设置整体底色 */
+  background-color: #eef3fb;
   color: #1d1d1f;
 }
 
+
 body {
   margin: 0;
-  display: block !important; /* 强制取消默认的 flex 居中 */
+  display: block !important;
   min-height: 100vh;
   width: 100%;
   background:
@@ -19,6 +20,7 @@ body {
     radial-gradient(circle at 92% 2%, rgba(255, 214, 199, 0.46), transparent 28rem),
     linear-gradient(180deg, #e9effb 0%, #f7f9fe 45%, #eef3fb 100%);
 }
+
 
 /* 2. 关键：重置 #app 容器，确保它铺满全屏且内容靠左对齐 */
 #app {

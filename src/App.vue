@@ -32,6 +32,7 @@ import { getUploadedImageUrl } from './utils/format'
 import { useAuth, hasAuthToken } from './composables/useAuth'
 import { useArticles } from './composables/useArticles'
 import { useGate } from './composables/useGate'
+import { useDarkMode } from './composables/useDarkMode'
 import { useComments } from './composables/useComments'
 import {
   fetchCategories as apiFetchCategories,
@@ -76,6 +77,9 @@ const {
 
 const adminArticles = ref<ArticleListItem[]>([])
 const isLoadingAdminArticles = ref(false)
+const adminPage = ref(1)
+const adminTotal = ref(0)
+const ADMIN_PAGE_SIZE = 6
 
 const { accessGranted, isCheckingGate, checkGateStatus, validateAccessCode } = useGate()
 
@@ -86,6 +90,8 @@ const {
   reviewComment,
   deleteComment: deleteCommentApi,
 } = useComments()
+
+const { isDark, toggleDark } = useDarkMode()
 
 // ── Categories & Tags (real data from backend) ──
 const categories = ref<Category[]>([])
@@ -114,20 +120,29 @@ async function fetchTags() {
   }
 }
 
-async function fetchAdminArticles() {
+async function fetchAdminArticles(page = 1) {
   if (!hasAuthToken()) {
     adminArticles.value = []
+    adminTotal.value = 0
     return
   }
   isLoadingAdminArticles.value = true
+  adminPage.value = page
   try {
-    adminArticles.value = await apiFetchAdminArticles()
+    const result = await apiFetchAdminArticles(page, ADMIN_PAGE_SIZE)
+    adminArticles.value = result.articles
+    adminTotal.value = result.total
   } catch (err) {
     console.warn('加载管理端文章列表失败', err)
     adminArticles.value = []
+    adminTotal.value = 0
   } finally {
     isLoadingAdminArticles.value = false
   }
+}
+
+function handleAdminPageChange(page: number) {
+  fetchAdminArticles(page)
 }
 
 async function refreshArticleData() {
@@ -1074,6 +1089,7 @@ onUnmounted(() => {
         :is-logged-in="isLoggedIn"
         :login-user="loginUser"
         :show-user-menu="showUserMenu"
+        :is-dark="isDark"
         @navigate="navigateToSection"
         @open-profile="openProfile"
         @open-dashboard="openDashboard"
@@ -1082,6 +1098,7 @@ onUnmounted(() => {
         @toggle-status="handleStatusClick"
         @open-search="showSearchModal = true"
         @logout="handleLogout"
+        @toggle-dark="toggleDark"
       />
 
       <!-- Global sidebar (hover from left edge) -->
@@ -1140,12 +1157,16 @@ onUnmounted(() => {
             :is-loading-pending="isLoadingPending"
             :comment-count="commentCount"
             :total-views="totalViews"
+            :page="adminPage"
+            :total="adminTotal"
+            :page-size="ADMIN_PAGE_SIZE"
             @new-article="openPublishModal"
             @edit-article="openPublishModal"
             @delete-article="deleteArticle"
             @open-article="openArticleDetail"
             @approve-comment="handleApproveComment"
             @delete-comment="handleDeleteComment"
+            @page-change="handleAdminPageChange"
           />
 
           <GuestbookView

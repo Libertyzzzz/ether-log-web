@@ -3,6 +3,7 @@ import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
 import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen } from 'lucide-vue-next'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
+import { getReadingTime } from '../utils/format'
 
 const props = defineProps<{
   article: ArticleDetail | ArticleListItem
@@ -35,9 +36,7 @@ const headings = computed(() => {
 const activeHeadingId = ref('')
 
 const readingMinutes = computed(() => {
-  const source = props.selectedArticle?.content || props.selectedArticle?.renderContent || props.article.summary || ''
-  const text = source.replace(/<[^>]+>/g, '').replace(/\s+/g, '')
-  return Math.max(1, Math.ceil(text.length / 450))
+  return getReadingTime(props.selectedArticle?.content || props.selectedArticle?.renderContent || props.article.summary || '')
 })
 
 // 注入锚点 id 到正文标题
@@ -742,4 +741,6 @@ onUnmounted(() => {
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
 }
+
+/* 暗色模式 */
 </style>

@@ -115,31 +115,34 @@ function mapArticleRecord(record: any): ArticleListItem {
   }
 }
 
-function extractRecords(response: any): any[] {
+function extractRecords(response: any): { records: any[]; total: number } {
   const raw = response.data as any
   const payload = raw?.data ?? raw
-  return Array.isArray(payload?.records)
+  const records = Array.isArray(payload?.records)
     ? payload.records
     : Array.isArray(payload)
       ? payload
       : []
+  const total = typeof payload?.total === 'number' ? payload.total : records.length
+  return { records, total }
 }
 
-export async function fetchAdminArticles(): Promise<ArticleListItem[]> {
-  if (!hasAuthToken()) return []
+export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ articles: ArticleListItem[]; total: number }> {
+  if (!hasAuthToken()) return { articles: [], total: 0 }
   const [publishedRes, draftRes] = await Promise.all([
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum: 1, pageSize: 200, status: 1 }, headers: getAuthHeaders() },
+      { params: { pageNum, pageSize, status: 1 }, headers: getAuthHeaders() },
     ),
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
       { params: { pageNum: 1, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
     ),
   ])
-  const publishedRecords = extractRecords(publishedRes)
-  const draftRecords = extractRecords(draftRes)
-  return [...publishedRecords.map(mapArticleRecord), ...draftRecords.map(mapArticleRecord)]
+  const { records: publishedRecords, total } = extractRecords(publishedRes)
+  const { records: draftRecords } = extractRecords(draftRes)
+  const articles = [...publishedRecords.map(mapArticleRecord), ...draftRecords.map(mapArticleRecord)]
+  return { articles, total }
 }
 
 export async function fetchArticleDetail(articleId: number, useAuth = false, status?: number): Promise<ArticleDetail | null> {

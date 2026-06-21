@@ -293,4 +293,5 @@ const stats = [
   .about-stats { justify-content: center; }
   .about-deco { display: none; }
 }
+
 </style>

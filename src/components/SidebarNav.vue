@@ -648,4 +648,5 @@ function closeSidebar() {
     display: none;
   }
 }
+
 </style>

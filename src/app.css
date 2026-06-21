@@ -1,4 +1,10 @@
 /* 使用 Scoped 样式确保布局不乱 */
+body {
+  background: var(--bg);
+  color: var(--text-primary);
+  transition: background-color 0.3s, color 0.3s;
+}
+
 .app-container {
   position: relative;
   min-height: 100vh;
@@ -6,9 +12,10 @@
     radial-gradient(circle at 8% 6%, rgba(84, 117, 255, 0.16), transparent 32rem),
     radial-gradient(circle at 92% 1%, rgba(255, 220, 205, 0.42), transparent 30rem),
     linear-gradient(180deg, #e9effb 0%, #f8faff 46%, #eef3fb 100%);
-  color: #1d1d1f;
-  text-align: left; /* 强制左对齐 */
+  color: var(--text-primary);
+  text-align: left;
 }
+
 
 .main-site-shell {
   min-height: 100vh;
@@ -1790,3 +1797,5 @@
   0%, 100% { opacity: 1; }
   50% { opacity: 0.5; }
 }
+
+/* 暗色模式 - 全局 */

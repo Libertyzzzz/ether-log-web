@@ -255,4 +255,5 @@ onMounted(() => {
 @media (max-width: 720px) {
   .anonymous-form { grid-template-columns: 1fr; }
 }
+
 </style>

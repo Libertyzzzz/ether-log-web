@@ -1017,4 +1017,5 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   .breadcrumb-sep { display: none; }
   .word-count { display: none; }
 }
+
 </style>

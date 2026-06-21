@@ -606,4 +606,5 @@ onUnmounted(() => {
   .config-actions, .chart-toolbar { flex-direction: column; align-items: stretch; }
   .chart-tabs { display: grid; grid-template-columns: 1fr 1fr; }
 }
+
 </style>

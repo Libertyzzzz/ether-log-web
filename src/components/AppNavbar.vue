@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted } from 'vue'
-import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search, FlaskConical } from 'lucide-vue-next'
+import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search, FlaskConical, Sun, Moon } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
@@ -8,6 +8,7 @@ const props = defineProps<{
   isLoggedIn: boolean
   loginUser: Partial<LoginUser>
   showUserMenu: boolean
+  isDark: boolean
 }>()
 
 const emit = defineEmits<{
@@ -19,6 +20,7 @@ const emit = defineEmits<{
   toggleStatus: []
   openSearch: []
   logout: []
+  toggleDark: []
 }>()
 
 // 移动端中间汉堡菜单的本地状态
@@ -127,6 +129,11 @@ onUnmounted(() => {
           <kbd class="desktop-only">⌘K</kbd>
         </button>
 
+        <button class="nav-theme-toggle" type="button" @click="$emit('toggleDark')" :title="isDark ? '切换亮色模式' : '切换暗色模式'">
+          <Sun v-if="isDark" :size="16" />
+          <Moon v-else :size="16" />
+        </button>
+
         <div class="nav-actions desktop-only">
           <button v-if="isLoggedIn" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
           <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
@@ -173,8 +180,8 @@ onUnmounted(() => {
 /* ── 基础布局 (PC) ── */
 .nav-standard {
   position: fixed; top: 0; left: 0; right: 0; height: 5rem;
-  background: rgba(255, 255, 255, 0.85); backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid rgba(226, 232, 240, 0.8);
+  background: var(--nav-bg); backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--nav-border);
   z-index: 1000; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s;
 }
 .nav-standard.nav-hidden { transform: translateY(-100%); }
@@ -234,6 +241,26 @@ kbd {
   font-size: 0.65rem;
   font-weight: 800;
   opacity: 0.6;
+}
+
+/* 主题切换 */
+.nav-theme-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border: 1px solid var(--border-color);
+  border-radius: 0.6rem;
+  background: var(--input-bg);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.2s;
+  flex-shrink: 0;
+}
+.nav-theme-toggle:hover {
+  border-color: var(--brand);
+  color: var(--brand);
 }
 
 /* 系统状态栏 (Badge) */
@@ -297,6 +324,7 @@ kbd {
   .nav-logo { grid-column: 1; }
   .mobile-nav-wrapper { grid-column: 2; justify-self: center; }
   .nav-right { grid-column: 3; justify-self: end; }
-  .logo-text { display: none; }
 }
+
+/* 暗色模式 */
 </style>

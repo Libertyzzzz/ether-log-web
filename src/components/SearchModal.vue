@@ -195,4 +195,5 @@ function handleKeyDown(e: KeyboardEvent) {
 .search-transition-enter-from, .search-transition-leave-to {
   opacity: 0; transform: scale(0.95) translateY(-20px);
 }
+
 </style>

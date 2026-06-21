@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import { hasAuthToken } from '../composables/useAuth'
 import AppConfirmDialog from './AppConfirmDialog.vue'
+import SkeletonLoader from './SkeletonLoader.vue'
 import { toast } from '../utils/toast'
 import type { ArticleListItem, CommentItem, Tag } from '../types/blog'
 import {
@@ -22,6 +23,9 @@ const props = defineProps<{
   isLoadingPending: boolean
   commentCount: number
   totalViews: number
+  page: number
+  total: number
+  pageSize: number
 }>()
 
 defineEmits<{
@@ -31,6 +35,7 @@ defineEmits<{
   openArticle: [article: ArticleListItem]
   approveComment: [commentId: number]
   deleteComment: [commentId: number]
+  'page-change': [page: number]
 }>()
 
 // categories management state (for control panel)
@@ -204,9 +209,46 @@ function getCover(post: ArticleListItem, i: number) {
     : `background:${coverGradients[i % coverGradients.length]}`
 }
 
+function scrollToSection(id: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
 const draftArticles = computed(() => props.articles.filter((article) => article.status === 0))
 const publishedArticles = computed(() => props.articles.filter((article) => article.status === 1 || article.status === undefined))
-const visibleArticles = computed(() => props.articles.filter((article) => article.status !== 0))
+const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
+
+const articleSearch = ref('')
+const articleStatusFilter = ref<number | null>(null)
+const articleCategoryFilter = ref<string>('')
+
+const articleCategories = computed(() => {
+  const names = new Set<string>()
+  for (const a of props.articles) {
+    if (a.categoryName && a.status !== 0) names.add(a.categoryName)
+  }
+  return [...names].sort()
+})
+
+const visibleArticles = computed(() => {
+  let list = props.articles.filter((article) => article.status !== 0)
+  if (articleSearch.value.trim()) {
+    const q = articleSearch.value.trim().toLowerCase()
+    list = list.filter((a) => a.title.toLowerCase().includes(q))
+  }
+  if (articleStatusFilter.value !== null) {
+    if (articleStatusFilter.value === 3) {
+      list = list.filter((a) => a.isTop)
+    } else {
+      list = list.filter((a) => (a.status ?? 1) === articleStatusFilter.value)
+    }
+  }
+  if (articleCategoryFilter.value) {
+    list = list.filter((a) => a.categoryName === articleCategoryFilter.value)
+  }
+  return list
+})
 
 function getArticleStatusLabel(post: ArticleListItem) {
   if (post.status === 0) return '草稿'
@@ -252,16 +294,18 @@ function getArticleStatusClass(post: ArticleListItem) {
 
       <!-- ── 统计卡片 ── -->
       <div class="db-stats-grid">
-        <div class="db-stat-card">
+        <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-articles')">
           <div class="db-stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1"><FileText :size="18"/></div>
           <span class="db-stat-label">文章总数</span>
-          <strong class="db-stat-value">{{ publishedArticles.length }}</strong>
+          <strong class="db-stat-value">{{ total }}</strong>
+          <ArrowRight class="db-stat-arrow" :size="14" />
           <div class="db-stat-wave db-wave-blue"></div>
         </div>
-        <div class="db-stat-card">
+        <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-comments')">
           <div class="db-stat-icon" style="background:rgba(34,197,94,0.1);color:#22c55e"><MessageSquare :size="18"/></div>
           <span class="db-stat-label">待审核评论</span>
           <strong class="db-stat-value">{{ commentCount }}</strong>
+          <ArrowRight class="db-stat-arrow" :size="14" />
           <div class="db-stat-wave db-wave-green"></div>
         </div>
         <div class="db-stat-card">
@@ -270,10 +314,11 @@ function getArticleStatusClass(post: ArticleListItem) {
           <strong class="db-stat-value">{{ totalViews }}</strong>
           <div class="db-stat-wave db-wave-orange"></div>
         </div>
-        <div class="db-stat-card">
+        <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-drafts')">
           <div class="db-stat-icon" style="background:rgba(168,85,247,0.1);color:#a855f7"><BookOpen :size="18"/></div>
           <span class="db-stat-label">草稿</span>
           <strong class="db-stat-value">{{ draftArticles.length }}</strong>
+          <ArrowRight class="db-stat-arrow" :size="14" />
           <div class="db-stat-wave db-wave-purple"></div>
         </div>
       </div>
@@ -282,7 +327,7 @@ function getArticleStatusClass(post: ArticleListItem) {
       <div class="db-main-grid">
 
         <!-- 文章列表 -->
-        <div class="db-card">
+        <div id="db-articles" class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <FileText :size="15" class="db-card-icon" />
@@ -293,33 +338,27 @@ function getArticleStatusClass(post: ArticleListItem) {
             </button>
           </div>
 
-          <section class="draft-box">
-            <div class="draft-box-header">
-              <div>
-                <span class="draft-kicker">DRAFTS</span>
-                <h3>草稿箱</h3>
-              </div>
-              <strong>{{ draftArticles.length }}</strong>
+          <div class="db-filter-bar">
+            <div class="db-search-wrap">
+              <Search :size="13" class="db-search-icon" />
+              <input
+                v-model="articleSearch"
+                type="text"
+                class="db-search-input"
+                placeholder="搜索文章标题..."
+              />
             </div>
-            <div v-if="isLoadingArticles" class="draft-empty">草稿加载中...</div>
-            <div v-else-if="!draftArticles.length" class="draft-empty">暂无草稿</div>
-            <div v-else class="draft-list">
-              <article v-for="draft in draftArticles" :key="draft.id" class="draft-item">
-                <div class="draft-info">
-                  <strong>{{ draft.title || '未命名草稿' }}</strong>
-                  <span>{{ draft.updateTime?.slice(0, 16) || draft.createTime?.slice(0, 16) || '刚刚保存' }}</span>
-                </div>
-                <div class="draft-actions">
-                  <button type="button" class="db-action-btn edit" @click="$emit('editArticle', draft)">
-                    <Edit3 :size="11" /> 继续写
-                  </button>
-                  <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', draft.id)">
-                    <Trash2 :size="11" />
-                  </button>
-                </div>
-              </article>
-            </div>
-          </section>
+            <select v-model="articleStatusFilter" class="db-filter-select">
+              <option :value="null">全部状态</option>
+              <option :value="1">公开</option>
+              <option :value="2">私密</option>
+              <option :value="3">置顶</option>
+            </select>
+            <select v-model="articleCategoryFilter" class="db-filter-select">
+              <option value="">全部分类</option>
+              <option v-for="c in articleCategories" :key="c" :value="c">{{ c }}</option>
+            </select>
+          </div>
 
           <div class="db-table-head">
             <span>标题</span>
@@ -328,8 +367,11 @@ function getArticleStatusClass(post: ArticleListItem) {
             <span>操作</span>
           </div>
 
-          <div v-if="isLoadingArticles" class="db-empty">文章加载中...</div>
-          <div v-else-if="!visibleArticles.length" class="db-empty">暂无已发布文章，点击新建开始写作</div>
+          <SkeletonLoader v-if="isLoadingArticles" variant="table" :rows="5" />
+          <div v-else-if="!visibleArticles.length" class="db-empty">
+            <template v-if="articleSearch || articleStatusFilter !== null || articleCategoryFilter">没有匹配的文章</template>
+            <template v-else>暂无已发布文章，点击新建开始写作</template>
+          </div>
 
           <div v-for="(post, i) in visibleArticles" :key="post.id" class="db-table-row">
             <div class="db-row-title">
@@ -351,6 +393,62 @@ function getArticleStatusClass(post: ArticleListItem) {
                 <Trash2 :size="11" />
               </button>
             </div>
+          </div>
+
+          <div v-if="totalPages > 1" class="db-pagination">
+            <button
+              class="db-page-btn"
+              :disabled="page <= 1"
+              @click="$emit('page-change', page - 1)"
+            >
+              <ChevronLeft :size="14" />
+            </button>
+            <span class="db-page-info">{{ page }} / {{ totalPages }}</span>
+            <button
+              class="db-page-btn"
+              :disabled="page >= totalPages"
+              @click="$emit('page-change', page + 1)"
+            >
+              <ChevronRight :size="14" />
+            </button>
+          </div>
+        </div>
+
+        <!-- 草稿箱 -->
+        <div id="db-drafts" class="db-card">
+          <div class="db-card-header">
+            <div class="db-card-title-row">
+              <Edit3 :size="15" class="db-card-icon" />
+              <h2 class="db-card-title">草稿箱</h2>
+            </div>
+            <span class="draft-count-badge">{{ draftArticles.length }}</span>
+          </div>
+          <div v-if="isLoadingArticles" class="draft-empty">
+            <span class="draft-empty-icon">⏳</span>
+            草稿加载中...
+          </div>
+          <div v-else-if="!draftArticles.length" class="draft-empty">
+            <span class="draft-empty-icon">📝</span>
+            <span>暂无草稿，开始写作吧</span>
+          </div>
+          <div v-else class="draft-list">
+            <article v-for="draft in draftArticles" :key="draft.id" class="draft-item">
+              <div class="draft-item-left">
+                <div class="draft-item-dot"></div>
+                <div class="draft-info">
+                  <strong>{{ draft.title || '未命名草稿' }}</strong>
+                  <span>{{ draft.updateTime?.slice(0, 16) || draft.createTime?.slice(0, 16) || '刚刚保存' }}</span>
+                </div>
+              </div>
+              <div class="draft-actions">
+                <button type="button" class="db-action-btn edit" @click="$emit('editArticle', draft)">
+                  <Edit3 :size="11" /> 继续写
+                </button>
+                <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', draft.id)">
+                  <Trash2 :size="11" />
+                </button>
+              </div>
+            </article>
           </div>
         </div>
 
@@ -468,7 +566,7 @@ function getArticleStatusClass(post: ArticleListItem) {
         </div>
 
         <!-- 待审核评论 -->
-        <div class="db-card">
+        <div id="db-comments" class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <MessageSquare :size="15" class="db-card-icon" />
@@ -551,6 +649,11 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-stat-label { font-size:0.75rem;color:#94a3b8;font-weight:600; }
 .db-stat-value { font-size:1.75rem;font-weight:900;color:#0f172a;line-height:1; }
 .db-stat-wave { position:absolute;bottom:0;left:0;right:0;height:32px;background-repeat:no-repeat;background-size:100% 100%;opacity:0.35; }
+.db-stat-card--clickable { cursor:pointer; transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1); }
+.db-stat-card--clickable:hover { transform: translateY(-2px); box-shadow: 0 8px 20px rgba(15,23,42,0.08); border-color: rgba(99,102,241,0.3); }
+.db-stat-card--clickable:active { transform: translateY(0); transition: transform 0.1s; }
+.db-stat-arrow { position:absolute; top:1rem; right:1rem; color:#cbd5e1; opacity:0; transition: all 0.25s; }
+.db-stat-card--clickable:hover .db-stat-arrow { opacity:1; color:#6366f1; transform: translateX(2px); }
 .db-wave-blue   { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%236366f1'/%3E%3C/svg%3E"); }
 .db-wave-green  { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%2322c55e'/%3E%3C/svg%3E"); }
 .db-wave-orange { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23f97316'/%3E%3C/svg%3E"); }
@@ -574,72 +677,151 @@ function getArticleStatusClass(post: ArticleListItem) {
 }
 .db-btn-sm:hover { background:#4338ca; }
 
+/* 筛选栏 */
+.db-filter-bar {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  flex-wrap: wrap;
+}
+.db-search-wrap {
+  flex: 1;
+  min-width: 140px;
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+.db-search-icon {
+  position: absolute;
+  left: 0.65rem;
+  color: #94a3b8;
+  pointer-events: none;
+}
+.db-search-input {
+  width: 100%;
+  padding: 0.45rem 0.65rem 0.45rem 1.85rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  font-size: 0.78rem;
+  color: #0f172a;
+  background: #f8fafc;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.db-search-input:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background: #fff;
+}
+.db-search-input::placeholder {
+  color: #94a3b8;
+}
+.db-filter-select {
+  padding: 0.45rem 1.65rem 0.45rem 0.65rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.6rem;
+  font-size: 0.78rem;
+  color: #475569;
+  background: #f8fafc;
+  outline: none;
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0.45rem center;
+  transition: border-color 0.15s;
+}
+.db-filter-select:focus {
+  border-color: #818cf8;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+  background-color: #fff;
+}
+
 /* 草稿箱 */
-.draft-box {
-  margin-bottom:1rem;
-  padding:1rem;
-  border-radius:1rem;
-  background:#fffbeb;
-  border:1px solid rgba(245,158,11,0.22);
-}
-.draft-box-header {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:1rem;
-  margin-bottom:0.75rem;
-}
-.draft-kicker {
-  display:block;
-  color:#d97706;
-  font-size:0.62rem;
-  font-weight:900;
-  letter-spacing:0.16em;
-}
-.draft-box h3 {
-  margin:0.15rem 0 0;
-  color:#78350f;
-  font-size:0.95rem;
-  font-weight:900;
-}
-.draft-box-header strong {
-  width:2rem;
-  height:2rem;
-  border-radius:999px;
-  display:flex;
-  align-items:center;
-  justify-content:center;
-  background:#f59e0b;
-  color:white;
-  font-size:0.9rem;
+.draft-count-badge {
+  min-width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(99, 102, 241, 0.08);
+  color: #6366f1;
+  font-size: 0.78rem;
+  font-weight: 750;
+  padding: 0 0.35rem;
+  flex-shrink: 0;
 }
 .draft-empty {
-  padding:0.75rem 0;
-  color:#b45309;
-  font-size:0.8rem;
-  font-weight:650;
+  padding: 1.5rem 0.5rem;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  font-weight: 550;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
 }
-.draft-list { display:flex; flex-direction:column; gap:0.55rem; }
+.draft-empty-icon {
+  font-size: 1.35rem;
+  opacity: 0.5;
+}
+.draft-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+}
 .draft-item {
-  display:flex;
-  align-items:center;
-  justify-content:space-between;
-  gap:0.75rem;
-  padding:0.7rem;
-  border-radius:0.8rem;
-  background:rgba(255,255,255,0.76);
-  border:1px solid rgba(245,158,11,0.18);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.85rem;
+  padding: 0.6rem 0.7rem;
+  border-radius: 0.7rem;
+  transition: background 0.15s;
 }
-.draft-info { min-width:0; display:flex; flex-direction:column; gap:0.2rem; }
+.draft-item:hover {
+  background: rgba(99, 102, 241, 0.04);
+}
+.draft-item-left {
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: 0;
+  flex: 1;
+}
+.draft-item-dot {
+  width: 0.35rem;
+  height: 0.35rem;
+  border-radius: 50%;
+  background: #a5b4fc;
+  flex-shrink: 0;
+}
+.draft-info {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
 .draft-info strong {
-  color:#0f172a;
-  font-size:0.84rem;
-  overflow:hidden;
-  text-overflow:ellipsis;
-  white-space:nowrap;
+  color: #0f172a;
+  font-size: 0.84rem;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
-.draft-info span { color:#92400e; font-size:0.7rem; font-weight:700; }
-.draft-actions { display:flex; flex-shrink:0; gap:0.35rem; }
+.draft-info span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 550;
+}
+.draft-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.35rem;
+}
 
 /* 表格 */
 .db-table-head {
@@ -695,6 +877,46 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-comment-meta { margin:0;font-size:0.72rem;color:#94a3b8; }
 .db-comment-actions { display:flex;gap:0.4rem; }
 
+/* 分页 */
+.db-pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding-top: 0.75rem;
+  margin-top: 0.25rem;
+  border-top: 1px solid #f1f5f9;
+}
+.db-page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 0.6rem;
+  border: 1px solid #e2e8f0;
+  background: #fff;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.db-page-btn:hover:not(:disabled) {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #0f172a;
+}
+.db-page-btn:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+.db-page-info {
+  font-size: 0.8rem;
+  font-weight: 700;
+  color: #475569;
+  min-width: 3rem;
+  text-align: center;
+}
+
 /* 响应式 */
 @media (max-width:900px) {
   .db-stats-grid { grid-template-columns:repeat(2,1fr); }
@@ -711,4 +933,6 @@ function getArticleStatusClass(post: ArticleListItem) {
   .db-hero-inner { flex-wrap:wrap; }
   .db-btn-new { width:100%; justify-content:center; }
 }
+
+/* 暗色模式 */
 </style>
