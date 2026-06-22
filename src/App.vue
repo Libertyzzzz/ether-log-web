@@ -254,7 +254,7 @@ const publishForm = reactive<ArticlePublishRequest>({
 })
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
 const uploadedImageMap = reactive<Map<string, number>>(new Map())
-const LOCAL_DRAFT_PREFIX = 'etherlog:publish-local-backup:'
+const LOCAL_DRAFT_PREFIX = 'nextify:publish-local-backup:'
 const publishReturnRoute = ref<string | null>(null)
 const draftStatus = ref('')
 const hasSavedPublishDraft = ref(false)
@@ -1041,7 +1041,7 @@ function handleBeforeUnload(event: BeforeUnloadEvent) {
 
 // ── Lifecycle ──
 onMounted(async () => {
-  document.title = 'ETHERLOG'
+  document.title = 'NEXTIFY'
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('beforeunload', handleBeforeUnload)
 

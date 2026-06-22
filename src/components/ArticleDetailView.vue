@@ -193,7 +193,7 @@ onUnmounted(() => {
             <span>返回</span>
           </button>
           <span class="breadcrumb-sep">/</span>
-          <span class="breadcrumb-site">ETHERLOG</span>
+          <span class="breadcrumb-site">NEXTIFY</span>
           <span class="breadcrumb-sep">/</span>
           <span class="breadcrumb-category">{{ getArticleCategory(article) }}</span>
           <div class="breadcrumb-spacer"></div>

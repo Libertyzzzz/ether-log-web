@@ -1,6 +1,6 @@
 import { ref, watchEffect } from 'vue'
 
-const STORAGE_KEY = 'ether-log-theme'
+const STORAGE_KEY = 'nextify-theme'
 
 const isDark = ref(false)
 

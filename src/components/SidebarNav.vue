@@ -226,7 +226,7 @@ function closeSidebar() {
       <div class="sidebar-top">
         <button class="brand-button" type="button" @click="handleNavigate('home')">
           <span class="brand-mark">E</span>
-          <span class="brand-text">ETHERLOG</span>
+          <span class="brand-text">NEXTIFY</span>
         </button>
         <button class="close-button" type="button" aria-label="折叠侧边栏" @click="closeSidebar">
           <X :size="14" />

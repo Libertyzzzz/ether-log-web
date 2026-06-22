@@ -83,7 +83,7 @@ onUnmounted(() => {
       <!-- 1. 左侧：Logo (始终靠左) -->
       <div class="nav-logo" @click="$emit('navigate', 'home')">
         <div class="logo-box">E</div>
-        <span class="logo-text">ETHERLOG</span>
+        <span class="logo-text">NEXTIFY</span>
       </div>
 
       <!-- 2. 中间：PC 链接 / 移动端汉堡 (绝对居中) -->

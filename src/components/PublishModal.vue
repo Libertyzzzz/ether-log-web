@@ -212,7 +212,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
           <span>关闭</span>
         </button>
         <span class="breadcrumb-sep">/</span>
-        <span class="breadcrumb-site">ETHERLOG</span>
+        <span class="breadcrumb-site">NEXTIFY</span>
         <span class="breadcrumb-sep">/</span>
         <span class="breadcrumb-action">
           <PenLine :size="12" />

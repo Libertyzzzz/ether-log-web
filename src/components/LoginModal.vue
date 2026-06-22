@@ -34,7 +34,7 @@ defineEmits<{
         <form class="login-form" @submit.prevent="$emit('login')">
           <label class="login-field">
             <span>邮箱</span>
-            <input class="form-input" type="email" placeholder="example@etherlog.com" :value="email" @input="$emit('update:email', ($event.target as HTMLInputElement).value)" />
+            <input class="form-input" type="email" placeholder="example@nextify.cn" :value="email" @input="$emit('update:email', ($event.target as HTMLInputElement).value)" />
           </label>
 
           <label class="login-field">

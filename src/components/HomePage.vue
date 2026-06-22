@@ -156,7 +156,7 @@ function formatDate(dateStr: string) {
           <div class="hp-glass-orb hp-orb-3"></div>
           <div class="hp-glass-card">
             <div class="hp-glass-card-inner">
-              <span class="hp-glass-label">EtherLog</span>
+              <span class="hp-glass-label">NEXTIFY</span>
               <strong class="hp-glass-title">E</strong>
               <span class="hp-glass-sub">Vue · Spring · JWT</span>
             </div>

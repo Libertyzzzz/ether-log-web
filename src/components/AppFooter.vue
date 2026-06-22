@@ -1,7 +1,7 @@
 <template>
   <footer class="footer-wrap">
     <div class="footer-inner">
-      <span class="footer-copy">© 2026 Etherlog. All rights reserved.</span>
+      <span class="footer-copy">© 2026 NEXTIFY. All rights reserved.</span>
       <div class="footer-links">
         <!-- GitHub -->
         <a class="footer-icon-btn" href="https://github.com" target="_blank" rel="noopener" aria-label="GitHub">

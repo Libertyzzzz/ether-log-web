@@ -219,7 +219,7 @@ const toggleEmailNotifications = (event: Event) => {
 
           <div class="pp-system-info">
             <p>Version 2.0.4-stable</p>
-            <p>© 2026 Etherlog System</p>
+            <p>© 2026 NEXTIFY</p>
           </div>
         </div>
       </div>
