@@ -29,7 +29,7 @@ import type {
 } from './types/blog'
 import { renderMarkdown } from './utils/markdown'
 import { getUploadedImageUrl } from './utils/format'
-import { useAuth, hasAuthToken } from './composables/useAuth'
+import { useAuth } from './composables/useAuth'
 import { useArticles } from './composables/useArticles'
 import { useGate } from './composables/useGate'
 import { useDarkMode } from './composables/useDarkMode'
@@ -121,11 +121,6 @@ async function fetchTags() {
 }
 
 async function fetchAdminArticles(page = 1) {
-  if (!hasAuthToken()) {
-    adminArticles.value = []
-    adminTotal.value = 0
-    return
-  }
   isLoadingAdminArticles.value = true
   adminPage.value = page
   try {
@@ -147,7 +142,9 @@ function handleAdminPageChange(page: number) {
 
 async function refreshArticleData() {
   await fetchArticles()
-  if (hasAuthToken()) await fetchAdminArticles()
+  try {
+    await fetchAdminArticles()
+  } catch { /* 未登录时后端 401，由拦截器处理 */ }
 }
 
 // ── Login form state ──
@@ -385,10 +382,6 @@ async function saveArticleWithStatus(status: 0 | 1 | 2) {
 
 async function savePublishDraft(options: { silent?: boolean } = {}) {
   if (!showPublishModal.value || isPublishing.value || isSavingDraft.value || isApplyingPublishSnapshot) return false
-  if (!hasAuthToken()) {
-    saveLocalPublishBackup('登录状态异常，已保留本地备份')
-    return false
-  }
 
   const snapshot = JSON.stringify(clonePublishForm())
   if (snapshot === lastSavedPublishSnapshot.value) return true
@@ -575,10 +568,6 @@ async function loadArticleForEdit(articleId: number) {
 }
 
 async function startPublishPage(articleId?: number) {
-  if (!isLoggedIn.value || !hasAuthToken()) {
-    showLoginModal.value = true
-    return
-  }
   closeArticleDetail()
   publishError.value = ''
   showPublishModal.value = true
@@ -610,10 +599,6 @@ async function startPublishPage(articleId?: number) {
 }
 
 function openPublishModal(article?: ArticleListItem | ArticleDetail) {
-  if (!isLoggedIn.value || !hasAuthToken()) {
-    showLoginModal.value = true
-    return
-  }
   if (currentPage.value !== 'publish') {
     publishReturnRoute.value = (route.name as string) || 'home'
   }
@@ -626,11 +611,6 @@ function openPublishModal(article?: ArticleListItem | ArticleDetail) {
 
 async function publishArticle() {
   publishError.value = ''
-  if (!hasAuthToken()) {
-    publishError.value = '登录状态已失效，请重新登录后再发布。'
-    showLoginModal.value = true
-    return
-  }
   if (!publishForm.title || !publishForm.content || !publishForm.categoryId) {
     publishError.value = '请至少填写标题、正文和分类。'
     return
@@ -671,10 +651,6 @@ async function publishArticle() {
 }
 
 async function deleteArticle(articleId: number) {
-  if (!isLoggedIn.value || !hasAuthToken()) {
-    showLoginModal.value = true
-    return
-  }
   pendingDeleteArticleId.value = articleId
   showDeleteConfirm.value = true
 }
@@ -733,11 +709,6 @@ async function insertMarkdown(before: string, after = '', placeholder = '文本'
 }
 
 function triggerImageUpload(type: 'markdown' | 'cover' | 'avatar') {
-  if (!hasAuthToken()) {
-    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
-    openLoginModal()
-    return
-  }
   if (type === 'markdown') {
     imageInput.value?.click()
   } else {
@@ -754,12 +725,6 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
 
   if (file.size > 50 * 1024 * 1024) {
     showAppToast('图片大小不能超过 50MB', 'error')
-    return
-  }
-  if (!hasAuthToken()) {
-    publishError.value = '登录状态已失效，请重新登录后再上传图片。'
-    showAppToast(publishError.value, 'error')
-    openLoginModal()
     return
   }
 
@@ -1051,7 +1016,9 @@ onMounted(async () => {
   await fetchCategories()
   fetchTags()
   await refreshArticleData()
-  if (hasAuthToken()) fetchPendingComments()
+  try {
+    fetchPendingComments()
+  } catch { /* 未登录时后端 401，由拦截器处理 */ }
   refreshPublishDraftState()
 
   if (currentPage.value === 'publish') {
@@ -1065,6 +1032,12 @@ onMounted(async () => {
     const ev = e as CustomEvent
     const detail = ev.detail || {}
     showAppToast(detail.message || '', detail.type || 'info')
+  })
+  // 后端返回 401 时，axios 拦截器触发此事件 → 清本地登录态 + 弹登录窗
+  window.addEventListener('auth:expired', () => {
+    clearLoginState()
+    showAppToast('登录已过期，请重新登录', 'info')
+    showLoginModal.value = true
   })
 })
 
@@ -1102,7 +1075,7 @@ onUnmounted(() => {
       />
 
       <!-- Global sidebar (hover from left edge) -->
-      <SidebarNav :articles="articles" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+      <SidebarNav :articles="articles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
 
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView
@@ -1152,6 +1125,8 @@ onUnmounted(() => {
           <DashboardPage
             v-if="currentPage === 'dashboard'"
             :articles="dashboardArticles"
+            :categories="categories"
+            :tags="tags"
             :is-loading-articles="isLoadingAdminArticles"
             :pending-comments="pendingComments"
             :is-loading-pending="isLoadingPending"
@@ -1167,6 +1142,8 @@ onUnmounted(() => {
             @approve-comment="handleApproveComment"
             @delete-comment="handleDeleteComment"
             @page-change="handleAdminPageChange"
+            @refresh-categories="fetchCategories"
+            @refresh-tags="fetchTags"
           />
 
           <GuestbookView

@@ -5,12 +5,10 @@ import { hasAuthToken } from '../composables/useAuth'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
 import { toast } from '../utils/toast'
-import type { ArticleListItem, CommentItem, Tag } from '../types/blog'
+import type { ArticleListItem, CommentItem, Tag, Category } from '../types/blog'
 import {
-  fetchTags as apiFetchTags,
   createTag as apiCreateTag,
   deleteTag as apiDeleteTag,
-  fetchCategories as apiFetchCategories,
   createCategory as apiCreateCategory,
   deleteCategory as apiDeleteCategory,
   updateArticleField,
@@ -18,6 +16,8 @@ import {
 
 const props = defineProps<{
   articles: ArticleListItem[]
+  categories: Category[]
+  tags: Tag[]
   isLoadingArticles: boolean
   pendingComments: CommentItem[]
   isLoadingPending: boolean
@@ -28,7 +28,7 @@ const props = defineProps<{
   pageSize: number
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   newArticle: []
   editArticle: [article: ArticleListItem]
   deleteArticle: [articleId: number]
@@ -36,18 +36,15 @@ defineEmits<{
   approveComment: [commentId: number]
   deleteComment: [commentId: number]
   'page-change': [page: number]
+  refreshCategories: []
+  refreshTags: []
 }>()
 
-// categories management state (for control panel)
-const categoriesList = ref<{ id: number; name: string; sort?: number }[]>([])
-const isLoadingCategories = ref(false)
+// categories / tags 管理 UI 状态（不再独立拉数据，读 props）
 const newCategoryName = ref('')
 const newCategorySort = ref<number | null>(null)
 const showCreateCategoryDialog = ref(false)
 const deletingCategory = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
-// tags management state
-const tagsList = ref<Tag[]>([])
-const isLoadingTags = ref(false)
 const newTagName = ref('')
 const newTagColor = ref('#7c3aed')
 const deletingTag = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
@@ -58,29 +55,18 @@ function openCreateTagDialog() {
   showCreateTagDialog.value = true
 }
 
-async function fetchTagsForAdmin() {
-  isLoadingTags.value = true
-  try {
-    tagsList.value = await apiFetchTags()
-  } catch (e) {
-    console.info('加载标签失败或端点不存在', e)
-  } finally {
-    isLoadingTags.value = false
-  }
-}
-
 async function createTagAdmin() {
   if (!newTagName.value.trim()) {
     toast('请输入标签名称', 'error')
     return
   }
   try {
-    const tag = await apiCreateTag({ name: newTagName.value.trim(), color: newTagColor.value })
-    tagsList.value.push(tag)
+    await apiCreateTag({ name: newTagName.value.trim(), color: newTagColor.value })
     newTagName.value = ''
     newTagColor.value = '#7c3aed'
     showCreateTagDialog.value = false
     toast('标签已创建', 'success')
+    emit('refreshTags')
   } catch (e) {
     console.error('创建标签失败', e)
     toast('创建标签失败', 'error')
@@ -96,25 +82,13 @@ async function performDeleteTag() {
   if (!id) { deletingTag.value.show = false; return }
   try {
     await apiDeleteTag(id)
-    tagsList.value = tagsList.value.filter((t) => t.id !== id)
     toast('标签已删除', 'success')
+    emit('refreshTags')
   } catch (e) {
     console.error('删除标签失败', e)
     toast('删除标签失败', 'error')
   } finally {
     deletingTag.value.show = false
-    await fetchTagsForAdmin()
-  }
-}
-
-async function fetchCategoriesForAdmin() {
-  isLoadingCategories.value = true
-  try {
-    categoriesList.value = await apiFetchCategories()
-  } catch (e) {
-    console.error('加载分类失败', e)
-  } finally {
-    isLoadingCategories.value = false
   }
 }
 
@@ -126,12 +100,12 @@ async function createCategoryAdmin() {
   try {
     const payload: any = { name: newCategoryName.value.trim() }
     if (newCategorySort.value !== null) payload.sort = Number(newCategorySort.value)
-    const cat = await apiCreateCategory(payload)
-    categoriesList.value.push(cat)
+    await apiCreateCategory(payload)
     newCategoryName.value = ''
     newCategorySort.value = null
-    toast('分类已创建', 'success')
     showCreateCategoryDialog.value = false
+    toast('分类已创建', 'success')
+    emit('refreshCategories')
   } catch (e) {
     console.error('创建分类失败', e)
     toast('创建分类失败', 'error')
@@ -155,18 +129,16 @@ async function performDeleteCategoryAdmin() {
   }
   try {
     // ensure general category
-    let general = categoriesList.value.find((c) => c.name === '通用目录')
+    let general = props.categories.find((c) => c.name === '通用目录')
     if (!general) {
-      const cat = await apiCreateCategory({ name: '通用目录', sort: 0 })
-      general = cat
-      categoriesList.value.push(general)
+      general = await apiCreateCategory({ name: '通用目录', sort: 0 })
     }
 
     // reassign articles locally and backend
     const toMove = props.articles.filter((a: ArticleListItem) => a.categoryName === name)
     for (const a of toMove) {
       try {
-        await updateArticleField(a.id, { categoryId: general.id })
+        await updateArticleField(a.id, { categoryId: general!.id })
       } catch (e) {
         console.error('移动文章失败', a.id, e)
       }
@@ -179,21 +151,19 @@ async function performDeleteCategoryAdmin() {
       console.error('删除分类失败', e)
     }
 
-    categoriesList.value = categoriesList.value.filter((c) => c.id !== id)
     toast('分类已删除并将文章移至通用目录', 'success')
+    emit('refreshCategories')
   } catch (e) {
     console.error('删除分类失败', e)
     toast('删除分类失败', 'error')
   } finally {
     deletingCategory.value.show = false
-    await fetchCategoriesForAdmin()
   }
 }
 
 // fetch categories when dashboard mounts
 onMounted(() => {
-  fetchCategoriesForAdmin()
-  fetchTagsForAdmin()
+  // categories / tags 由 App.vue 通过 props 提供，无需单独拉取
 })
 
 const coverGradients = [
@@ -464,10 +434,10 @@ function getArticleStatusClass(post: ArticleListItem) {
           </div>
 
           <div class="db-card-body">
-            <div v-if="isLoadingCategories" class="db-empty">加载中...</div>
+            <div v-if="!categories.length" class="db-empty">暂无分类</div>
             <div v-else>
               <div class="cat-list">
-                  <div v-for="cat in categoriesList" :key="cat.id" class="cat-row">
+                  <div v-for="cat in categories" :key="cat.id" class="cat-row">
                     <span class="cat-name">{{ cat.name }}</span>
                     <div class="cat-actions">
                     <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteCategory(cat)">删除</button>
@@ -519,10 +489,10 @@ function getArticleStatusClass(post: ArticleListItem) {
           </div>
 
           <div class="db-card-body">
-            <div v-if="isLoadingTags" class="db-empty">加载中...</div>
+            <div v-if="!tags.length" class="db-empty">暂无标签</div>
             <div v-else>
               <div class="cat-list">
-                <div v-for="tag in tagsList" :key="tag.id" class="cat-row">
+                <div v-for="tag in tags" :key="tag.id" class="cat-row">
                   <div style="display:flex;align-items:center;gap:0.6rem">
                     <span class="tag-badge" :style="{background: tag.color || '#e6eef6'}"></span>
                     <span class="cat-name">{{ tag.name }}</span>

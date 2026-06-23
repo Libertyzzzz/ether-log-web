@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { fetchCategories as apiFetchCategories } from '../api'
 import {
   FileText,
   Folder,
@@ -11,10 +10,11 @@ import {
   Plus,
   X,
 } from 'lucide-vue-next'
-import type { ArticleDirectory, ArticleListItem } from '../types/blog'
+import type { ArticleDirectory, ArticleListItem, Category } from '../types/blog'
 
 const props = defineProps<{
   articles: ArticleListItem[]
+  categories: Category[]
 }>()
 
 const emit = defineEmits<{
@@ -40,43 +40,25 @@ const navItems = [
   { id: 'about', label: '关于我', icon: Info },
 ]
 
-const directories = ref<ArticleDirectory[]>([])
-
-async function fetchCategories() {
-  try {
-    const data = await apiFetchCategories()
-    if (Array.isArray(data)) {
-      // map backend categories to local directory shape and include article ids by matching category name
-      const mapped = data.map((c: any) => ({
-        id: c.id,
-        name: c.name || c.label || String(c.id),
-        description: c.icon || '',
-        articleIds: props.articles ? props.articles.filter(a => a.categoryName === (c.name || c.label)).map(a => a.id) : [],
-        sortOrder: c.sort || 0,
-      }))
-      directories.value = mapped.sort((a, b) => a.sortOrder - b.sortOrder)
-    }
-  } catch (error) {
-    // fallback to local mock if API fails
-    console.error('无法加载分类列表，使用本地数据', error)
-    if (!directories.value.length) {
-      directories.value = [
-        { id: 101, name: '灵感笔记', description: '随手记录的想法', articleIds: [], sortOrder: 1 },
-        { id: 102, name: '项目复盘', description: '开发过程与经验', articleIds: [], sortOrder: 2 },
-        { id: 103, name: '长期主题', description: '持续打磨的议题', articleIds: [], sortOrder: 3 },
-      ]
-      syncMockDirectoryArticles()
-    }
-  }
-}
+// directories 由 props.categories 计算，文章归属按 categoryName 匹配
+const directories = computed<ArticleDirectory[]>(() => {
+  const mapped = props.categories.map((c) => ({
+    id: c.id,
+    name: c.name || String(c.id),
+    description: '',
+    articleIds: props.articles
+      .filter((a) => a.categoryName === (c.name || String(c.id)))
+      .map((a) => a.id),
+    sortOrder: c.sort || 0,
+  }))
+  return mapped.sort((a, b) => a.sortOrder - b.sortOrder)
+})
 
 const articleMap = computed(() => new Map(props.articles.map((article) => [article.id, article])))
 
 const sortedDirectories = computed(() =>
   [...directories.value].sort((a, b) => a.sortOrder - b.sortOrder)
 )
-
-// open/close are implemented later to also reset mouse tracking
 
 function handleNavigate(page: string) {
   emit('navigate', page)
@@ -96,84 +78,23 @@ function getDirectoryArticles(directory: ArticleDirectory) {
 
 function selectDirectory(directoryId: number) {
   activeDirectoryId.value = directoryId
-  const dir = directories.value.find(d => d.id === directoryId)
+  const dir = directories.value.find((d) => d.id === directoryId)
   if (dir) emit('filter-category', dir.name)
 }
 
 function addDirectory() {
-  // redirect to control panel for category management
   emit('navigate', 'dashboard')
 }
 
-// Sidebar is read-only for categories; management is in control panel
-// creation/deletion handled in control panel; keep sidebar read-only
-
-// creation/deletion are moved to control panel (Dashboard)
-
-function moveArticle(articleId: number, targetDirectoryId: number) {
-  directories.value = directories.value.map((directory) => {
-    const articleIds = directory.articleIds.filter((id) => id !== articleId)
-    if (directory.id === targetDirectoryId) articleIds.push(articleId)
-    return { ...directory, articleIds }
-  })
-  activeDirectoryId.value = targetDirectoryId
+function moveArticle(_articleId: number, _targetDirectoryId: number) {
+  // 仅前端操作：文章归属由后端 categoryName 决定，这里不做本地目录改动
 }
-
-function syncMockDirectoryArticles() {
-  if (!props.articles.length) return
-
-  const validArticleIds = new Set(props.articles.map((article) => article.id))
-  const hasExistingAssignments = directories.value.some((directory) => directory.articleIds.length)
-
-  if (!hasExistingAssignments) {
-    directories.value = directories.value.map((directory, directoryIndex) => ({
-      ...directory,
-      articleIds: props.articles
-        .filter((_, articleIndex) => articleIndex % directories.value.length === directoryIndex)
-        .map((article) => article.id),
-    }))
-    return
-  }
-
-  const assignedIds = new Set<number>()
-  directories.value = directories.value.map((directory) => {
-    const articleIds = directory.articleIds.filter((articleId) => validArticleIds.has(articleId))
-    articleIds.forEach((articleId) => assignedIds.add(articleId))
-    return { ...directory, articleIds }
-  })
-
-  const unassignedArticleIds = props.articles
-    .map((article) => article.id)
-    .filter((articleId) => !assignedIds.has(articleId))
-
-  if (unassignedArticleIds.length) {
-    directories.value = directories.value.map((directory, index) =>
-      index === 0
-        ? { ...directory, articleIds: [...directory.articleIds, ...unassignedArticleIds] }
-        : directory
-    )
-  }
-}
-
-watch(() => props.articles.map((article) => article.id).join(','), syncMockDirectoryArticles, { immediate: true })
-// rebuild directory article assignments when articles change
-watch(() => props.articles.map((article) => article.id).join(','), () => {
-  // update articleIds for each directory based on category names
-  if (directories.value.length) {
-    directories.value = directories.value.map((directory) => ({
-      ...directory,
-      articleIds: props.articles
-        .filter((a) => a.categoryName === directory.name)
-        .map((a) => a.id),
-    }))
-  }
-}, { immediate: true })
 
 let mouseMoveListener: ((e: MouseEvent) => void) | null = null
 let lastMouseX: number | null = null
 
 onMounted(() => {
-  fetchCategories()
+  // categories 由 App.vue 提供，无需单独调用 API
 
   // open when cursor moves leftwards and crosses left 20% of the viewport
   mouseMoveListener = (e: MouseEvent) => {
@@ -181,11 +102,10 @@ onMounted(() => {
     if (!allowSidebar.value) return
     const shell = shellRef.value
     if (!shell) return
-    const threshold = window.innerWidth * 0.2 // left 20% of viewport
+    const threshold = window.innerWidth * 0.2
     const prevX = lastMouseX ?? e.clientX
     const delta = e.clientX - prevX
     lastMouseX = e.clientX
-    // only trigger when moving left (delta < 0) and within threshold
     if (delta < 0 && e.clientX <= threshold) {
       openSidebar()
     }

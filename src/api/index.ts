@@ -28,13 +28,34 @@ export function getAuthHeaders(): Record<string, string> {
 }
 
 // ═══════════════════════════════════════════════════════════════
+// Global auth lifecycle handler
+// 权限校验唯一真相源 = 后端响应状态码
+//   401 → 未登录 / token 过期 → 清本地状态 + 弹登录窗
+//   403 → 已登录但权限不足 → 静默记录
+// ═══════════════════════════════════════════════════════════════
+axios.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (axios.isAxiosError(error)) {
+      const status = error.response?.status
+      if (status === 401) {
+        localStorage.removeItem('authToken')
+        localStorage.removeItem('authUser')
+        window.dispatchEvent(new CustomEvent('auth:expired'))
+      } else if (status === 403) {
+        console.warn('权限不足 (403):', error.config?.url)
+      }
+    }
+    return Promise.reject(error)
+  }
+)
+
+// ═══════════════════════════════════════════════════════════════
 // Categories
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list', {
-    headers: hasAuthToken() ? getAuthHeaders() : undefined,
-  })
+  const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list')
   const data = Array.isArray(response.data) ? response.data : response.data?.data
   if (Array.isArray(data)) {
     return data.map((c: any) => ({
@@ -63,7 +84,6 @@ export async function deleteCategory(id: number): Promise<void> {
 export async function fetchTags(): Promise<Tag[]> {
   const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
     '/api/tags/page?pageNum=1&pageSize=200',
-    { headers: hasAuthToken() ? getAuthHeaders() : undefined },
   )
   const payload = response.data?.data || response.data
   const records: any[] = Array.isArray(payload?.records) ? payload.records : []
@@ -128,7 +148,6 @@ function extractRecords(response: any): { records: any[]; total: number } {
 }
 
 export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ articles: ArticleListItem[]; total: number }> {
-  if (!hasAuthToken()) return { articles: [], total: 0 }
   const [publishedRes, draftRes] = await Promise.all([
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
