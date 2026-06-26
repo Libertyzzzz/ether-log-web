@@ -12,15 +12,15 @@ export default defineConfig(({ mode }) => {
     plugins: [
       vue(),
       VitePWA({
-      registerType: 'autoUpdate', // 自动更新 Service Worker
+      registerType: 'autoUpdate',
       manifest: {
         name: '尘埃 - Dust',
         short_name: 'Dust',
         description: '数字化遗产管理工具',
-        theme_color: '#ffffff', // 建议配合你的极简白背景
+        theme_color: '#ffffff',
         icons: [
           {
-            src: 'pwa-192x192.png', // 需放在 public 目录下
+            src: 'pwa-192x192.png',
             sizes: '192x192',
             type: 'image/png'
           },
@@ -30,11 +30,14 @@ export default defineConfig(({ mode }) => {
             type: 'image/png'
           }
         ],
-        display: 'standalone', // 关键：隐藏浏览器地址栏，模拟原生 App
+        display: 'standalone',
         start_url: '/',
       },
+      workbox: {
+        maximumFileSizeToCacheInBytes: 5 * 1024 * 1024 // 5MB
+      },
       devOptions: {
-        enabled: true // 开发环境也开启，方便你调试
+        enabled: true
       }
     })
     ],
