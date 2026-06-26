@@ -1,11 +1,14 @@
-import { ref, computed } from 'vue'
+import { ref, computed, onUnmounted } from 'vue'
 import axios from 'axios'
 import type { LoginUser } from '../types/blog'
 import {
   hasAuthToken,
   login as apiLogin,
+  refreshToken as apiRefreshToken,
   fetchUserProfile as apiFetchUserProfile,
   updateUserProfile as apiUpdateUserProfile,
+  getTokenExpire,
+  setTokenExpire,
 } from '../api'
 
 const emptyLoginUser: Partial<LoginUser> = {
@@ -15,6 +18,70 @@ const emptyLoginUser: Partial<LoginUser> = {
 }
 
 export { hasAuthToken, getAuthHeaders } from '../api'
+
+// token 续约定时器：只要 token 还没过期就排 refresh
+//   - 过期前一半时间点触发，最少 5s，最多 30s
+//   - 已过期 → 不主动刷，等后端返回 1004
+// 续约成功 → 覆盖本地 token 并重新排下一次
+// 续约失败（code=1003/1004）→ 由响应拦截器清登录态
+const MIN_REFRESH_INTERVAL_MS = 5 * 1000
+
+let refreshTimer: ReturnType<typeof setTimeout> | null = null
+let isRefreshing = false
+let lastRefreshAt = 0
+
+function clearRefreshTimer() {
+  if (refreshTimer !== null) {
+    clearTimeout(refreshTimer)
+    refreshTimer = null
+  }
+}
+
+function scheduleRefresh() {
+  clearRefreshTimer()
+  const expire = getTokenExpire()
+  if (!expire) return
+
+  const now = Date.now()
+  const msUntilExpire = expire - now
+  if (msUntilExpire <= 0) return
+
+  // 过期前一半时间点触发，夹在 [5s, 30s] 之间
+  let delay = Math.floor(msUntilExpire / 2)
+  if (delay < MIN_REFRESH_INTERVAL_MS) delay = MIN_REFRESH_INTERVAL_MS
+  if (delay > 30 * 1000) delay = 30 * 1000
+
+  const minAllowed = Math.max(0, lastRefreshAt + MIN_REFRESH_INTERVAL_MS - now)
+  if (delay < minAllowed) delay = minAllowed
+
+  refreshTimer = setTimeout(async () => {
+    await runRefresh()
+    if (hasAuthToken()) {
+      scheduleRefresh()
+    }
+  }, delay)
+}
+
+async function runRefresh() {
+  if (isRefreshing) return
+  if (!hasAuthToken()) return
+  const now = Date.now()
+  if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return
+
+  isRefreshing = true
+  lastRefreshAt = now
+  try {
+    const { token, expire } = await apiRefreshToken()
+    localStorage.setItem('authToken', token)
+    if (typeof expire === 'number') {
+      setTokenExpire(expire)
+    }
+  } catch (e) {
+    console.warn('[auth] token 续约失败:', e)
+  } finally {
+    isRefreshing = false
+  }
+}
 
 export function useAuth() {
   const isLoggedIn = ref(false)
@@ -36,10 +103,13 @@ export function useAuth() {
           isLoggedIn.value = true
         } catch {
           clearLoginState()
+          return
         }
       } else {
         isLoggedIn.value = true
       }
+      // 已有登录态 → 立刻安排下一次刷新
+      scheduleRefresh()
     }
   }
 
@@ -48,7 +118,9 @@ export function useAuth() {
     loginUser.value = emptyLoginUser
     loginError.value = ''
     localStorage.removeItem('authToken')
+    localStorage.removeItem('authTokenExpire')
     localStorage.removeItem('authUser')
+    clearRefreshTimer()
   }
 
   async function login(email: string, password: string): Promise<boolean> {
@@ -63,9 +135,15 @@ export function useAuth() {
       const loginData = await apiLogin(email, password)
 
       localStorage.setItem('authToken', loginData.token)
+      if (typeof loginData.expire === 'number') {
+        setTokenExpire(loginData.expire)
+      }
       localStorage.setItem('authUser', JSON.stringify(loginData.user))
       loginUser.value = loginData.user
       isLoggedIn.value = true
+
+      // 安排 token 自动续约
+      scheduleRefresh()
 
       // 静默更新最后登录时间
       const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
@@ -141,6 +219,10 @@ export function useAuth() {
       return false
     }
   }
+
+  onUnmounted(() => {
+    clearRefreshTimer()
+  })
 
   return {
     isLoggedIn,

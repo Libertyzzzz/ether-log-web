@@ -1034,9 +1034,19 @@ onMounted(async () => {
     showAppToast(detail.message || '', detail.type || 'info')
   })
   // 后端返回 401 时，axios 拦截器触发此事件 → 清本地登录态 + 弹登录窗
-  window.addEventListener('auth:expired', () => {
+  // code=1004 (MAX_EXPIRED) —— token 超过最大有效期，强制提醒重新登录
+  // code=1003 (TOKEN_INVALID) —— token 无效
+  window.addEventListener('auth:expired', (evt: Event) => {
     clearLoginState()
-    showAppToast('登录已过期，请重新登录', 'info')
+    const detail = (evt as CustomEvent).detail
+    const code = detail?.code
+    if (code === 1004) {
+      showAppToast('登录已过期，请重新登录', 'warning')
+    } else if (code === 1003) {
+      showAppToast('登录态无效，请重新登录', 'warning')
+    } else {
+      showAppToast('登录已过期，请重新登录', 'info')
+    }
     showLoginModal.value = true
   })
 })

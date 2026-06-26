@@ -81,7 +81,13 @@ export interface LoginUser {
 
 export interface LoginData {
   token: string
+  expire: number
   user: LoginUser
+}
+
+export interface RefreshTokenData {
+  token: string
+  expire: number
 }
 
 export interface UploadImageData {

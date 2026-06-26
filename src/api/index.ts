@@ -9,6 +9,7 @@ import type {
   LoginData,
   LoginUser,
   PageResponse,
+  RefreshTokenData,
   ResultResponse,
   Tag,
   UploadImageData,
@@ -18,30 +19,84 @@ import type {
 // Auth Helpers
 // ═══════════════════════════════════════════════════════════════
 
+const TOKEN_KEY = 'authToken'
+const TOKEN_EXPIRE_KEY = 'authTokenExpire'
+
 export function hasAuthToken(): boolean {
-  return !!localStorage.getItem('authToken')
+  return !!localStorage.getItem(TOKEN_KEY)
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem('authToken')
+  const token = localStorage.getItem(TOKEN_KEY)
   return token ? { Authorization: token } : {}
+}
+
+// 解析 JWT 的 payload 部分（不做签名校验，仅用于读取 exp / maxExpire）
+export function parseJwt<T = any>(token: string): T | null {
+  try {
+    const parts = token.split('.')
+    if (parts.length < 2) return null
+    const base64 = parts[1].replace(/-/g, '+').replace(/_/g, '/')
+    const json = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    )
+    return JSON.parse(json)
+  } catch (e) {
+    return null
+  }
+}
+
+export function getTokenExpire(): number | null {
+  const stored = localStorage.getItem(TOKEN_EXPIRE_KEY)
+  if (stored) {
+    const n = Number(stored)
+    if (!Number.isNaN(n)) return n
+  }
+  // 回退：从 token 本身解析 exp（后端约定 exp 也是毫秒
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (!token) return null
+  const payload = parseJwt<{ exp: number }>(token)
+  if (payload && typeof payload.exp === 'number') {
+    return payload.exp
+  }
+  return null
+}
+
+export function setTokenExpire(expireMs: number) {
+  localStorage.setItem(TOKEN_EXPIRE_KEY, String(expireMs))
 }
 
 // ═══════════════════════════════════════════════════════════════
 // Global auth lifecycle handler
-// 权限校验唯一真相源 = 后端响应状态码
-//   401 → 未登录 / token 过期 → 清本地状态 + 弹登录窗
+//   401 → 未登录 / token 过期 → 清本地状态
 //   403 → 已登录但权限不足 → 静默记录
+//   code=1003 (TOKEN_INVALID) / code=1004 (MAX_EXPIRED) → 清本地状态 + 提示重新登录
 // ═══════════════════════════════════════════════════════════════
 axios.interceptors.response.use(
-  (response) => response,
+  (response) => {
+    const body = response.data
+    const code = body?.code
+    if (code === 1003 || code === 1004) {
+      localStorage.removeItem(TOKEN_KEY)
+      localStorage.removeItem(TOKEN_EXPIRE_KEY)
+      localStorage.removeItem('authUser')
+      window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code } }))
+      // 中断响应链，让调用方 catch 到异常
+      return Promise.reject(new Error(body?.message || '登录已过期'))
+    }
+    return response
+  },
   (error) => {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
       if (status === 401) {
-        localStorage.removeItem('authToken')
+        localStorage.removeItem(TOKEN_KEY)
+        localStorage.removeItem(TOKEN_EXPIRE_KEY)
         localStorage.removeItem('authUser')
-        window.dispatchEvent(new CustomEvent('auth:expired'))
+        window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code: undefined } }))
       } else if (status === 403) {
         console.warn('权限不足 (403):', error.config?.url)
       }
@@ -239,6 +294,13 @@ export async function searchArticles(keyword: string): Promise<any[]> {
 // Auth
 // ═══════════════════════════════════════════════════════════════
 
+// 后端返回的 expire 以及 JWT payload 中的 exp 统一都是毫秒时间戳（epoch milliseconds）
+// —— 前端不再做任何单位换算，仅做有效性校验
+function normalizeExpire(value: number | undefined | null): number | undefined {
+  if (typeof value !== 'number' || Number.isNaN(value)) return undefined
+  return value
+}
+
 export async function login(email: string, password: string): Promise<LoginData> {
   const response = await axios.post<ResultResponse<LoginData>>('/api/auth/login', {
     username: email,
@@ -251,7 +313,38 @@ export async function login(email: string, password: string): Promise<LoginData>
   if (!loginData?.token || !loginData.user) {
     throw new Error('登录返回数据格式不正确')
   }
+  // 优先用接口返回的 expire（已经是毫秒）；接口没给再从 token payload 解析（也是毫秒）
+  const fromApi = normalizeExpire(loginData.expire)
+  if (fromApi) {
+    loginData.expire = fromApi
+  } else {
+    const payload = parseJwt(loginData.token)
+    if (payload && typeof payload.exp === 'number') {
+      loginData.expire = payload.exp
+    }
+  }
   return loginData
+}
+
+// 刷新 token —— 请求头携带当前 Authorization；
+// 续约成功：更新本地 token 和 expire；
+// 续约失败：响应拦截器会根据后端返回的 code (1003/1004) 处理登录态清理，这里不做额外判断。
+export async function refreshToken(): Promise<RefreshTokenData> {
+  const token = localStorage.getItem(TOKEN_KEY)
+  if (!token) throw new Error('当前无登录态，无法刷新 token')
+  const response = await axios.post<ResultResponse<RefreshTokenData>>(
+    '/api/auth/refresh',
+    {},
+    { headers: { Authorization: token } }
+  )
+  if (response.data.code !== 200) {
+    throw new Error(response.data.message || '刷新 token 失败')
+  }
+  const data = response.data.data
+  if (!data?.token) throw new Error('刷新返回数据格式不正确')
+  const normalized = normalizeExpire(data.expire)
+  if (normalized) data.expire = normalized
+  return data
 }
 
 export async function fetchUserProfile(userId: number): Promise<LoginUser | null> {
