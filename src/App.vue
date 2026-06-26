@@ -1041,9 +1041,9 @@ onMounted(async () => {
     const detail = (evt as CustomEvent).detail
     const code = detail?.code
     if (code === 1004) {
-      showAppToast('登录已过期，请重新登录', 'warning')
+      showAppToast('登录已过期，请重新登录', 'info')
     } else if (code === 1003) {
-      showAppToast('登录态无效，请重新登录', 'warning')
+      showAppToast('登录态无效，请重新登录', 'info')
     } else {
       showAppToast('登录已过期，请重新登录', 'info')
     }
