@@ -200,7 +200,7 @@ const isOrderedListActive = computed(() => editor.value?.isActive('orderedList')
 const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || false)
 
 // ── TOC 目录导航 ──
-type TocItem = { id: string; text: string; level: number }
+type TocItem = { id: string; text: string; level: number; pos: number }
 
 const tocCollapsed = ref(false)
 const tocItems = ref<TocItem[]>([])
@@ -209,28 +209,49 @@ let tocObserver: IntersectionObserver | null = null
 
 function extractTocFromEditor() {
   if (!editor.value) { tocItems.value = []; return }
-  const html = editor.value.getHTML()
-  const parser = new DOMParser()
-  const doc = parser.parseFromString(html, 'text/html')
-  const headings = doc.querySelectorAll('h1, h2, h3')
+  const { state } = editor.value
   const items: TocItem[] = []
-  headings.forEach((h, i) => {
-    const id = `toc-heading-${i}`
-    h.id = id
-    const level = parseInt(h.tagName[1], 10)
-    items.push({ id, text: h.textContent?.trim() || '', level })
+  state.doc.descendants((node, pos) => {
+    if (node.type.name === 'heading') {
+      const id = `toc-heading-${items.length}`
+      items.push({
+        id,
+        text: node.textContent || '',
+        level: node.attrs.level as number,
+        pos,
+      })
+    }
+    return true
   })
   tocItems.value = items
 }
 
 function scrollToTocItem(id: string) {
-  const el = editor.value?.view.dom.querySelector(`#${id}`)
-  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  if (!editor.value) return
+  const idx = tocItems.value.findIndex(t => t.id === id)
+  if (idx < 0) return
+  const headings = editor.value.view.dom.querySelectorAll('h1, h2, h3')
+  const target = headings[idx] as HTMLElement | undefined
+  if (!target) return
+  // .editor-pane 就是滚动容器
+  const editorPane = document.querySelector('.editor-pane') as HTMLElement | null
+  if (!editorPane) return
+  const targetTop = target.offsetTop - editorPane.offsetTop - 20
+  editorPane.scrollTo({ top: Math.max(0, targetTop), behavior: 'smooth' })
 }
 
 function setupTocObserver() {
   if (typeof IntersectionObserver === 'undefined') return
   tocObserver?.disconnect()
+  if (!editor.value) return
+  const container = editor.value.view.dom
+  // 重新给 DOM 中的标题设置 id
+  const headings = container.querySelectorAll('h1, h2, h3')
+  headings.forEach((h, i) => {
+    if (tocItems.value[i]) {
+      h.id = tocItems.value[i].id
+    }
+  })
   tocObserver = new IntersectionObserver(
     (entries) => {
       for (const entry of entries) {
@@ -242,8 +263,6 @@ function setupTocObserver() {
     },
     { rootMargin: '-80px 0px -60% 0px', threshold: 0 }
   )
-  const container = editor.value?.view.dom
-  if (!container) return
   tocItems.value.forEach((item) => {
     const el = container.querySelector(`#${item.id}`)
     if (el) tocObserver!.observe(el)
