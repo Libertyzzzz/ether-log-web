@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch } from 'vue'
-import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2 } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, ref, watch, onMounted } from 'vue'
+import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2, ListTree, ChevronRight } from 'lucide-vue-next'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import TiptapImage from '@tiptap/extension-image'
@@ -198,6 +198,75 @@ const isQuoteActive = computed(() => editor.value?.isActive('blockquote') || fal
 const isListActive = computed(() => editor.value?.isActive('bulletList') || false)
 const isOrderedListActive = computed(() => editor.value?.isActive('orderedList') || false)
 const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || false)
+
+// ── TOC 目录导航 ──
+type TocItem = { id: string; text: string; level: number }
+
+const tocCollapsed = ref(false)
+const tocItems = ref<TocItem[]>([])
+const activeTocId = ref('')
+let tocObserver: IntersectionObserver | null = null
+
+function extractTocFromEditor() {
+  if (!editor.value) { tocItems.value = []; return }
+  const html = editor.value.getHTML()
+  const parser = new DOMParser()
+  const doc = parser.parseFromString(html, 'text/html')
+  const headings = doc.querySelectorAll('h1, h2, h3')
+  const items: TocItem[] = []
+  headings.forEach((h, i) => {
+    const id = `toc-heading-${i}`
+    h.id = id
+    const level = parseInt(h.tagName[1], 10)
+    items.push({ id, text: h.textContent?.trim() || '', level })
+  })
+  tocItems.value = items
+}
+
+function scrollToTocItem(id: string) {
+  const el = editor.value?.view.dom.querySelector(`#${id}`)
+  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+}
+
+function setupTocObserver() {
+  if (typeof IntersectionObserver === 'undefined') return
+  tocObserver?.disconnect()
+  tocObserver = new IntersectionObserver(
+    (entries) => {
+      for (const entry of entries) {
+        if (entry.isIntersecting) {
+          activeTocId.value = entry.target.id
+          break
+        }
+      }
+    },
+    { rootMargin: '-80px 0px -60% 0px', threshold: 0 }
+  )
+  const container = editor.value?.view.dom
+  if (!container) return
+  tocItems.value.forEach((item) => {
+    const el = container.querySelector(`#${item.id}`)
+    if (el) tocObserver!.observe(el)
+  })
+}
+
+watch(
+  () => props.publishForm.contentHtml,
+  () => {
+    extractTocFromEditor()
+    nextTick(() => setupTocObserver())
+  },
+  { flush: 'post' }
+)
+
+onMounted(() => {
+  extractTocFromEditor()
+  nextTick(() => setupTocObserver())
+})
+
+onBeforeUnmount(() => {
+  tocObserver?.disconnect()
+})
 </script>
 
 <template>
@@ -398,6 +467,39 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
           <EditorContent v-if="editor" :editor="editor" class="rich-editor-shell" />
         </div>
       </main>
+
+      <!-- 右侧 TOC 目录导航 -->
+      <aside class="publish-toc" :class="{ collapsed: tocCollapsed }">
+        <button
+          class="toc-toggle-btn"
+          type="button"
+          :title="tocCollapsed ? '展开目录' : '收起目录'"
+          @click="tocCollapsed = !tocCollapsed"
+        >
+          <ListTree :size="13" />
+          <span>{{ tocCollapsed ? '目录' : '收起' }}</span>
+        </button>
+
+        <template v-if="!tocCollapsed">
+          <div class="toc-list" v-if="tocItems.length">
+            <button
+              v-for="item in tocItems"
+              :key="item.id"
+              class="toc-item"
+              :class="{ active: activeTocId === item.id }"
+              :style="{ paddingLeft: `${(item.level - 1) * 0.75 + 0.5}rem` }"
+              @click="scrollToTocItem(item.id)"
+            >
+              <ChevronRight :size="10" class="toc-chevron" />
+              <span class="toc-text">{{ item.text }}</span>
+            </button>
+          </div>
+          <div v-else class="toc-empty">
+            <span>暂无目录</span>
+            <span class="toc-empty-hint">在编辑器中使用标题语法创建章节</span>
+          </div>
+        </template>
+      </aside>
 
     </div>
   </div>
@@ -999,11 +1101,112 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
   margin: 0;
 }
 
+/* ════════════════════════════════
+   右侧 TOC 目录导航
+════════════════════════════════ */
+.publish-toc {
+  width: 200px;
+  flex-shrink: 0;
+  height: 100%;
+  overflow-y: auto;
+  padding: 2rem 1rem 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  background: #f8fafc;
+  border-left: 1px solid rgba(226, 232, 240, 0.7);
+  scrollbar-width: none;
+}
+.publish-toc::-webkit-scrollbar { display: none; }
+.publish-toc.collapsed {
+  width: 48px;
+  overflow: hidden;
+}
+
+.toc-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: none;
+  background: transparent;
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 9999px;
+  transition: background 0.2s, color 0.2s;
+  align-self: flex-start;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+}
+.toc-toggle-btn:hover { background: rgba(37, 99, 235, 0.08); color: #2563eb; }
+
+.toc-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+.toc-item {
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  width: 100%;
+  border: none;
+  background: transparent;
+  color: #64748b;
+  font-size: 0.75rem;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0.35rem 0.5rem;
+  border-radius: 0.5rem;
+  text-align: left;
+  transition: background 0.15s, color 0.15s;
+  line-height: 1.4;
+}
+.toc-item:hover { background: rgba(37, 99, 235, 0.06); color: #2563eb; }
+.toc-item.active {
+  background: rgba(37, 99, 235, 0.1);
+  color: #2563eb;
+  font-weight: 700;
+}
+.toc-chevron {
+  flex-shrink: 0;
+  opacity: 0.5;
+  transition: opacity 0.15s;
+}
+.toc-item:hover .toc-chevron,
+.toc-item.active .toc-chevron { opacity: 1; }
+.toc-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.toc-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 1.5rem 0.5rem;
+  color: #94a3b8;
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-align: center;
+}
+.toc-empty-hint {
+  font-size: 0.65rem;
+  color: #cbd5e1;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
 /* 响应式 */
 @media (max-width: 768px) {
   .publish-layout { padding-top: 4.5rem; }
   .publish-layout-inner { padding: 0 1rem; }
   .publish-sidebar { display: none; }
+  .publish-toc { display: none; }
   .publish-main {
     padding: 1.5rem 0 4rem;
     overflow-y: auto;
