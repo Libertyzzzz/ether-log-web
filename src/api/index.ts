@@ -132,6 +132,12 @@ export async function deleteCategory(id: number): Promise<void> {
   await axios.delete(`/api/categories/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
 }
 
+export async function updateCategory(id: number, payload: { name: string; sort?: number }): Promise<Category> {
+  const resp = await axios.put(`/api/categories/${id}`, payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const p = resp.data && resp.data.data ? resp.data.data : resp.data
+  return { id: p?.id || id, name: payload.name, sort: payload.sort }
+}
+
 // ═══════════════════════════════════════════════════════════════
 // Tags
 // ═══════════════════════════════════════════════════════════════
@@ -157,6 +163,12 @@ export async function createTag(payload: { name: string; color?: string }): Prom
 
 export async function deleteTag(id: number): Promise<void> {
   await axios.delete(`/api/tags/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+}
+
+export async function updateTag(id: number, payload: { name: string; color?: string }): Promise<Tag> {
+  const resp = await axios.put(`/api/tags/${id}`, payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const p = resp.data && resp.data.data ? resp.data.data : resp.data
+  return { id: p?.id || id, name: payload.name, color: payload.color }
 }
 
 // ═══════════════════════════════════════════════════════════════

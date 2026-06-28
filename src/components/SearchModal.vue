@@ -196,4 +196,21 @@ function handleKeyDown(e: KeyboardEvent) {
   opacity: 0; transform: scale(0.95) translateY(-20px);
 }
 
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .search-overlay { padding-top: 0; align-items: flex-start; }
+  .search-container {
+    width: 100vw; max-width: 100vw; height: 100vh; max-height: 100vh;
+    border-radius: 0; border: none;
+  }
+  .search-input-wrapper { padding: 1rem; }
+  .search-input { font-size: 1rem; }
+  .search-close kbd { display: none; }
+  .search-results { padding: 0.5rem; }
+  .result-item { padding: 0.75rem 0.75rem; }
+  .item-title { font-size: 0.9rem; }
+  .item-desc { font-size: 0.75rem; }
+  .search-footer { padding: 0.75rem 1rem; }
+  .footer-tip { font-size: 0.68rem; }
+}
 </style>

@@ -184,7 +184,8 @@ function removeCoverImage() {
   emit('removeCoverImage')
 }
 
-const sidebarCollapsed = ref(false)
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+const sidebarCollapsed = ref(isMobile.value)
 
 const wordCount = computed(() => {
   const text = props.publishForm.content || ''
@@ -202,7 +203,7 @@ const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || 
 // ── TOC 目录导航 ──
 type TocItem = { id: string; text: string; level: number; pos: number }
 
-const tocCollapsed = ref(false)
+const tocCollapsed = ref(isMobile.value)
 const tocItems = ref<TocItem[]>([])
 const activeTocId = ref('')
 let tocObserver: IntersectionObserver | null = null
@@ -378,6 +379,13 @@ onBeforeUnmount(() => {
 
     <!-- 主体：和文章详情页完全相同的双栏结构 -->
     <div class="publish-layout-inner">
+
+      <!-- 移动端遮罩层 -->
+      <div
+        v-if="(!sidebarCollapsed || !tocCollapsed) && isMobile"
+        class="publish-mobile-overlay"
+        @click="sidebarCollapsed = true; tocCollapsed = true"
+      ></div>
 
       <!-- 左侧设置面板（对应文章详情的 sidebar） -->
       <aside class="publish-sidebar" :class="{ collapsed: sidebarCollapsed }">
@@ -1223,21 +1231,81 @@ onBeforeUnmount(() => {
 /* 响应式 */
 @media (max-width: 768px) {
   .publish-layout { padding-top: 4.5rem; }
-  .publish-layout-inner { padding: 0 1rem; }
-  .publish-sidebar { display: none; }
-  .publish-toc { display: none; }
+  .publish-layout-inner { padding: 0 0.75rem; flex-direction: column; }
+  /* 侧边栏改为底部抽屉 */
+  .publish-sidebar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    width: 100%;
+    max-height: 75vh;
+    border-radius: 1rem 1rem 0 0;
+    border-left: none;
+    border-top: 1px solid rgba(226, 232, 240, 0.7);
+    z-index: 100;
+    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
+    transform: translateY(100%);
+    transition: transform 0.3s ease;
+  }
+  .publish-sidebar:not(.collapsed) {
+    transform: translateY(0);
+  }
+  .publish-sidebar.collapsed {
+    transform: translateY(calc(100% - 3rem));
+  }
+  .sidebar-collapse-btn {
+    border-radius: 1rem 1rem 0 0;
+    width: 100%;
+    justify-content: center;
+    padding: 0.75rem;
+  }
+  /* TOC 改为右侧抽屉 */
+  .publish-toc {
+    position: fixed;
+    top: 0;
+    right: 0;
+    width: 80%;
+    max-width: 280px;
+    height: 100vh;
+    border-left: 1px solid rgba(226, 232, 240, 0.7);
+    z-index: 100;
+    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
+    transform: translateX(100%);
+    transition: transform 0.3s ease;
+  }
+  .publish-toc:not(.collapsed) {
+    transform: translateX(0);
+  }
+  .publish-toc.collapsed {
+    transform: translateX(calc(100% - 2.5rem));
+  }
+  .toc-toggle-btn {
+    border-radius: 0.5rem 0 0 0.5rem;
+  }
+  /* 主编辑区 */
   .publish-main {
-    padding: 1.5rem 0 4rem;
+    padding: 1rem 0 6rem;
     overflow-y: auto;
+    min-height: 70vh;
   }
   .editor-pane {
     flex: none;
-    min-height: 50vh;
+    min-height: 60vh;
+    padding: 1.5rem 1rem 2rem;
   }
+  .publish-title-input { font-size: 1.5rem; }
   .breadcrumb-toolbar { display: none; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
   .word-count { display: none; }
+  /* 移动端遮罩层 */
+  .publish-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99;
+  }
 }
 
 </style>

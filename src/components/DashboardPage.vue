@@ -9,8 +9,10 @@ import type { ArticleListItem, CommentItem, Tag, Category } from '../types/blog'
 import {
   createTag as apiCreateTag,
   deleteTag as apiDeleteTag,
+  updateTag as apiUpdateTag,
   createCategory as apiCreateCategory,
   deleteCategory as apiDeleteCategory,
+  updateCategory as apiUpdateCategory,
   updateArticleField,
 } from '../api'
 
@@ -45,10 +47,12 @@ const newCategoryName = ref('')
 const newCategorySort = ref<number | null>(null)
 const showCreateCategoryDialog = ref(false)
 const deletingCategory = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
+const editingCategory = ref<{ show: boolean; id?: number; name?: string; sort?: number }>({ show: false })
 const newTagName = ref('')
 const newTagColor = ref('#7c3aed')
 const deletingTag = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
 const showCreateTagDialog = ref(false)
+const editingTag = ref<{ show: boolean; id?: number; name?: string; color?: string }>({ show: false })
 
 // dialog-driven create flows (open on header button)
 function openCreateTagDialog() {
@@ -158,6 +162,54 @@ async function performDeleteCategoryAdmin() {
     toast('删除分类失败', 'error')
   } finally {
     deletingCategory.value.show = false
+  }
+}
+
+// ── Edit Category ──
+function openEditCategoryDialog(cat: { id: number; name: string; sort?: number }) {
+  editingCategory.value = { show: true, id: cat.id, name: cat.name, sort: cat.sort }
+}
+
+async function performEditCategory() {
+  const { id, name, sort } = editingCategory.value
+  if (!id || !name?.trim()) {
+    editingCategory.value.show = false
+    return
+  }
+  try {
+    const payload: any = { name: name.trim() }
+    if (sort !== undefined && sort !== null) payload.sort = Number(sort)
+    await apiUpdateCategory(id, payload)
+    toast('分类已更新', 'success')
+    emit('refreshCategories')
+  } catch (e) {
+    console.error('更新分类失败', e)
+    toast('更新分类失败', 'error')
+  } finally {
+    editingCategory.value.show = false
+  }
+}
+
+// ── Edit Tag ──
+function openEditTagDialog(tag: { id: number; name: string; color?: string }) {
+  editingTag.value = { show: true, id: tag.id, name: tag.name, color: tag.color }
+}
+
+async function performEditTag() {
+  const { id, name, color } = editingTag.value
+  if (!id || !name?.trim()) {
+    editingTag.value.show = false
+    return
+  }
+  try {
+    await apiUpdateTag(id, { name: name.trim(), color })
+    toast('标签已更新', 'success')
+    emit('refreshTags')
+  } catch (e) {
+    console.error('更新标签失败', e)
+    toast('更新标签失败', 'error')
+  } finally {
+    editingTag.value.show = false
   }
 }
 
@@ -440,6 +492,7 @@ function getArticleStatusClass(post: ArticleListItem) {
                   <div v-for="cat in categories" :key="cat.id" class="cat-row">
                     <span class="cat-name">{{ cat.name }}</span>
                     <div class="cat-actions">
+                    <button v-if="hasAuthToken()" class="db-action-btn edit" type="button" @click="openEditCategoryDialog(cat)">修改</button>
                     <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteCategory(cat)">删除</button>
                     </div>
                   </div>
@@ -474,6 +527,21 @@ function getArticleStatusClass(post: ArticleListItem) {
               <input v-model.number="newCategorySort" placeholder="排序 (sort)" type="number" />
             </div>
           </AppConfirmDialog>
+
+          <!-- 修改分类弹窗 -->
+          <AppConfirmDialog
+            :show="editingCategory.show"
+            title="修改分类"
+            confirmText="保存"
+            cancelText="取消"
+            @confirm="performEditCategory"
+            @cancel="editingCategory.show = false"
+          >
+            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
+              <input v-model="editingCategory.name" placeholder="分类名称" aria-label="分类名称" />
+              <input v-model.number="editingCategory.sort" placeholder="排序 (sort)" type="number" />
+            </div>
+          </AppConfirmDialog>
         </div>
 
         <!-- 标签管理 -->
@@ -498,7 +566,8 @@ function getArticleStatusClass(post: ArticleListItem) {
                     <span class="cat-name">{{ tag.name }}</span>
                   </div>
                   <div class="cat-actions">
-                    <button class="db-action-btn view" type="button" @click="confirmDeleteTag(tag)">删除</button>
+                    <button v-if="hasAuthToken()" class="db-action-btn edit" type="button" @click="openEditTagDialog(tag)">修改</button>
+                    <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteTag(tag)">删除</button>
                   </div>
                 </div>
               </div>
@@ -530,6 +599,21 @@ function getArticleStatusClass(post: ArticleListItem) {
             <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
               <input v-model="newTagName" placeholder="标签名称" aria-label="标签名称" />
               <label style="display:flex;gap:0.6rem;align-items:center"><span style="font-size:0.85rem;color:#64748b">颜色</span><input type="color" v-model="newTagColor" style="width:2.2rem;height:2.2rem;border:0;padding:0;background:transparent"/></label>
+            </div>
+          </AppConfirmDialog>
+
+          <!-- 修改标签弹窗 -->
+          <AppConfirmDialog
+            :show="editingTag.show"
+            title="修改标签"
+            confirmText="保存"
+            cancelText="取消"
+            @confirm="performEditTag"
+            @cancel="editingTag.show = false"
+          >
+            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
+              <input v-model="editingTag.name" placeholder="标签名称" aria-label="标签名称" />
+              <label style="display:flex;gap:0.6rem;align-items:center"><span style="font-size:0.85rem;color:#64748b">颜色</span><input type="color" v-model="editingTag.color" style="width:2.2rem;height:2.2rem;border:0;padding:0;background:transparent"/></label>
             </div>
           </AppConfirmDialog>
         </div>

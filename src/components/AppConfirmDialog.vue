@@ -150,4 +150,15 @@ defineEmits<{
   opacity: 0;
 }
 
+/* 移动端适配 */
+@media (max-width: 768px) {
+  .confirm-overlay { padding: 0; align-items: flex-end; }
+  .confirm-dialog {
+    width: 100vw; max-width: 100vw;
+    border-radius: 1.25rem 1.25rem 0 0;
+    padding: 1.25rem;
+  }
+  .confirm-actions { gap: 0.5rem; }
+  .confirm-btn { min-width: 4.5rem; padding: 0.65rem 0.85rem; font-size: 0.8rem; }
+}
 </style>

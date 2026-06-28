@@ -14,6 +14,9 @@ const props = defineProps<{
   nextArticle: ArticleListItem | null
 }>()
 
+const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
+const sidebarCollapsed = ref(isMobile.value)
+
 defineEmits<{
   close: []
   edit: [article: ArticleDetail | ArticleListItem]
@@ -107,8 +110,15 @@ onUnmounted(() => {
     <!-- ── 主体：左侧导航 + 右侧正文，整体从 navbar 下方开始 ── -->
     <div class="article-layout-inner">
 
+      <!-- 移动端遮罩层 -->
+      <div
+        v-if="!sidebarCollapsed && isMobile"
+        class="article-mobile-overlay"
+        @click="sidebarCollapsed = true"
+      ></div>
+
       <!-- 左侧导航栏 -->
-      <aside class="article-sidebar">
+      <aside class="article-sidebar" :class="{ collapsed: sidebarCollapsed }">
 
         <!-- 返回按钮 -->
         <button class="sidebar-back" type="button" @click="$emit('close')">
@@ -733,13 +743,43 @@ onUnmounted(() => {
 /* ── 响应式 ── */
 @media (max-width: 768px) {
   .article-layout { padding-top: 4.5rem; }
-  .article-layout-inner { padding: 0 1rem; }
-  .article-sidebar { display: none; }
+  .article-layout-inner { padding: 0 0.75rem; }
+  /* 侧边栏改为左侧抽屉 */
+  .article-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 85%;
+    max-width: 320px;
+    height: 100vh;
+    border-right: 1px solid rgba(226, 232, 240, 0.7);
+    z-index: 100;
+    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
+    transform: translateX(-100%);
+    transition: transform 0.3s ease;
+    border-radius: 0;
+  }
+  .article-sidebar:not(.collapsed) {
+    transform: translateX(0);
+  }
+  .article-sidebar.collapsed {
+    transform: translateX(calc(-100% + 2.5rem));
+  }
+  .sidebar-back {
+    border-radius: 0 0.5rem 0.5rem 0;
+  }
   .article-main { padding: 1.5rem 0 4rem; }
   .article-neighbors { grid-template-columns: 1fr; }
   .neighbor-card.placeholder { display: none; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
+  /* 移动端遮罩层 */
+  .article-mobile-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.3);
+    z-index: 99;
+  }
 }
 
 /* 暗色模式 */
