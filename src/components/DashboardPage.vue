@@ -1,6 +1,7 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight, Image } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
+import { useRouter } from 'vue-router'
 import { hasAuthToken } from '../composables/useAuth'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
@@ -41,6 +42,8 @@ const emit = defineEmits<{
   refreshCategories: []
   refreshTags: []
 }>()
+
+const router = useRouter()
 
 // categories / tags 管理 UI 状态（不再独立拉数据，读 props）
 const newCategoryName = ref('')
@@ -296,12 +299,14 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-orb db-orb-2"></div>
         </div>
         <div class="db-hero-inner">
-          <div class="db-hero-icon">
-            <LayoutDashboard :size="28" />
-          </div>
-          <div class="db-hero-info">
-            <h1 class="db-hero-title">控制面板</h1>
-            <p class="db-hero-sub">管理你的文章、评论与内容数据</p>
+          <div class="db-hero-left">
+            <div class="db-hero-icon">
+              <LayoutDashboard :size="24" />
+            </div>
+            <div class="db-hero-info">
+              <h1 class="db-hero-title">控制面板</h1>
+              <p class="db-hero-sub">管理你的文章、评论与内容数据</p>
+            </div>
           </div>
           <button class="db-btn-new" type="button" @click="$emit('newArticle')">
             <Plus :size="15" />
@@ -313,7 +318,7 @@ function getArticleStatusClass(post: ArticleListItem) {
 
     <div class="db-body">
 
-      <!-- ── 统计卡片 ── -->
+      <!-- ── 统计卡片 ─ -->
       <div class="db-stats-grid">
         <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-articles')">
           <div class="db-stat-icon" style="background:rgba(99,102,241,0.1);color:#6366f1"><FileText :size="18"/></div>
@@ -323,24 +328,41 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-stat-wave db-wave-blue"></div>
         </div>
         <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-comments')">
-          <div class="db-stat-icon" style="background:rgba(34,197,94,0.1);color:#22c55e"><MessageSquare :size="18"/></div>
+          <div class="db-stat-icon" style="background:rgba(139,92,246,0.1);color:#8b5cf6"><MessageSquare :size="18"/></div>
           <span class="db-stat-label">待审核评论</span>
           <strong class="db-stat-value">{{ commentCount }}</strong>
           <ArrowRight class="db-stat-arrow" :size="14" />
           <div class="db-stat-wave db-wave-green"></div>
         </div>
         <div class="db-stat-card">
-          <div class="db-stat-icon" style="background:rgba(249,115,22,0.1);color:#f97316"><Eye :size="18"/></div>
+          <div class="db-stat-icon" style="background:rgba(167,139,250,0.1);color:#a78bfa"><Eye :size="18"/></div>
           <span class="db-stat-label">总浏览</span>
           <strong class="db-stat-value">{{ totalViews }}</strong>
           <div class="db-stat-wave db-wave-orange"></div>
         </div>
         <div class="db-stat-card db-stat-card--clickable" @click="scrollToSection('db-drafts')">
-          <div class="db-stat-icon" style="background:rgba(168,85,247,0.1);color:#a855f7"><BookOpen :size="18"/></div>
+          <div class="db-stat-icon" style="background:rgba(196,181,253,0.12);color:#c4b5fd"><BookOpen :size="18"/></div>
           <span class="db-stat-label">草稿</span>
           <strong class="db-stat-value">{{ draftArticles.length }}</strong>
           <ArrowRight class="db-stat-arrow" :size="14" />
           <div class="db-stat-wave db-wave-purple"></div>
+        </div>
+      </div>
+
+      <!-- ── 媒体库入口横幅 ── -->
+      <div class="db-media-banner" @click="router.push('/dashboard/media')">
+        <div class="db-media-banner-left">
+          <div class="db-media-banner-icon">
+            <Image :size="22" />
+          </div>
+          <div class="db-media-banner-info">
+            <strong class="db-media-banner-title">媒体资源管理</strong>
+            <span class="db-media-banner-desc">管理图片、附件等媒体文件</span>
+          </div>
+        </div>
+        <div class="db-media-banner-right">
+          <span class="db-media-banner-action">进入管理</span>
+          <ArrowRight :size="16" class="db-media-banner-arrow" />
         </div>
       </div>
 
@@ -655,34 +677,36 @@ function getArticleStatusClass(post: ArticleListItem) {
 
 <style scoped>
 .db-page { background:#f5f5f7; min-height:100vh; padding-top: 6rem; }
-.db-body { max-width:64rem; margin: 1.5rem auto 0; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:2rem; }
+.db-body { max-width:64rem; margin: 1.5rem auto 0; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:1rem; }
 
 /* ── Hero Banner ── */
 .db-hero { max-width:64rem; margin:0 auto; padding:0 1.5rem; }
 .db-hero-bg-wrap {
   position:relative; overflow:hidden; border-radius:1.75rem;
   background:linear-gradient(160deg,#0a0e1a 0%,#0f172a 40%,#1e1b4b 100%);
-  min-height:120px;
+  min-height:100px;
 }
 .db-hero-bg { position:absolute; inset:0; pointer-events:none; }
 .db-orb {
   position:absolute; border-radius:50%;
   background:radial-gradient(circle,rgba(99,102,241,0.25),transparent 70%);
 }
-.db-orb-1 { width:350px;height:350px;top:-120px;right:-60px; }
-.db-orb-2 { width:180px;height:180px;bottom:-60px;right:180px;background:radial-gradient(circle,rgba(129,140,248,0.15),transparent 70%); }
+.db-orb-1 { width:300px;height:300px;top:-100px;right:-40px; }
+.db-orb-2 { width:160px;height:160px;bottom:-50px;right:160px;background:radial-gradient(circle,rgba(129,140,248,0.15),transparent 70%); }
 .db-hero-inner {
   position:relative; z-index:1;
-  padding: 2.5rem 2.5rem;
-  display:flex; align-items:center; gap:1.25rem;
+  padding: 1.75rem 2.25rem;
+  display:flex; align-items:center; justify-content:space-between; gap:1.25rem;
 }
+.db-hero-left { display:flex; align-items:center; gap:1rem; }
 .db-hero-icon {
-  width:56px; height:56px; border-radius:1.1rem; flex-shrink:0;
-  background:rgba(129,140,248,0.15); border:1px solid rgba(129,140,248,0.25);
+  width:3.25rem; height:3.25rem; border-radius:0.9rem; flex-shrink:0;
+  background:rgba(129,140,248,0.12); border:1px solid rgba(129,140,248,0.2);
   display:flex; align-items:center; justify-content:center; color:#a5b4fc;
 }
-.db-hero-title { margin:0; font-size:1.5rem; font-weight:900; color:#f8fafc; }
-.db-hero-sub { margin:0; font-size:0.85rem; color:#94a3b8; }
+.db-hero-info { display:flex; flex-direction:column; gap:0.15rem; }
+.db-hero-title { margin:0; font-size:1.25rem; font-weight:900; color:#f8fafc; }
+.db-hero-sub { margin:0; font-size:0.78rem; color:#94a3b8; }
 .db-btn-new {
   display:inline-flex; align-items:center; gap:0.4rem;
   padding:0.6rem 1.25rem; border:none; border-radius:9999px;
@@ -708,9 +732,42 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-stat-arrow { position:absolute; top:1rem; right:1rem; color:#cbd5e1; opacity:0; transition: all 0.25s; }
 .db-stat-card--clickable:hover .db-stat-arrow { opacity:1; color:#6366f1; transform: translateX(2px); }
 .db-wave-blue   { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%236366f1'/%3E%3C/svg%3E"); }
-.db-wave-green  { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%2322c55e'/%3E%3C/svg%3E"); }
-.db-wave-orange { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23f97316'/%3E%3C/svg%3E"); }
-.db-wave-purple { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23a855f7'/%3E%3C/svg%3E"); }
+.db-wave-green  { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%238b5cf6'/%3E%3C/svg%3E"); }
+.db-wave-orange { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23a78bfa'/%3E%3C/svg%3E"); }
+.db-wave-purple { background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 32'%3E%3Cpath d='M0 20 Q25 8 50 20 Q75 32 100 20 Q125 8 150 20 Q175 32 200 20 L200 32 L0 32Z' fill='%23c4b5fd'/%3E%3C/svg%3E"); }
+
+/* ── 媒体库入口横幅 ── */
+.db-media-banner {
+  background: #ffffff;
+  border: 1px solid rgba(99,102,241,0.1);
+  border-radius: 1.25rem;
+  padding: 1rem 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  cursor: pointer;
+  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 0 2px 8px rgba(15,23,42,0.04);
+}
+.db-media-banner:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(99,102,241,0.08);
+  border-color: rgba(99,102,241,0.2);
+}
+.db-media-banner:active { transform: translateY(0); transition: transform 0.1s; }
+.db-media-banner-left { display: flex; align-items: center; gap: 0.85rem; }
+.db-media-banner-icon {
+  width: 2.5rem; height: 2.5rem; border-radius: 0.75rem;
+  background: rgba(99,102,241,0.08); color: #6366f1;
+  display: flex; align-items: center; justify-content: center;
+}
+.db-media-banner-info { display: flex; flex-direction: column; gap: 0.15rem; }
+.db-media-banner-title { font-size: 0.9rem; font-weight: 800; color: #0f172a; }
+.db-media-banner-desc { font-size: 0.75rem; color: #94a3b8; font-weight: 500; }
+.db-media-banner-right { display: flex; align-items: center; gap: 0.4rem; }
+.db-media-banner-action { font-size: 0.8rem; font-weight: 700; color: #6366f1; }
+.db-media-banner-arrow { color: #6366f1; transition: transform 0.2s; }
+.db-media-banner:hover .db-media-banner-arrow { transform: translateX(3px); }
 
 /* ── 主内容双栏 ── */
 .db-main-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:1.25rem; }
@@ -977,6 +1034,8 @@ function getArticleStatusClass(post: ArticleListItem) {
 }
 @media (max-width:600px) {
   .db-stats-grid { grid-template-columns:repeat(2,1fr); }
+  .db-media-banner { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
+  .db-media-banner-right { align-self: flex-end; }
   .db-table-head,
   .db-table-row { grid-template-columns:1fr auto; }
   .db-table-head span:nth-child(2),
@@ -984,6 +1043,7 @@ function getArticleStatusClass(post: ArticleListItem) {
   .db-table-row .db-row-cat,
   .db-table-row .db-row-status { display:none; }
   .db-hero-inner { flex-wrap:wrap; }
+  .db-hero-left { width:100%; }
   .db-btn-new { width:100%; justify-content:center; }
 }
 

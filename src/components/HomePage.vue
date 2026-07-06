@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee, Clock } from 'lucide-vue-next'
+import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee, Clock, ChevronLeft, ChevronRight } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 import { getReadingTime } from '../utils/format'
@@ -105,6 +105,14 @@ function formatDate(dateStr: string) {
   if (!dateStr) return ''
   return dateStr.slice(0, 10)
 }
+
+// 分类横向滚动
+const catScrollRef = ref<HTMLElement | null>(null)
+function scrollCategories(dir: number) {
+  const el = catScrollRef.value
+  if (!el) return
+  el.scrollBy({ left: dir * 280, behavior: 'smooth' })
+}
 </script>
 
 <template>
@@ -168,25 +176,33 @@ function formatDate(dateStr: string) {
       </div>
     </section>
 
-    <!-- ── 分类卡片（固定静态，图标写死） ── -->
+    <!-- ── 分类卡片（横向滚动） ─ -->
     <section class="hp-categories">
-      <div class="hp-categories-inner">
-        <div
-          v-for="cat in categories"
-          :key="cat.id"
-          class="hp-cat-card"
-          :class="{ active: activeCategoryId === cat.id }"
-          @click="$emit('toggleCategory', cat.id); $emit('scrollToPosts')"
-        >
-          <div class="hp-cat-icon">
-            <component :is="categoryIconMap[cat.name] || BookMarked" :size="20" />
+      <div class="hp-categories-wrapper">
+        <button class="hp-cat-scroll-btn hp-cat-scroll-left" type="button" @click="scrollCategories(-1)">
+          <ChevronLeft :size="16" />
+        </button>
+        <div class="hp-categories-inner" ref="catScrollRef">
+          <div
+            v-for="cat in categories"
+            :key="cat.id"
+            class="hp-cat-card"
+            :class="{ active: activeCategoryId === cat.id }"
+            @click="$emit('toggleCategory', cat.id); $emit('scrollToPosts')"
+          >
+            <div class="hp-cat-icon">
+              <component :is="categoryIconMap[cat.name] || BookMarked" :size="18" />
+            </div>
+            <div class="hp-cat-info">
+              <strong>{{ cat.name }}</strong>
+              <span>{{ categoryDescMap[cat.name] || cat.name }}</span>
+            </div>
+            <ArrowRight class="hp-cat-arrow" :size="13" />
           </div>
-          <div class="hp-cat-info">
-            <strong>{{ cat.name }}</strong>
-            <span>{{ categoryDescMap[cat.name] || cat.name }}</span>
-          </div>
-          <ArrowRight class="hp-cat-arrow" :size="14" />
         </div>
+        <button class="hp-cat-scroll-btn hp-cat-scroll-right" type="button" @click="scrollCategories(1)">
+          <ChevronRight :size="16" />
+        </button>
       </div>
     </section>
 
@@ -369,7 +385,7 @@ function formatDate(dateStr: string) {
   border: 1px solid rgba(191, 219, 254, 0.22);
   border-radius: 1.5rem;
   overflow: hidden;
-  padding: 2rem 2.5rem;
+  padding: 1.5rem 2rem;
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
   gap: 1.5rem;
@@ -411,8 +427,8 @@ function formatDate(dateStr: string) {
 .hp-label-arrow { color: #c4b5fd; }
 
 .hp-hero-title {
-  margin: 0 0 1rem;
-  font-size: clamp(1.5rem, 2.8vw, 2.2rem);
+  margin: 0 0 0.85rem;
+  font-size: clamp(1.35rem, 2.5vw, 2rem);
   font-weight: 900;
   line-height: 1.15;
   letter-spacing: -0.03em;
@@ -427,8 +443,8 @@ function formatDate(dateStr: string) {
 }
 
 .hp-hero-sub {
-  margin: 0 0 1.25rem;
-  font-size: 0.88rem;
+  margin: 0 0 1rem;
+  font-size: 0.82rem;
   color: #cbd5e1;
   line-height: 1.75;
   font-weight: 400;
@@ -436,19 +452,19 @@ function formatDate(dateStr: string) {
 
 .hp-hero-actions {
   display: flex;
-  gap: 0.85rem;
+  gap: 0.7rem;
   flex-wrap: wrap;
 }
 .hp-btn-primary {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   border: 1px solid rgba(191, 219, 254, 0.18);
   border-radius: 9999px;
   background: linear-gradient(135deg, #1e293b 0%, #334155 100%);
   color: white;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 800;
   cursor: pointer;
   transition: background 0.2s, transform 0.15s;
@@ -458,12 +474,12 @@ function formatDate(dateStr: string) {
   display: inline-flex;
   align-items: center;
   gap: 0.5rem;
-  padding: 0.75rem 1.5rem;
+  padding: 0.65rem 1.25rem;
   border: 1px solid rgba(191, 219, 254, 0.22);
   border-radius: 9999px;
   background: rgba(15, 23, 42, 0.26);
   color: #dbeafe;
-  font-size: 0.88rem;
+  font-size: 0.82rem;
   font-weight: 700;
   cursor: pointer;
   transition: background 0.2s, border-color 0.2s;
@@ -478,7 +494,7 @@ function formatDate(dateStr: string) {
 /* 右侧装饰 */
 .hp-hero-visual {
   position: relative;
-  height: 220px;
+  height: 190px;
 }
 .hp-glass-orb {
   position: absolute;
@@ -486,28 +502,28 @@ function formatDate(dateStr: string) {
   filter: blur(1px);
 }
 .hp-orb-1 {
-  width: 220px; height: 220px;
-  top: 20px; right: 10px;
+  width: 185px; height: 185px;
+  top: 15px; right: 10px;
   background: radial-gradient(circle at 35% 35%, rgba(147,197,253,0.34), rgba(96,165,250,0.12) 58%, transparent);
   border: 1px solid rgba(191,219,254,0.22);
 }
 .hp-orb-2 {
-  width: 140px; height: 140px;
-  top: 60px; right: 80px;
+  width: 118px; height: 118px;
+  top: 50px; right: 68px;
   background: radial-gradient(circle at 40% 30%, rgba(240,171,252,0.22), transparent 70%);
   border: 1px solid rgba(240,171,252,0.16);
 }
 .hp-orb-3 {
-  width: 80px; height: 80px;
-  bottom: 80px; right: 40px;
+  width: 68px; height: 68px;
+  bottom: 68px; right: 34px;
   background: radial-gradient(circle, rgba(96,165,250,0.38), transparent 70%);
 }
 .hp-glass-card {
   position: absolute;
   top: 50%; left: 50%;
   transform: translate(-50%, -50%);
-  width: 120px; height: 120px;
-  border-radius: 2rem;
+  width: 102px; height: 102px;
+  border-radius: 1.7rem;
   background: rgba(255,255,255,0.075);
   border: 1px solid rgba(191,219,254,0.2);
   backdrop-filter: blur(20px);
@@ -520,11 +536,11 @@ function formatDate(dateStr: string) {
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 0.25rem;
+  gap: 0.2rem;
 }
-.hp-glass-label { font-size: 0.6rem; font-weight: 800; letter-spacing: 0.2em; color: #93c5fd; text-transform: uppercase; }
-.hp-glass-title { font-size: 3rem; font-weight: 900; color: white; line-height: 1; }
-.hp-glass-sub { font-size: 0.55rem; color: #94a3b8; font-weight: 600; }
+.hp-glass-label { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.2em; color: #93c5fd; text-transform: uppercase; }
+.hp-glass-title { font-size: 2.5rem; font-weight: 900; color: white; line-height: 1; }
+.hp-glass-sub { font-size: 0.5rem; color: #94a3b8; font-weight: 600; }
 
 .hp-float-chip {
   position: absolute;
@@ -542,31 +558,61 @@ function formatDate(dateStr: string) {
 .hp-chip-3 { bottom: 40px; right: 10px; }
 
 /* ════════════════════════════════
-   分类卡片
+   分类卡片（横向滚动）
 ════════════════════════════════ */
 .hp-categories {
   background: transparent;
-  padding: 1.25rem 0 0.5rem;
+  padding: 1rem 0 0.5rem;
 }
-.hp-categories-inner {
+.hp-categories-wrapper {
   max-width: 64rem;
   margin: 0 auto;
   padding: 0 1.5rem;
-  display: grid;
-  grid-template-columns: repeat(4, 1fr);
-  gap: 0.75rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
 }
+.hp-categories-inner {
+  flex: 1;
+  display: flex;
+  gap: 0.75rem;
+  overflow-x: auto;
+  scroll-behavior: smooth;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding: 0.25rem 0;
+}
+.hp-categories-inner::-webkit-scrollbar { display: none; }
+.hp-cat-scroll-btn {
+  flex-shrink: 0;
+  width: 2rem;
+  height: 2rem;
+  border-radius: 50%;
+  border: 1px solid rgba(191,219,254,0.32);
+  background: rgba(255,255,255,0.78);
+  color: #64748b;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.15s;
+  box-shadow: 0 4px 12px rgba(70,91,128,0.08);
+}
+.hp-cat-scroll-btn:hover { background: #fff; color: #2563eb; border-color: rgba(79,124,255,0.34); }
 .hp-cat-card {
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  padding: 0.7rem 0.85rem;
+  gap: 0.6rem;
+  padding: 0.6rem 0.75rem;
   border-radius: 0.85rem;
   background: rgba(255,255,255,0.78);
   border: 1px solid rgba(191,219,254,0.32);
   cursor: pointer;
   transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
   box-shadow: 0 8px 22px rgba(70,91,128,0.07);
+  flex-shrink: 0;
+  width: 200px;
+  min-width: 180px;
 }
 .hp-cat-card:hover {
   box-shadow: 0 14px 34px rgba(59,130,246,0.12);
@@ -1014,20 +1060,23 @@ function formatDate(dateStr: string) {
    响应式
 ════════════════════════════════ */
 @media (max-width: 1024px) {
-  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
   .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 768px) {
-  .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; } /* 移动端切回垂直排列 */
+  .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .hp-hero { padding-left: 1rem; padding-right: 1rem; }
-  .hp-hero-inner { grid-template-columns: 1fr; padding: 2.5rem 1.5rem; border-radius: 1.5rem; }
+  .hp-hero-inner { grid-template-columns: 1fr; padding: 2rem 1.25rem; border-radius: 1.5rem; }
   .hp-hero-visual { display: none; }
-  .hp-categories-inner { grid-template-columns: repeat(2, 1fr); }
+  .hp-cat-scroll-btn { display: none; }
+  .hp-categories-wrapper { padding: 0 1rem; }
+  .hp-categories-inner { padding: 0.25rem 0; }
+  .hp-cat-card { width: 170px; min-width: 160px; }
   .hp-posts-grid { grid-template-columns: 1fr; }
   .hp-quote-content { padding: 2rem 1.5rem; }
 }
 @media (max-width: 480px) {
-  .hp-categories-inner { grid-template-columns: 1fr 1fr; }
+  .hp-cat-card { width: 150px; min-width: 140px; padding: 0.5rem 0.6rem; }
+  .hp-cat-info span { display: none; }
 }
 
 /* 暗色模式 */

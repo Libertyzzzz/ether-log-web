@@ -46,10 +46,9 @@ function scheduleRefresh() {
   const msUntilExpire = expire - now
   if (msUntilExpire <= 0) return
 
-  // 过期前一半时间点触发，夹在 [5s, 30s] 之间
+  // 过期前一半时间点触发，最少 5s
   let delay = Math.floor(msUntilExpire / 2)
   if (delay < MIN_REFRESH_INTERVAL_MS) delay = MIN_REFRESH_INTERVAL_MS
-  if (delay > 30 * 1000) delay = 30 * 1000
 
   const minAllowed = Math.max(0, lastRefreshAt + MIN_REFRESH_INTERVAL_MS - now)
   if (delay < minAllowed) delay = minAllowed

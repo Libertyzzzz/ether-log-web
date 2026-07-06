@@ -57,7 +57,7 @@ const handleImageUpload = async (event: Event) => {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      formData.append('usageType', 'OTHER')
+      formData.append('usageType', '100')
       
       const data = await uploadImage(formData)
 

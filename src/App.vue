@@ -11,6 +11,7 @@ import SidebarNav from './components/SidebarNav.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
+import MediaHubPage from './components/MediaHubPage.vue'
 import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
@@ -734,7 +735,7 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
   try {
     const formData = new FormData()
     formData.append('file', file)
-    const usageTypeMap = { markdown: '3', cover: '2', avatar: '1' } as const
+    const usageTypeMap = { markdown: '3', cover: '1', avatar: '2' } as const
     formData.append('usageType', usageTypeMap[type])
     if (editingArticleId.value && (type === 'markdown' || type === 'cover')) {
       formData.append('usageId', editingArticleId.value.toString())
@@ -1154,6 +1155,11 @@ onUnmounted(() => {
             @page-change="handleAdminPageChange"
             @refresh-categories="fetchCategories"
             @refresh-tags="fetchTags"
+          />
+
+          <MediaHubPage
+            v-if="currentPage === 'dashboard-media'"
+            @back="router.push('/dashboard')"
           />
 
           <GuestbookView

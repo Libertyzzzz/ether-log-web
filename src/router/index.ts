@@ -43,6 +43,12 @@ const router = createRouter({
       meta: { page: 'dashboard' }
     },
     {
+      path: '/dashboard/media',
+      name: 'dashboard-media',
+      component: App,
+      meta: { page: 'dashboard-media', requiresAuth: true }
+    },
+    {
       path: '/publish',
       name: 'publish',
       component: App,

@@ -145,3 +145,43 @@ export interface Tag {
   color?: string
   createTime?: string
 }
+
+export interface ImageInfoVo {
+  id: number
+  fileName: string
+  originalName: string
+  url: string
+  size: number
+  mimeType: string
+  width: number
+  height: number
+  altText: string
+  title: string
+  referenceCount: number
+  usageType: string
+  usageId: number
+  isTemporary: boolean
+  createTime: string
+}
+
+export interface ImageQueryDto {
+  keyword?: string
+  usageType?: string
+  isTemporary?: boolean
+  mimeType?: string
+  pageNum?: number
+  pageSize?: number
+}
+
+export interface ImageReferenceVo {
+  usageType: number
+  usageId: number
+  sourceTitle: string
+  sourceUrl: string
+}
+
+export interface ImageDeleteResultVo {
+  successCount: number
+  failCount: number
+  errorMessages: string[]
+}

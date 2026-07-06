@@ -8,7 +8,6 @@ import {
   Info,
   MoveRight,
   Plus,
-  X,
 } from 'lucide-vue-next'
 import type { ArticleDirectory, ArticleListItem, Category } from '../types/blog'
 
@@ -143,16 +142,6 @@ function closeSidebar() {
     </div>
 
     <aside class="smart-sidebar" :aria-hidden="!isOpen" aria-label="侧边目录导航栏">
-      <div class="sidebar-top">
-        <button class="brand-button" type="button" @click="handleNavigate('home')">
-          <span class="brand-mark">E</span>
-          <span class="brand-text">NEXTIFY</span>
-        </button>
-        <button class="close-button" type="button" aria-label="折叠侧边栏" @click="closeSidebar">
-          <X :size="14" />
-        </button>
-      </div>
-
       <nav class="sidebar-section" aria-label="页面导航">
         <p class="section-label">导航</p>
         <button
@@ -225,10 +214,6 @@ function closeSidebar() {
       </div>
 
       <!-- 目录的新增/删除在控制面板中管理 -->
-
-      <div class="sidebar-footer">
-        <span>目录数据为本地模拟，后续可接后端接口。</span>
-      </div>
     </aside>
   </div>
 </template>
@@ -298,9 +283,9 @@ function closeSidebar() {
   gap: 1.05rem;
   /* remove rounded corners and heavy shadow for edge-aligned seamless look */
   border-radius: 0;
-  background: linear-gradient(180deg, rgba(255,255,255,0.98), rgba(248,250,252,0.98));
+  background: transparent;
   color: #0f172a;
-  border: none;
+  border-right: 1px solid rgba(226, 232, 240, 0.6);
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
@@ -320,14 +305,6 @@ function closeSidebar() {
   opacity: 1;
 }
 
-.sidebar-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 0.75rem;
-}
-.brand-button,
-.close-button,
 .nav-row,
 .directory-button,
 .article-link,
@@ -335,44 +312,6 @@ function closeSidebar() {
   border: 0;
   font: inherit;
   cursor: pointer;
-}
-.brand-button {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55rem;
-  min-width: 0;
-  padding: 0;
-  background: transparent;
-  color: #0f172a;
-}
-.brand-mark {
-  width: 1.55rem;
-  height: 1.55rem;
-  border-radius: 0.42rem;
-  display: grid;
-  place-items: center;
-  background: #0f172a;
-  color: #ffffff;
-  font-size: 0.8rem;
-  font-weight: 950;
-}
-.brand-text {
-  font-size: 0.72rem;
-  letter-spacing: 0.1em;
-  font-weight: 900;
-}
-.close-button {
-  width: 1.65rem;
-  height: 1.65rem;
-  display: grid;
-  place-items: center;
-  border-radius: 999px;
-  background: rgba(241, 245, 249, 0.86);
-  color: #64748b;
-}
-.close-button:hover {
-  background: rgba(226, 232, 240, 0.92);
-  color: #0f172a;
 }
 
 .sidebar-section {
@@ -546,21 +485,6 @@ function closeSidebar() {
   color: #94a3b8;
   font-size: 0.68rem;
   line-height: 1.45;
-}
-
-.sidebar-footer {
-  margin-top: auto;
-  padding: 0.45rem 0.2rem 0;
-  border-top: 1px solid rgba(226, 232, 240, 0.82);
-}
-.sidebar-footer span {
-  display: block;
-  color: #64748b;
-  font-size: 0.66rem;
-  line-height: 1.55;
-
-/* 新建目录模态 */
-/* 新建目录模态 */
 }
 
 @media (max-width: 768px) {

@@ -6,6 +6,10 @@ import type {
   BackendCommentVO,
   Category,
   CommentSubmitRequest,
+  ImageDeleteResultVo,
+  ImageInfoVo,
+  ImageQueryDto,
+  ImageReferenceVo,
   LoginData,
   LoginUser,
   PageResponse,
@@ -455,7 +459,7 @@ export async function verifyAccessCode(code: string): Promise<boolean> {
 
 export async function uploadImage(formData: FormData): Promise<UploadImageData | null> {
   const response = await axios.post<ResultResponse<UploadImageData>>(
-    '/api/admin/upload/image/with-reference',
+    '/api/image/upload/with-reference',
     formData,
     { headers: getAuthHeaders() },
   )
@@ -465,7 +469,40 @@ export async function uploadImage(formData: FormData): Promise<UploadImageData |
   return null
 }
 
-// ═══════════════════════════════════════════════════════════════
+export async function fetchImageList(params: ImageQueryDto = {}): Promise<PageResponse<ImageInfoVo>> {
+  const response = await axios.get<ResultResponse<PageResponse<ImageInfoVo>>>(
+    '/api/image/list',
+    { params, headers: getAuthHeaders() },
+  )
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  return { records: [], total: 0, size: 0, current: 1, pages: 0 }
+}
+
+export async function fetchImageReference(imageId: string): Promise<ImageReferenceVo[]> {
+  const response = await axios.get<ResultResponse<ImageReferenceVo[]>>(
+    '/api/image/reference',
+    { params: { imageId }, headers: getAuthHeaders() },
+  )
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  return []
+}
+
+export async function deleteImages(ids: number[]): Promise<ImageDeleteResultVo> {
+  const response = await axios.delete<ResultResponse<ImageDeleteResultVo>>(
+    '/api/image/delete',
+    { data: { ids }, headers: getAuthHeaders() },
+  )
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  return { successCount: 0, failCount: 0, errorMessages: [] }
+}
+
+// ══════════════════════════════════════════════════════════════
 // Anonymous
 // ═══════════════════════════════════════════════════════════════
 
