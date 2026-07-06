@@ -66,12 +66,15 @@ const {
 
 const {
   articles,
+  totalArticles,
   articleError,
   isLoadingArticles,
+  isLoadingMore,
   selectedArticle,
   selectedArticlePreview,
   isLoadingArticleDetail,
   fetchArticles,
+  loadMoreArticles,
   openArticleDetail,
   closeArticleDetail,
 } = useArticles()
@@ -1111,8 +1114,10 @@ onUnmounted(() => {
             :active-category-id="activeCategoryId"
             :articles="articles"
             :filtered-articles="filteredArticles"
+            :total-articles="totalArticles"
             :article-error="articleError"
             :is-loading-articles="isLoadingArticles"
+            :is-loading-more="isLoadingMore"
             :show-actions="showActionsOnPage"
             :show-featured-only="showFeaturedOnly"
             @toggle-category="toggleCategory"
@@ -1124,6 +1129,7 @@ onUnmounted(() => {
             @open-assessment="openAssessment"
             @open-donate="openDonate"
             @navigate="navigateToSection"
+            @load-more="loadMoreArticles"
           />
 
           <ProfilePage

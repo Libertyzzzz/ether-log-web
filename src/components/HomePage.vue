@@ -10,47 +10,38 @@ const props = defineProps<{
   activeCategoryId: number | null
   articles: ArticleListItem[]
   filteredArticles: ArticleListItem[]
+  totalArticles: number
   articleError: string
   isLoadingArticles: boolean
+  isLoadingMore: boolean
   showActions: boolean
   showFeaturedOnly: boolean
 }>()
 
-defineEmits<{
+const emit = defineEmits<{
   toggleCategory: [categoryId: number]
   openArticle: [article: ArticleListItem]
   editArticle: [article: ArticleListItem]
   deleteArticle: [articleId: number]
   scrollToPosts: []
   toggleFeatured: [val: boolean]
-  openAssessment: [] // 新增：打开人间估值事件
+  openAssessment: []
   openDonate: []
   navigate: [page: string]
+  loadMore: []
 }>()
 
-const PAGE_SIZE = 9
-const displayedCount = ref(PAGE_SIZE)
-const isLoadingMore = ref(false)
-
-const displayedArticles = computed(() =>
-  props.filteredArticles.slice(0, displayedCount.value)
-)
-
 const hasMore = computed(() =>
-  displayedCount.value < props.filteredArticles.length
+  props.filteredArticles.length < props.totalArticles
 )
 
 const remainingCount = computed(() =>
-  props.filteredArticles.length - displayedCount.value
+  props.totalArticles - props.filteredArticles.length
 )
 
 function loadMore() {
-  if (!hasMore.value || isLoadingMore.value) return
-  isLoadingMore.value = true
-  setTimeout(() => {
-    displayedCount.value += PAGE_SIZE
-    isLoadingMore.value = false
-  }, 350)
+  if (!hasMore.value || props.isLoadingMore) return
+  emit('loadMore')
 }
 
 let sentinelObserver: IntersectionObserver | null = null
@@ -60,7 +51,7 @@ onMounted(() => {
   if (typeof IntersectionObserver === 'undefined') return
   sentinelObserver = new IntersectionObserver(
     (entries) => {
-      if (entries[0].isIntersecting && hasMore.value && !isLoadingMore.value) {
+      if (entries[0].isIntersecting && hasMore.value && !props.isLoadingMore) {
         loadMore()
       }
     },
@@ -257,7 +248,7 @@ function scrollCategories(dir: number) {
         <!-- 文章卡片列表（3 列） -->
         <div v-else class="hp-posts-grid">
           <article
-            v-for="(post, index) in displayedArticles"
+            v-for="(post, index) in filteredArticles"
             :key="post.id"
             class="hp-article-card"
             @click="$emit('openArticle', post)"

@@ -8,6 +8,7 @@ import {
   Info,
   MoveRight,
   Plus,
+  X,
 } from 'lucide-vue-next'
 import type { ArticleDirectory, ArticleListItem, Category } from '../types/blog'
 
@@ -23,8 +24,13 @@ const emit = defineEmits<{
 }>()
 
 const isOpen = ref(false)
+const isMobile = ref(false)
 const shellRef = ref<HTMLElement | null>(null)
 const activeDirectoryId = ref(101)
+
+function checkMobile() {
+  isMobile.value = typeof window !== 'undefined' && window.innerWidth <= 1024
+}
 
 const route = useRoute()
 const blockedPages = new Set(['profile', 'dashboard', 'guestbook'])
@@ -93,14 +99,15 @@ let mouseMoveListener: ((e: MouseEvent) => void) | null = null
 let lastMouseX: number | null = null
 
 onMounted(() => {
-  // categories 由 App.vue 提供，无需单独调用 API
+  checkMobile()
+  window.addEventListener('resize', checkMobile)
 
-  // open when cursor moves leftwards and crosses left 20% of the viewport
+  // open when cursor moves leftwards and crosses left 20% of the viewport (desktop only)
   mouseMoveListener = (e: MouseEvent) => {
+    if (isMobile.value) return
     if (isOpen.value) return
     if (!allowSidebar.value) return
-    const shell = shellRef.value
-    if (!shell) return
+    if (!shellRef.value) return
     const threshold = window.innerWidth * 0.2
     const prevX = lastMouseX ?? e.clientX
     const delta = e.clientX - prevX
@@ -120,6 +127,7 @@ watch(() => route.fullPath, () => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', checkMobile)
   if (mouseMoveListener) window.removeEventListener('mousemove', mouseMoveListener)
 })
 
@@ -132,16 +140,47 @@ function closeSidebar() {
   isOpen.value = false
   lastMouseX = null
 }
+
+function toggleSidebar() {
+  if (isOpen.value) {
+    closeSidebar()
+  } else {
+    openSidebar()
+  }
+}
 </script>
 
 <template>
-  <div ref="shellRef" class="smart-sidebar-shell" :class="{ open: isOpen }" @mouseenter="openSidebar" @mouseleave="closeSidebar">
+  <!-- Backdrop overlay (mobile/tablet only) -->
+  <div
+    v-if="isOpen && isMobile"
+    class="sidebar-backdrop"
+    @click="closeSidebar"
+    @touchstart.prevent="closeSidebar"
+  ></div>
+
+  <div
+    ref="shellRef"
+    class="smart-sidebar-shell"
+    :class="{ open: isOpen, mobile: isMobile }"
+    @mouseenter="!isMobile && openSidebar()"
+    @mouseleave="!isMobile && closeSidebar()"
+  >
     <div class="sidebar-hover-bridge" aria-hidden="true"></div>
-    <div class="sidebar-hotspot" aria-hidden="true" :style="{ display: allowSidebar ? 'block' : 'none' }">
+    <div
+      class="sidebar-hotspot"
+      aria-hidden="true"
+      :style="{ display: allowSidebar ? 'block' : 'none' }"
+      @click.stop="toggleSidebar"
+    >
       <span></span>
     </div>
 
     <aside class="smart-sidebar" :aria-hidden="!isOpen" aria-label="侧边目录导航栏">
+      <!-- Close button -->
+      <button class="sidebar-close-btn" type="button" @click="closeSidebar" :aria-label="'关闭侧边栏'">
+        <X :size="18" />
+      </button>
       <nav class="sidebar-section" aria-label="页面导航">
         <p class="section-label">导航</p>
         <button
@@ -219,9 +258,21 @@ function closeSidebar() {
 </template>
 
 <style scoped>
+/* ── Backdrop overlay ── */
+.sidebar-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 1190;
+  background: rgba(0, 0, 0, 0.35);
+  animation: backdropIn 0.18s ease;
+}
+@keyframes backdropIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 .smart-sidebar-shell {
   position: fixed;
-  /* place the sidebar shell below the top navigation (nav height = 5rem) */
   top: 5rem;
   bottom: 0;
   left: 0;
@@ -274,28 +325,24 @@ function closeSidebar() {
 
 .smart-sidebar {
   width: 15.5rem;
-  /* fill the shell (which already starts below the nav) */
   height: 100%;
-  margin: 0 0 0 0;
+  margin: 0;
   padding: 1rem 0.85rem;
   display: flex;
   flex-direction: column;
   gap: 1.05rem;
-  /* remove rounded corners and heavy shadow for edge-aligned seamless look */
   border-radius: 0;
-  background: transparent;
+  background: #f8fafc;
   color: #0f172a;
-  border-right: 1px solid rgba(226, 232, 240, 0.6);
-  box-shadow: none;
-  backdrop-filter: none;
-  -webkit-backdrop-filter: none;
+  border-right: 1px solid rgba(226, 232, 240, 0.8);
+  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06);
   pointer-events: auto;
   overflow: hidden auto;
   scrollbar-width: none;
-  /* hide off-canvas by translating full width; animate quickly for near-instant feel */
   transform: translateX(-100%);
   opacity: 0;
-  transition: transform 0.12s linear, opacity 0.08s linear;
+  transition: transform 0.18s ease, opacity 0.14s ease;
+  position: relative;
 }
 .smart-sidebar::-webkit-scrollbar {
   display: none;
@@ -303,6 +350,28 @@ function closeSidebar() {
 .smart-sidebar-shell.open .smart-sidebar {
   transform: translateX(0);
   opacity: 1;
+}
+
+/* ── Close button ── */
+.sidebar-close-btn {
+  position: absolute;
+  top: 0.5rem;
+  right: 0.5rem;
+  width: 2rem;
+  height: 2rem;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 0.5rem;
+  background: transparent;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+  z-index: 2;
+}
+.sidebar-close-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #334155;
 }
 
 .nav-row,
@@ -487,9 +556,59 @@ function closeSidebar() {
   line-height: 1.45;
 }
 
-@media (max-width: 768px) {
+/* ── Mobile / Tablet: full-height drawer ── */
+@media (max-width: 1024px) {
   .smart-sidebar-shell {
+    top: 0;
+    width: 100%;
+    z-index: 1210;
+    pointer-events: none;
+  }
+  .smart-sidebar-shell.open {
+    pointer-events: auto;
+  }
+  .smart-sidebar-shell.mobile .sidebar-hover-bridge {
     display: none;
+  }
+  .sidebar-hotspot {
+    top: 0.75rem;
+    bottom: auto;
+    left: 0.5rem;
+    width: 2.25rem;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    background: rgba(255, 255, 255, 0.92);
+    border: 1px solid rgba(226, 232, 240, 0.7);
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1220;
+  }
+  .sidebar-hotspot span {
+    position: static;
+    width: 1.1rem;
+    height: 0.12rem;
+    border-radius: 999px;
+    background: #64748b;
+    transform: none;
+    box-shadow: 0 -0.28rem 0 #64748b, 0 0.28rem 0 #64748b;
+  }
+  .smart-sidebar-shell.open .sidebar-hotspot {
+    opacity: 0;
+    pointer-events: none;
+  }
+  .smart-sidebar {
+    width: 80%;
+    max-width: 320px;
+    height: 100%;
+    border-radius: 0 0.75rem 0.75rem 0;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.15);
+    padding-top: 2.5rem;
+  }
+  .sidebar-close-btn {
+    top: 0.5rem;
+    right: 0.5rem;
   }
 }
 

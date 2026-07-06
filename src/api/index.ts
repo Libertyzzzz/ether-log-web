@@ -179,14 +179,17 @@ export async function updateTag(id: number, payload: { name: string; color?: str
 // Articles
 // ═══════════════════════════════════════════════════════════════
 
-export async function fetchPublicArticles(pageNum = 1, pageSize = 10): Promise<ArticleListItem[]> {
+export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ records: ArticleListItem[]; total: number }> {
   const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
     params: { pageNum, pageSize, status: 1 },
   })
   if (response.data.code === 200) {
-    return response.data.data?.records || []
+    const data = response.data.data
+    const records = (data?.records || []).map(mapArticleRecord)
+    const total = data?.total ?? records.length
+    return { records, total }
   }
-  return []
+  return { records: [], total: 0 }
 }
 
 function mapArticleRecord(record: any): ArticleListItem {
