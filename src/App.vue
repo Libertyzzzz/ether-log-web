@@ -1095,8 +1095,8 @@ onUnmounted(() => {
         @close-user-menu="closeUserMenu"
       />
 
-      <!-- Global sidebar (hover from left edge) -->
-      <SidebarNav :articles="articles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+      <!-- Global sidebar (hover from left edge) - only on home, posts, about, and article detail -->
+      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about' || isArticleDetailOpen" :articles="articles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
 
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView

@@ -185,7 +185,7 @@ function removeCoverImage() {
 }
 
 const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
-const sidebarCollapsed = ref(isMobile.value)
+const sidebarCollapsed = ref(true)
 
 const wordCount = computed(() => {
   const text = props.publishForm.content || ''

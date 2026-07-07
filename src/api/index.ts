@@ -229,7 +229,7 @@ export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ a
     ),
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum: 1, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
+      { params: { pageNum, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
     ),
   ])
   const { records: publishedRecords, total } = extractRecords(publishedRes)
