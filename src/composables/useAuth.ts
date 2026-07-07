@@ -104,11 +104,6 @@ export function useAuth() {
 
   function initFromLocalStorage() {
     if (hasAuthToken()) {
-      const expire = getTokenExpire()
-      if (expire && Date.now() >= expire) {
-        clearLoginState()
-        return
-      }
       const stored = localStorage.getItem('authUser')
       if (stored) {
         try {

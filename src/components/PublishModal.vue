@@ -1232,56 +1232,10 @@ onBeforeUnmount(() => {
 @media (max-width: 768px) {
   .publish-layout { padding-top: 4.5rem; }
   .publish-layout-inner { padding: 0 0.75rem; flex-direction: column; }
-  /* 侧边栏改为底部抽屉 */
-  .publish-sidebar {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    width: 100%;
-    max-height: 75vh;
-    border-radius: 1rem 1rem 0 0;
-    border-left: none;
-    border-top: 1px solid rgba(226, 232, 240, 0.7);
-    z-index: 100;
-    box-shadow: 0 -4px 24px rgba(0, 0, 0, 0.1);
-    transform: translateY(100%);
-    transition: transform 0.3s ease;
-  }
-  .publish-sidebar:not(.collapsed) {
-    transform: translateY(0);
-  }
-  .publish-sidebar.collapsed {
-    transform: translateY(calc(100% - 3rem));
-  }
-  .sidebar-collapse-btn {
-    border-radius: 1rem 1rem 0 0;
-    width: 100%;
-    justify-content: center;
-    padding: 0.75rem;
-  }
-  /* TOC 改为右侧抽屉 */
+  /* 侧边栏和 TOC 移动端均隐藏 */
+  .publish-sidebar,
   .publish-toc {
-    position: fixed;
-    top: 0;
-    right: 0;
-    width: 80%;
-    max-width: 280px;
-    height: 100vh;
-    border-left: 1px solid rgba(226, 232, 240, 0.7);
-    z-index: 100;
-    box-shadow: -4px 0 24px rgba(0, 0, 0, 0.1);
-    transform: translateX(100%);
-    transition: transform 0.3s ease;
-  }
-  .publish-toc:not(.collapsed) {
-    transform: translateX(0);
-  }
-  .publish-toc.collapsed {
-    transform: translateX(calc(100% - 2.5rem));
-  }
-  .toc-toggle-btn {
-    border-radius: 0.5rem 0 0 0.5rem;
+    display: none;
   }
   /* 主编辑区 */
   .publish-main {
@@ -1299,13 +1253,6 @@ onBeforeUnmount(() => {
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
   .word-count { display: none; }
-  /* 移动端遮罩层 */
-  .publish-mobile-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 99;
-  }
 }
 
 </style>

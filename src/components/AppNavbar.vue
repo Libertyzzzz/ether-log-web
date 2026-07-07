@@ -317,14 +317,18 @@ kbd {
 .desktop-only { display: flex; }
 .mobile-only { display: none; }
 
-/* ── 移动端适配 (Safari/Chrome/iOS) ── */
+/* ── 移动端适配 (Safari/Chrome/iOS) ─ */
 @media (max-width: 768px) {
-  .nav-content { display: grid; grid-template-columns: 1fr auto 1fr; padding: 0 1rem; }
+  .nav-content { display: grid; grid-template-columns: auto auto 1fr; padding: 0 0.75rem; gap: 0.5rem; }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
   .nav-logo { grid-column: 1; }
   .mobile-nav-wrapper { grid-column: 2; justify-self: center; }
-  .nav-right { grid-column: 3; justify-self: end; }
+  .nav-right { grid-column: 3; justify-self: end; gap: 0.4rem; }
+  .status-badge { padding: 0.3rem 0.5rem; font-size: 0.55rem; gap: 0.3rem; }
+  .status-badge .label-text { display: none; }
+  .nav-search-trigger { padding: 0.35rem 0.45rem; }
+  .nav-search-trigger .search-label { display: none; }
 }
 
 /* 暗色模式 */

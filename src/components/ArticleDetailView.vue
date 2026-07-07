@@ -744,35 +744,21 @@ onUnmounted(() => {
 @media (max-width: 768px) {
   .article-layout { padding-top: 4.5rem; }
   .article-layout-inner { padding: 0 0.75rem; }
-  /* 侧边栏改为左侧抽屉 */
+  /* 侧边栏移动端隐藏 */
   .article-sidebar {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 85%;
-    max-width: 320px;
-    height: 100vh;
-    border-right: 1px solid rgba(226, 232, 240, 0.7);
-    z-index: 100;
-    box-shadow: 4px 0 24px rgba(0, 0, 0, 0.1);
-    transform: translateX(-100%);
-    transition: transform 0.3s ease;
-    border-radius: 0;
-  }
-  .article-sidebar:not(.collapsed) {
-    transform: translateX(0);
-  }
-  .article-sidebar.collapsed {
-    transform: translateX(calc(-100% + 2.5rem));
-  }
-  .sidebar-back {
-    border-radius: 0 0.5rem 0.5rem 0;
+    display: none;
   }
   .article-main { padding: 1.5rem 0 4rem; }
   .article-neighbors { grid-template-columns: 1fr; }
   .neighbor-card.placeholder { display: none; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
+  .breadcrumb-back span { display: none; }
+  .breadcrumb-actions { gap: 0.3rem; }
+  .breadcrumb-action-btn span { display: none; }
+  .breadcrumb-action-btn { padding: 0.35rem; }
+  .article-main-title { font-size: 1.6rem; }
+  .article-main-meta { flex-wrap: wrap; gap: 0.5rem; }
   /* 移动端遮罩层 */
   .article-mobile-overlay {
     position: fixed;
