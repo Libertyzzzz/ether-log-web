@@ -21,6 +21,7 @@ const emit = defineEmits<{
   openSearch: []
   logout: []
   toggleDark: []
+  closeUserMenu: []
 }>()
 
 // 移动端中间汉堡菜单的本地状态
@@ -160,14 +161,14 @@ onUnmounted(() => {
               <template v-if="isLoggedIn">
                 <!-- 仅在移动端显示这些链接，因为 PC 端它们已经直接摆在导航栏上了 -->
                 <template v-if="isMobile">
-                  <button class="dropdown-item" type="button" @click="$emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
-                  <button class="dropdown-item" type="button" @click="$emit('openProfile')"><User :size="14" /> 个人主页</button>
-                  <button class="dropdown-item" type="button" @click="$emit('openDashboard')"><LayoutDashboard :size="14" /> 控制面板</button>
+                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
+                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
+                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><LayoutDashboard :size="14" /> 控制面板</button>
                   <div class="dropdown-divider"></div>
                 </template>
-                <button class="dropdown-item danger" type="button" @click="$emit('logout')"><LogOut :size="14" /> 退出登录</button>
+                <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
               </template>
-              <button v-else class="dropdown-item" type="button" @click="$emit('openLogin')">登录账户</button>
+              <button v-else class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openLogin')">登录账户</button>
             </div>
           </Transition>
         </div>

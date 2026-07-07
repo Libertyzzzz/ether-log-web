@@ -884,6 +884,7 @@ function handleClickOutside(event: MouseEvent) {
 }
 
 function navigateToSection(sectionId: string) {
+  closeUserMenu()
   router.push({ name: sectionId })
   selectedArticle.value = null
   selectedArticlePreview.value = null
@@ -909,12 +910,14 @@ function navigateToSection(sectionId: string) {
 }
 
 function openProfile() {
+  closeUserMenu()
   router.push({ name: 'profile' })
   closeArticleDetail()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
 function openDashboard() {
+  closeUserMenu()
   router.push({ name: 'dashboard' })
   closeArticleDetail()
   fetchAdminArticles()
@@ -922,6 +925,7 @@ function openDashboard() {
 }
 
 function openQuantLab() {
+  closeUserMenu()
   router.push({ name: 'quant-lab' })
   closeArticleDetail()
   window.scrollTo({ top: 0, behavior: 'smooth' })
@@ -1014,6 +1018,24 @@ onMounted(async () => {
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('beforeunload', handleBeforeUnload)
 
+  // 尽早注册 auth:expired 监听，避免早于拦截器 dispatch 的时序问题
+  // 后端返回 401 时，axios 拦截器触发此事件 → 清本地登录态 + 弹登录窗
+  // code=1004 (MAX_EXPIRED) —— token 超过最大有效期，强制提醒重新登录
+  // code=1003 (TOKEN_INVALID) —— token 无效
+  window.addEventListener('auth:expired', (evt: Event) => {
+    clearLoginState()
+    const detail = (evt as CustomEvent).detail
+    const code = detail?.code
+    if (code === 1004) {
+      showAppToast('登录已过期，请重新登录', 'info')
+    } else if (code === 1003) {
+      showAppToast('登录态无效，请重新登录', 'info')
+    } else {
+      showAppToast('登录已过期，请重新登录', 'info')
+    }
+    showLoginModal.value = true
+  })
+
   await checkGateStatus()
   initFromLocalStorage()
   fetchUserProfile()
@@ -1036,22 +1058,6 @@ onMounted(async () => {
     const ev = e as CustomEvent
     const detail = ev.detail || {}
     showAppToast(detail.message || '', detail.type || 'info')
-  })
-  // 后端返回 401 时，axios 拦截器触发此事件 → 清本地登录态 + 弹登录窗
-  // code=1004 (MAX_EXPIRED) —— token 超过最大有效期，强制提醒重新登录
-  // code=1003 (TOKEN_INVALID) —— token 无效
-  window.addEventListener('auth:expired', (evt: Event) => {
-    clearLoginState()
-    const detail = (evt as CustomEvent).detail
-    const code = detail?.code
-    if (code === 1004) {
-      showAppToast('登录已过期，请重新登录', 'info')
-    } else if (code === 1003) {
-      showAppToast('登录态无效，请重新登录', 'info')
-    } else {
-      showAppToast('登录已过期，请重新登录', 'info')
-    }
-    showLoginModal.value = true
   })
 })
 
@@ -1086,6 +1092,7 @@ onUnmounted(() => {
         @open-search="showSearchModal = true"
         @logout="handleLogout"
         @toggle-dark="toggleDark"
+        @close-user-menu="closeUserMenu"
       />
 
       <!-- Global sidebar (hover from left edge) -->

@@ -29,6 +29,8 @@ const MIN_REFRESH_INTERVAL_MS = 5 * 1000
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
 let isRefreshing = false
 let lastRefreshAt = 0
+let refreshFailCount = 0
+const MAX_REFRESH_FAILS = 3
 
 function clearRefreshTimer() {
   if (refreshTimer !== null) {
@@ -46,37 +48,44 @@ function scheduleRefresh() {
   const msUntilExpire = expire - now
   if (msUntilExpire <= 0) return
 
-  // 过期前一半时间点触发，最少 5s
+  // 过期前一半时间点触发，最少 5s，最多 30min
   let delay = Math.floor(msUntilExpire / 2)
   if (delay < MIN_REFRESH_INTERVAL_MS) delay = MIN_REFRESH_INTERVAL_MS
+  const MAX_REFRESH_INTERVAL_MS = 30 * 60 * 1000
+  if (delay > MAX_REFRESH_INTERVAL_MS) delay = MAX_REFRESH_INTERVAL_MS
 
   const minAllowed = Math.max(0, lastRefreshAt + MIN_REFRESH_INTERVAL_MS - now)
   if (delay < minAllowed) delay = minAllowed
 
   refreshTimer = setTimeout(async () => {
-    await runRefresh()
-    if (hasAuthToken()) {
+    const ok = await runRefresh()
+    if (ok) {
+      refreshFailCount = 0
       scheduleRefresh()
     }
   }, delay)
 }
 
-async function runRefresh() {
-  if (isRefreshing) return
-  if (!hasAuthToken()) return
+async function runRefresh(): Promise<boolean> {
+  if (isRefreshing) return false
+  if (!hasAuthToken()) return false
+  if (refreshFailCount >= MAX_REFRESH_FAILS) return false
   const now = Date.now()
-  if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return
+  if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return false
 
   isRefreshing = true
-  lastRefreshAt = now
   try {
     const { token, expire } = await apiRefreshToken()
     localStorage.setItem('authToken', token)
     if (typeof expire === 'number') {
       setTokenExpire(expire)
     }
+    lastRefreshAt = Date.now()
+    return true
   } catch (e) {
-    console.warn('[auth] token 续约失败:', e)
+    refreshFailCount++
+    console.warn(`[auth] token 续约失败 (${refreshFailCount}/${MAX_REFRESH_FAILS}):`, e)
+    return false
   } finally {
     isRefreshing = false
   }
@@ -95,6 +104,11 @@ export function useAuth() {
 
   function initFromLocalStorage() {
     if (hasAuthToken()) {
+      const expire = getTokenExpire()
+      if (expire && Date.now() >= expire) {
+        clearLoginState()
+        return
+      }
       const stored = localStorage.getItem('authUser')
       if (stored) {
         try {

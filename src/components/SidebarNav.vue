@@ -8,7 +8,6 @@ import {
   Info,
   MoveRight,
   Plus,
-  X,
 } from 'lucide-vue-next'
 import type { ArticleDirectory, ArticleListItem, Category } from '../types/blog'
 
@@ -177,10 +176,6 @@ function toggleSidebar() {
     </div>
 
     <aside class="smart-sidebar" :aria-hidden="!isOpen" aria-label="侧边目录导航栏">
-      <!-- Close button -->
-      <button class="sidebar-close-btn" type="button" @click="closeSidebar" :aria-label="'关闭侧边栏'">
-        <X :size="18" />
-      </button>
       <nav class="sidebar-section" aria-label="页面导航">
         <p class="section-label">导航</p>
         <button
@@ -332,10 +327,10 @@ function toggleSidebar() {
   flex-direction: column;
   gap: 1.05rem;
   border-radius: 0;
-  background: #f8fafc;
+  background: transparent;
   color: #0f172a;
-  border-right: 1px solid rgba(226, 232, 240, 0.8);
-  box-shadow: 2px 0 20px rgba(0, 0, 0, 0.06);
+  border-right: 1px solid rgba(226, 232, 240, 0.3);
+  box-shadow: none;
   pointer-events: auto;
   overflow: hidden auto;
   scrollbar-width: none;
@@ -343,6 +338,8 @@ function toggleSidebar() {
   opacity: 0;
   transition: transform 0.18s ease, opacity 0.14s ease;
   position: relative;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
 }
 .smart-sidebar::-webkit-scrollbar {
   display: none;
@@ -350,28 +347,6 @@ function toggleSidebar() {
 .smart-sidebar-shell.open .smart-sidebar {
   transform: translateX(0);
   opacity: 1;
-}
-
-/* ── Close button ── */
-.sidebar-close-btn {
-  position: absolute;
-  top: 0.5rem;
-  right: 0.5rem;
-  width: 2rem;
-  height: 2rem;
-  display: grid;
-  place-items: center;
-  border: 0;
-  border-radius: 0.5rem;
-  background: transparent;
-  color: #94a3b8;
-  cursor: pointer;
-  transition: background 0.15s, color 0.15s;
-  z-index: 2;
-}
-.sidebar-close-btn:hover {
-  background: rgba(0, 0, 0, 0.06);
-  color: #334155;
 }
 
 .nav-row,
@@ -556,59 +531,11 @@ function toggleSidebar() {
   line-height: 1.45;
 }
 
-/* ── Mobile / Tablet: full-height drawer ── */
+/* ── Mobile / Tablet: hide sidebar entirely ── */
 @media (max-width: 1024px) {
-  .smart-sidebar-shell {
-    top: 0;
-    width: 100%;
-    z-index: 1210;
-    pointer-events: none;
-  }
-  .smart-sidebar-shell.open {
-    pointer-events: auto;
-  }
-  .smart-sidebar-shell.mobile .sidebar-hover-bridge {
-    display: none;
-  }
-  .sidebar-hotspot {
-    top: 0.75rem;
-    bottom: auto;
-    left: 0.5rem;
-    width: 2.25rem;
-    height: 2.25rem;
-    border-radius: 0.5rem;
-    background: rgba(255, 255, 255, 0.92);
-    border: 1px solid rgba(226, 232, 240, 0.7);
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1220;
-  }
-  .sidebar-hotspot span {
-    position: static;
-    width: 1.1rem;
-    height: 0.12rem;
-    border-radius: 999px;
-    background: #64748b;
-    transform: none;
-    box-shadow: 0 -0.28rem 0 #64748b, 0 0.28rem 0 #64748b;
-  }
-  .smart-sidebar-shell.open .sidebar-hotspot {
-    opacity: 0;
-    pointer-events: none;
-  }
-  .smart-sidebar {
-    width: 80%;
-    max-width: 320px;
-    height: 100%;
-    border-radius: 0 0.75rem 0.75rem 0;
-    box-shadow: 4px 0 30px rgba(0, 0, 0, 0.15);
-    padding-top: 2.5rem;
-  }
-  .sidebar-close-btn {
-    top: 0.5rem;
-    right: 0.5rem;
+  .smart-sidebar-shell,
+  .sidebar-backdrop {
+    display: none !important;
   }
 }
 

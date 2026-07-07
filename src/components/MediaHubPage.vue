@@ -1022,6 +1022,8 @@ onMounted(() => {
   .media-hub { padding: 1rem 0.75rem; }
   .mh-stats { grid-template-columns: repeat(2, 1fr); }
   .mh-filters { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
+  .mh-filter-group { flex-wrap: wrap; }
+  .mh-filter-label { width: 100%; margin-bottom: 0.25rem; }
   .mh-search-box { margin-left: 0; width: 100%; }
   .mh-search-input { width: 100%; }
   .mh-grid { grid-template-columns: repeat(2, 1fr); gap: 0.75rem; }
