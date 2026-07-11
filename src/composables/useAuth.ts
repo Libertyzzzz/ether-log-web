@@ -9,6 +9,7 @@ import {
   updateUserProfile as apiUpdateUserProfile,
   getTokenExpire,
   setTokenExpire,
+  parseJwt,
 } from '../api'
 
 const emptyLoginUser: Partial<LoginUser> = {
@@ -75,11 +76,25 @@ async function runRefresh(): Promise<boolean> {
 
   isRefreshing = true
   try {
-    const { token, expire } = await apiRefreshToken()
-    localStorage.setItem('authToken', token)
-    if (typeof expire === 'number') {
-      setTokenExpire(expire)
+    const { token, expire: apiExpire } = await apiRefreshToken()
+    sessionStorage.setItem('authToken', token)
+    
+    // 【关键】确保获取新 token 的过期时间
+    // 优先使用 API 返回的 expire；如果没有或无效，从 JWT payload 解析
+    let newExpire = apiExpire
+    if (typeof newExpire !== 'number') {
+      const payload = parseJwt<{ exp: number }>(token)
+      newExpire = payload?.exp
     }
+    
+    if (typeof newExpire === 'number') {
+      setTokenExpire(newExpire)
+      console.log('[auth] token 续约成功，新过期时间:', new Date(newExpire).toISOString())
+    } else {
+      console.error('[auth] 无法获取 token 过期时间')
+      return false
+    }
+    
     lastRefreshAt = Date.now()
     return true
   } catch (e) {
@@ -104,7 +119,7 @@ export function useAuth() {
 
   function initFromLocalStorage() {
     if (hasAuthToken()) {
-      const stored = localStorage.getItem('authUser')
+      const stored = sessionStorage.getItem('authUser')
       if (stored) {
         try {
           loginUser.value = JSON.parse(stored)
@@ -125,9 +140,9 @@ export function useAuth() {
     isLoggedIn.value = false
     loginUser.value = emptyLoginUser
     loginError.value = ''
-    localStorage.removeItem('authToken')
-    localStorage.removeItem('authTokenExpire')
-    localStorage.removeItem('authUser')
+    sessionStorage.removeItem('authToken')
+    sessionStorage.removeItem('authTokenExpire')
+    sessionStorage.removeItem('authUser')
     clearRefreshTimer()
   }
 
@@ -142,11 +157,11 @@ export function useAuth() {
     try {
       const loginData = await apiLogin(email, password)
 
-      localStorage.setItem('authToken', loginData.token)
+      sessionStorage.setItem('authToken', loginData.token)
       if (typeof loginData.expire === 'number') {
         setTokenExpire(loginData.expire)
       }
-      localStorage.setItem('authUser', JSON.stringify(loginData.user))
+      sessionStorage.setItem('authUser', JSON.stringify(loginData.user))
       loginUser.value = loginData.user
       isLoggedIn.value = true
 
@@ -188,10 +203,10 @@ export function useAuth() {
       const user = await apiFetchUserProfile(loginUser.value.id || 0)
       if (user) {
         loginUser.value = user
-        localStorage.setItem('authUser', JSON.stringify(user))
+        sessionStorage.setItem('authUser', JSON.stringify(user))
       }
     } catch (error) {
-      console.error('无法同步最新用户信息:', error)
+      console.warn('[auth] fetchUserProfile failed')
     }
   }
 

@@ -27,11 +27,11 @@ const TOKEN_KEY = 'authToken'
 const TOKEN_EXPIRE_KEY = 'authTokenExpire'
 
 export function hasAuthToken(): boolean {
-  return !!localStorage.getItem(TOKEN_KEY)
+  return !!sessionStorage.getItem(TOKEN_KEY)
 }
 
 export function getAuthHeaders(): Record<string, string> {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = sessionStorage.getItem(TOKEN_KEY)
   return token ? { Authorization: token } : {}
 }
 
@@ -54,13 +54,13 @@ export function parseJwt<T = any>(token: string): T | null {
 }
 
 export function getTokenExpire(): number | null {
-  const stored = localStorage.getItem(TOKEN_EXPIRE_KEY)
+  const stored = sessionStorage.getItem(TOKEN_EXPIRE_KEY)
   if (stored) {
     const n = Number(stored)
     if (!Number.isNaN(n)) return n
   }
   // 回退：从 token 本身解析 exp（后端约定 exp 也是毫秒
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = sessionStorage.getItem(TOKEN_KEY)
   if (!token) return null
   const payload = parseJwt<{ exp: number }>(token)
   if (payload && typeof payload.exp === 'number') {
@@ -70,25 +70,40 @@ export function getTokenExpire(): number | null {
 }
 
 export function setTokenExpire(expireMs: number) {
-  localStorage.setItem(TOKEN_EXPIRE_KEY, String(expireMs))
+  sessionStorage.setItem(TOKEN_EXPIRE_KEY, String(expireMs))
 }
 
-// ═══════════════════════════════════════════════════════════════
+function clearAuthState(code?: number) {
+  sessionStorage.removeItem(TOKEN_KEY)
+  sessionStorage.removeItem(TOKEN_EXPIRE_KEY)
+  sessionStorage.removeItem('authUser')
+  window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code } }))
+}
+
+axios.interceptors.request.use(
+  (config) => {
+    const expire = getTokenExpire()
+    if (expire !== null && Date.now() >= expire && hasAuthToken()) {
+      clearAuthState(1004)
+      return Promise.reject(new Error('登录已过期'))
+    }
+    return config
+  },
+  (error) => Promise.reject(error),
+)
+
+// ═══════════════════════════════════════════════════════════════════════
 // Global auth lifecycle handler
 //   401 → 未登录 / token 过期 → 清本地状态
 //   403 → 已登录但权限不足 → 静默记录
 //   code=1003 (TOKEN_INVALID) / code=1004 (MAX_EXPIRED) → 清本地状态 + 提示重新登录
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════════════════
 axios.interceptors.response.use(
   (response) => {
     const body = response.data
     const code = body?.code
     if (code === 1003 || code === 1004) {
-      localStorage.removeItem(TOKEN_KEY)
-      localStorage.removeItem(TOKEN_EXPIRE_KEY)
-      localStorage.removeItem('authUser')
-      window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code } }))
-      // 中断响应链，让调用方 catch 到异常
+      clearAuthState(code)
       return Promise.reject(new Error(body?.message || '登录已过期'))
     }
     return response
@@ -97,12 +112,15 @@ axios.interceptors.response.use(
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
       if (status === 401) {
-        localStorage.removeItem(TOKEN_KEY)
-        localStorage.removeItem(TOKEN_EXPIRE_KEY)
-        localStorage.removeItem('authUser')
-        window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code: undefined } }))
+        clearAuthState(undefined)
       } else if (status === 403) {
-        console.warn('权限不足 (403):', error.config?.url)
+        const body = error.response?.data
+        const code = body?.code
+        if (code === 1003 || code === 1004) {
+          clearAuthState(code)
+        } else {
+          console.warn('Access denied (403)')
+        }
       }
     }
     return Promise.reject(error)
@@ -349,7 +367,7 @@ export async function login(email: string, password: string): Promise<LoginData>
 // 续约成功：更新本地 token 和 expire；
 // 续约失败：响应拦截器会根据后端返回的 code (1003/1004) 处理登录态清理，这里不做额外判断。
 export async function refreshToken(): Promise<RefreshTokenData> {
-  const token = localStorage.getItem(TOKEN_KEY)
+  const token = sessionStorage.getItem(TOKEN_KEY)
   if (!token) throw new Error('当前无登录态，无法刷新 token')
   const response = await axios.post<ResultResponse<RefreshTokenData>>(
     '/api/auth/refresh',

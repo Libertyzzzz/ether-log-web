@@ -75,7 +75,6 @@ async function createTagAdmin() {
     toast('标签已创建', 'success')
     emit('refreshTags')
   } catch (e) {
-    console.error('创建标签失败', e)
     toast('创建标签失败', 'error')
   }
 }
@@ -92,7 +91,6 @@ async function performDeleteTag() {
     toast('标签已删除', 'success')
     emit('refreshTags')
   } catch (e) {
-    console.error('删除标签失败', e)
     toast('删除标签失败', 'error')
   } finally {
     deletingTag.value.show = false
@@ -114,7 +112,6 @@ async function createCategoryAdmin() {
     toast('分类已创建', 'success')
     emit('refreshCategories')
   } catch (e) {
-    console.error('创建分类失败', e)
     toast('创建分类失败', 'error')
   }
 }
@@ -147,7 +144,7 @@ async function performDeleteCategoryAdmin() {
       try {
         await updateArticleField(a.id, { categoryId: general!.id })
       } catch (e) {
-        console.error('移动文章失败', a.id, e)
+        // ignore move error
       }
     }
 
@@ -155,13 +152,12 @@ async function performDeleteCategoryAdmin() {
     try {
       await apiDeleteCategory(id)
     } catch (e) {
-      console.error('删除分类失败', e)
+      // ignore delete error
     }
 
     toast('分类已删除并将文章移至通用目录', 'success')
     emit('refreshCategories')
   } catch (e) {
-    console.error('删除分类失败', e)
     toast('删除分类失败', 'error')
   } finally {
     deletingCategory.value.show = false
@@ -186,7 +182,6 @@ async function performEditCategory() {
     toast('分类已更新', 'success')
     emit('refreshCategories')
   } catch (e) {
-    console.error('更新分类失败', e)
     toast('更新分类失败', 'error')
   } finally {
     editingCategory.value.show = false
@@ -209,7 +204,6 @@ async function performEditTag() {
     toast('标签已更新', 'success')
     emit('refreshTags')
   } catch (e) {
-    console.error('更新标签失败', e)
     toast('更新标签失败', 'error')
   } finally {
     editingTag.value.show = false
