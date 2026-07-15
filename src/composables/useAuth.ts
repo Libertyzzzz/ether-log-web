@@ -81,7 +81,7 @@ async function runRefresh(): Promise<boolean> {
     
     // 【关键】确保获取新 token 的过期时间
     // 优先使用 API 返回的 expire；如果没有或无效，从 JWT payload 解析
-    let newExpire = apiExpire
+    let newExpire: number | undefined = typeof apiExpire === 'number' ? apiExpire : undefined
     if (typeof newExpire !== 'number') {
       const payload = parseJwt<{ exp: number }>(token)
       newExpire = payload?.exp

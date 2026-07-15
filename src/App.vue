@@ -12,6 +12,7 @@ import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
 import MediaHubPage from './components/MediaHubPage.vue'
+import SensitiveWordPage from './components/SensitiveWordPage.vue'
 import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
@@ -1172,6 +1173,11 @@ onUnmounted(() => {
 
           <MediaHubPage
             v-if="currentPage === 'dashboard-media'"
+            @back="router.push('/dashboard')"
+          />
+
+          <SensitiveWordPage
+            v-if="currentPage === 'dashboard-sensitive-words'"
             @back="router.push('/dashboard')"
           />
 

@@ -15,6 +15,9 @@ import type {
   PageResponse,
   RefreshTokenData,
   ResultResponse,
+  SensitiveWordCreateRequest,
+  SensitiveWordItem,
+  SensitiveWordQueryDto,
   Tag,
   UploadImageData,
 } from '../types/blog'
@@ -191,6 +194,48 @@ export async function updateTag(id: number, payload: { name: string; color?: str
   const resp = await axios.put(`/api/tags/${id}`, payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, color: payload.color }
+}
+
+// ═══════════════════════════════════════════════════════════════
+// Sensitive Words
+// ═══════════════════════════════════════════════════════════════
+
+export async function fetchSensitiveWords(params: SensitiveWordQueryDto = {}): Promise<PageResponse<SensitiveWordItem>> {
+  const response = await axios.get<ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>>(
+    '/api/admin/sensitive-words',
+    { params, headers: getAuthHeaders() },
+  )
+  const body = response.data as ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>
+  const payload = (body as any)?.data ?? body
+  if (payload && typeof payload === 'object' && Array.isArray(payload.records)) {
+    return {
+      records: payload.records,
+      total: typeof payload.total === 'number' ? payload.total : payload.records.length,
+      size: typeof payload.size === 'number' ? payload.size : params.pageSize ?? 10,
+      current: typeof payload.current === 'number' ? payload.current : params.pageNum ?? 1,
+      pages: typeof payload.pages === 'number' ? payload.pages : 1,
+    }
+  }
+  return { records: [], total: 0, size: params.pageSize ?? 10, current: params.pageNum ?? 1, pages: 1 }
+}
+
+export async function createSensitiveWord(payload: SensitiveWordCreateRequest): Promise<SensitiveWordItem> {
+  const response = await axios.post<ResultResponse<SensitiveWordItem>>('/api/admin/sensitive-words', payload, {
+    headers: getAuthHeaders(),
+  })
+  if (response.data?.code === 200) {
+    return (response.data.data ?? {}) as SensitiveWordItem
+  }
+  throw new Error(response.data?.message || '创建敏感词失败')
+}
+
+export async function deleteSensitiveWord(id: number): Promise<void> {
+  const response = await axios.delete<ResultResponse<null>>(`/api/admin/sensitive-words/${id}`, {
+    headers: getAuthHeaders(),
+  })
+  if (response.data?.code !== 200) {
+    throw new Error(response.data?.message || '删除敏感词失败')
+  }
 }
 
 // ═══════════════════════════════════════════════════════════════

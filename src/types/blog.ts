@@ -180,6 +180,25 @@ export interface ImageReferenceVo {
   sourceUrl: string
 }
 
+export interface SensitiveWordItem {
+  id: number
+  word: string
+  category?: string
+  createTime?: string
+}
+
+export interface SensitiveWordCreateRequest {
+  word: string
+  category?: string
+}
+
+export interface SensitiveWordQueryDto {
+  keyword?: string
+  category?: string
+  pageNum?: number
+  pageSize?: number
+}
+
 export interface ImageDeleteResultVo {
   successCount: number
   failCount: number

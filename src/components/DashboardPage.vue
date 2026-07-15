@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight, Image } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight, Image, ShieldAlert } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { hasAuthToken } from '../composables/useAuth'
@@ -344,19 +344,37 @@ function getArticleStatusClass(post: ArticleListItem) {
       </div>
 
       <!-- ── 媒体库入口横幅 ── -->
-      <div class="db-media-banner" @click="router.push('/dashboard/media')">
-        <div class="db-media-banner-left">
-          <div class="db-media-banner-icon">
-            <Image :size="22" />
+      <div class="db-management-stack">
+        <div class="db-media-banner" @click="router.push('/dashboard/media')">
+          <div class="db-media-banner-left">
+            <div class="db-media-banner-icon">
+              <Image :size="22" />
+            </div>
+            <div class="db-media-banner-info">
+              <strong class="db-media-banner-title">媒体资源管理</strong>
+              <span class="db-media-banner-desc">管理图片、附件等媒体文件</span>
+            </div>
           </div>
-          <div class="db-media-banner-info">
-            <strong class="db-media-banner-title">媒体资源管理</strong>
-            <span class="db-media-banner-desc">管理图片、附件等媒体文件</span>
+          <div class="db-media-banner-right">
+            <span class="db-media-banner-action">进入管理</span>
+            <ArrowRight :size="16" class="db-media-banner-arrow" />
           </div>
         </div>
-        <div class="db-media-banner-right">
-          <span class="db-media-banner-action">进入管理</span>
-          <ArrowRight :size="16" class="db-media-banner-arrow" />
+
+        <div class="db-media-banner db-media-banner--secondary" @click="router.push('/dashboard/sensitive-words')">
+          <div class="db-media-banner-left">
+            <div class="db-media-banner-icon" style="background:rgba(248,113,113,0.15);color:#fda4af">
+              <ShieldAlert :size="22" />
+            </div>
+            <div class="db-media-banner-info">
+              <strong class="db-media-banner-title">敏感词管理</strong>
+              <span class="db-media-banner-desc">维护平台内容过滤词库</span>
+            </div>
+          </div>
+          <div class="db-media-banner-right">
+            <span class="db-media-banner-action">进入管理</span>
+            <ArrowRight :size="16" class="db-media-banner-arrow" />
+          </div>
         </div>
       </div>
 

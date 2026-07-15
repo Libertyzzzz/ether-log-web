@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted } from 'vue'
 import {
-  ArrowLeft, Upload, Image, Trash2, Link2, Download,
+  ArrowLeft, Image, Trash2, Link2, Download,
   X, ChevronLeft, ChevronRight, Search,
   HardDrive, FileWarning, CheckCircle, Clock
 } from 'lucide-vue-next'
@@ -78,7 +78,6 @@ const selectedItems = ref<Set<number>>(new Set())
 const showDetailModal = ref(false)
 const detailItem = ref<MediaItem | null>(null)
 const detailReferences = ref<ImageReferenceVo[]>([])
-const showUploadModal = ref(false)
 
 //  加载数据 ──
 async function loadData() {
@@ -275,10 +274,6 @@ onMounted(() => {
         <span>返回控制面板</span>
       </button>
       <h1 class="mh-title">媒体资源管理</h1>
-      <button class="mh-upload-btn" type="button" @click="showUploadModal = true">
-        <Upload :size="14" />
-        <span>上传图片</span>
-      </button>
     </div>
 
     <!-- 存储概览 -->
@@ -507,23 +502,6 @@ onMounted(() => {
       </div>
     </Transition>
 
-    <!-- 上传弹窗（占位） -->
-    <Transition name="mh-modal-fade">
-      <div v-if="showUploadModal" class="mh-detail-overlay" @click.self="showUploadModal = false">
-        <div class="mh-detail-modal mh-upload-modal">
-          <button class="mh-detail-close" type="button" @click="showUploadModal = false">
-            <X :size="18" />
-          </button>
-          <h3>上传图片</h3>
-          <div class="mh-upload-dropzone">
-            <Upload :size="32" style="color:#94a3b8" />
-            <p>拖拽图片到此处，或点击上传</p>
-            <span class="mh-upload-hint">支持 JPG、PNG、WebP、GIF，最大 10MB</span>
-            <!-- TODO: 接入实际上传逻辑 -->
-          </div>
-        </div>
-      </div>
-    </Transition>
   </div>
 </template>
 
@@ -531,7 +509,8 @@ onMounted(() => {
 .media-hub {
   max-width: 64rem;
   margin: 0 auto;
-  padding: 1.5rem;
+  padding: 5.5rem 1.5rem 1.5rem;
+  box-sizing: border-box;
 }
 
 /* 工具栏 */
@@ -563,22 +542,6 @@ onMounted(() => {
   color: #0f172a;
   margin: 0;
 }
-.mh-upload-btn {
-  display: flex;
-  align-items: center;
-  gap: 0.4rem;
-  border: none;
-  background: #2563eb;
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 700;
-  cursor: pointer;
-  padding: 0.6rem 1.2rem;
-  border-radius: 0.6rem;
-  transition: background 0.15s;
-}
-.mh-upload-btn:hover { background: #1d4ed8; }
-
 /* 存储概览 */
 .mh-stats {
   display: grid;
@@ -989,37 +952,13 @@ onMounted(() => {
 .mh-detail-action-btn.danger { color: #dc2626; border-color: #fecaca; }
 .mh-detail-action-btn.danger:hover { background: #fef2f2; }
 
-/* 上传弹窗 */
-.mh-upload-modal { padding: 1.5rem; }
-.mh-upload-modal h3 {
-  margin: 0 0 1rem;
-  font-size: 1.05rem;
-  font-weight: 800;
-  color: #0f172a;
-}
-.mh-upload-dropzone {
-  border: 2px dashed #e2e8f0;
-  border-radius: 0.85rem;
-  padding: 2.5rem 1.5rem;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 0.5rem;
-  text-align: center;
-  cursor: pointer;
-  transition: border-color 0.15s, background 0.15s;
-}
-.mh-upload-dropzone:hover { border-color: #2563eb; background: #f0f9ff; }
-.mh-upload-dropzone p { margin: 0; font-size: 0.9rem; color: #475569; font-weight: 600; }
-.mh-upload-hint { font-size: 0.75rem; color: #94a3b8; }
-
 /* 动画 */
 .mh-modal-fade-enter-active, .mh-modal-fade-leave-active { transition: opacity 0.2s ease; }
 .mh-modal-fade-enter-from, .mh-modal-fade-leave-to { opacity: 0; }
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .media-hub { padding: 1rem 0.75rem; }
+  .media-hub { max-width: none; margin: 0; padding: 1rem 0.75rem; }
   .mh-stats { grid-template-columns: repeat(2, 1fr); }
   .mh-filters { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
   .mh-filter-group { flex-wrap: wrap; }

@@ -49,6 +49,12 @@ const router = createRouter({
       meta: { page: 'dashboard-media', requiresAuth: true }
     },
     {
+      path: '/dashboard/sensitive-words',
+      name: 'dashboard-sensitive-words',
+      component: App,
+      meta: { page: 'dashboard-sensitive-words', requiresAuth: true }
+    },
+    {
       path: '/publish',
       name: 'publish',
       component: App,
