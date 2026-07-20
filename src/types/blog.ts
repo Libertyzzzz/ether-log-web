@@ -204,3 +204,44 @@ export interface ImageDeleteResultVo {
   failCount: number
   errorMessages: string[]
 }
+
+// ═══════════════════════════════════════════════════════════════
+// AI Assistant
+// ═══════════════════════════════════════════════════════════════
+
+export type AIChatRole = 'user' | 'assistant'
+export type AIChatAction =
+  | 'chat'
+  | 'generate_title'
+  | 'polish_text'
+  | 'continue_write'
+  | 'generate_summary'
+  | 'check_typo'
+  | 'generate_outline'
+
+export interface AIChatMessage {
+  id: string
+  role: AIChatRole
+  content: string
+  timestamp: number
+  action?: AIChatAction
+  originalText?: string
+  candidates?: string[]
+}
+
+export interface AIChatRequest {
+  action: AIChatAction
+  message: string
+  context: string
+  title?: string
+  style?: AIStyleKey
+  history: AIChatMessage[]
+}
+
+export type AIStyleKey = 'humor' | 'academic' | 'minimal' | 'viral' | 'casual'
+
+export interface AIChatResponse {
+  content: string
+  candidates?: string[]
+  action?: AIChatAction
+}

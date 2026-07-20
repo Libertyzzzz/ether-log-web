@@ -1,9 +1,10 @@
 <script setup lang="ts">
 import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee, Clock, ChevronLeft, ChevronRight } from 'lucide-vue-next'
+import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Code2, Palette, BookMarked, MessageCircle, Sparkles, Star, Coffee, Clock, ChevronLeft, ChevronRight, Send } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 import { getReadingTime } from '../utils/format'
+import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 
 const props = defineProps<{
   categories: Category[]
@@ -104,6 +105,44 @@ function scrollCategories(dir: number) {
   if (!el) return
   el.scrollBy({ left: dir * 280, behavior: 'smooth' })
 }
+
+// ── Hero 右侧 AI 助手卡片 ──
+const ai = useAIAssistant()
+const heroInput = ref('')
+
+// Hero 示例问题（和右侧抽屉中首页的快捷操作呼应）
+const heroExampleQuestions = [
+  'Spring Security 登录流程',
+  'JWT 如何工作？',
+  'Docker 最佳实践',
+  'Redis 缓存设计',
+]
+let heroExampleIndex = ref(3) // 默认显示 3 个，点"更多"显示全部
+
+function toggleHeroExamples() {
+  heroExampleIndex.value = heroExampleIndex.value === 3 ? heroExampleQuestions.length : 3
+}
+
+// 在 Hero 输入框发送 → 打开右侧抽屉 + 发送消息
+async function heroSendFromInput() {
+  const text = heroInput.value.trim()
+  if (!text) return
+  heroInput.value = ''
+  ai.open()
+  await ai.sendFreeChat(text)
+}
+
+// 点击 Hero 示例 → 打开右侧抽屉 + 发送示例
+async function heroSendExample(text: string) {
+  heroInput.value = ''
+  ai.open()
+  await ai.sendFreeChat(text)
+}
+
+// 仅打开右侧抽屉（点击卡片空白区域或"展开"按钮）
+function heroOpenDrawerOnly() {
+  ai.open()
+}
 </script>
 
 <template>
@@ -148,21 +187,76 @@ function scrollCategories(dir: number) {
           </div>
         </div>
 
-        <!-- 右侧装饰：纯 CSS 玻璃态几何，无需图片资源 -->
-        <div class="hp-hero-visual" aria-hidden="true">
-          <div class="hp-glass-orb hp-orb-1"></div>
-          <div class="hp-glass-orb hp-orb-2"></div>
-          <div class="hp-glass-orb hp-orb-3"></div>
-          <div class="hp-glass-card">
-            <div class="hp-glass-card-inner">
-              <span class="hp-glass-label">NEXTIFY</span>
-              <strong class="hp-glass-title">E</strong>
-              <span class="hp-glass-sub">Vue · Spring · JWT</span>
+        <!-- 右侧：AI 助手卡片（贴合 Hero，输入/发送后复用右侧抽屉展开） -->
+        <div class="hp-hero-ai" @click="heroOpenDrawerOnly">
+          <!-- 玻璃态背景点缀（保留原装饰风格） -->
+          <span class="hp-ai-orb hp-ai-orb-1"></span>
+          <span class="hp-ai-orb hp-ai-orb-2"></span>
+
+          <!-- 卡片顶部：标题 + BETA + 在线状态 -->
+          <div class="hp-ai-header">
+            <div class="hp-ai-title">
+              <Sparkles :size="14" />
+              <span>AI 助手</span>
+              <span class="hp-ai-beta">BETA</span>
+            </div>
+            <div class="hp-ai-status">
+              <span class="hp-ai-status-dot"></span>
+              <span>在线</span>
             </div>
           </div>
-          <div class="hp-float-chip hp-chip-1">Thought</div>
-          <div class="hp-float-chip hp-chip-2">Code</div>
-          <div class="hp-float-chip hp-chip-3">Design</div>
+
+          <!-- 问候语 -->
+          <div class="hp-ai-greet">你好，有什么可以帮你？</div>
+
+          <!-- 输入区：阻止冒泡，避免触发 heroOpenDrawerOnly -->
+          <div class="hp-ai-input-wrap" @click.stop>
+            <input
+              v-model="heroInput"
+              type="text"
+              class="hp-ai-input"
+              placeholder="输入你的问题，或 / 选择示例"
+              @keyup.enter="heroSendFromInput"
+            />
+            <button
+              class="hp-ai-send"
+              type="button"
+              :disabled="!heroInput.trim()"
+              @click="heroSendFromInput"
+              title="发送"
+            >
+              <Send :size="15" />
+            </button>
+          </div>
+
+          <!-- 示例按钮区 -->
+          <div class="hp-ai-examples" @click.stop>
+            <button
+              v-for="q in heroExampleQuestions.slice(0, heroExampleIndex)"
+              :key="q"
+              type="button"
+              class="hp-ai-chip"
+              @click="heroSendExample(q)"
+            >
+              {{ q }}
+            </button>
+            <button
+              v-if="heroExampleIndex < heroExampleQuestions.length"
+              type="button"
+              class="hp-ai-chip hp-ai-chip-more"
+              @click="toggleHeroExamples"
+            >
+              更多 →
+            </button>
+            <button
+              v-else-if="heroExampleQuestions.length > 3"
+              type="button"
+              class="hp-ai-chip hp-ai-chip-more"
+              @click="toggleHeroExamples"
+            >
+              收起 ↑
+            </button>
+          </div>
         </div>
       </div>
     </section>
@@ -370,8 +464,9 @@ function scrollCategories(dir: number) {
 .hp-hero-inner {
   position: relative;
   background:
-    radial-gradient(circle at 78% 28%, rgba(96, 165, 250, 0.24), transparent 16rem),
-    radial-gradient(circle at 88% 70%, rgba(240, 171, 252, 0.16), transparent 18rem),
+    radial-gradient(circle at 75% 30%, rgba(139, 92, 246, 0.45), transparent 14rem),
+    radial-gradient(circle at 92% 75%, rgba(167, 139, 250, 0.35), transparent 18rem),
+    radial-gradient(circle at 10% 80%, rgba(59, 130, 246, 0.18), transparent 16rem),
     linear-gradient(145deg, rgba(12, 18, 32, 0.96) 0%, rgba(24, 35, 55, 0.92) 46%, rgba(49, 46, 129, 0.82) 100%);
   border: 1px solid rgba(191, 219, 254, 0.22);
   border-radius: 1.5rem;
@@ -482,71 +577,190 @@ function scrollCategories(dir: number) {
   color: #ffffff;
 }
 
-/* 右侧装饰 */
-.hp-hero-visual {
+/* —— Hero 右侧 AI 助手区域（融入 Hero，无独立卡片感） —— */
+.hp-hero-ai {
   position: relative;
-  height: 190px;
+  padding: 0.5rem 0 0.5rem 1.25rem;
+  /* 无独立背景 → 让 Hero 背景直接透过来 */
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  cursor: pointer;
+  transition: transform 0.2s ease;
+  box-shadow: none;
+  overflow: visible;
 }
-.hp-glass-orb {
+.hp-hero-ai:hover {
+  /* 不再上浮（避免像卡片） */
+  box-shadow: none;
+}
+.hp-hero-ai:hover::before {
+  opacity: 1;
+}
+/* 左侧渐变分隔线（代替卡片边界） */
+.hp-hero-ai::before {
+  content: '';
   position: absolute;
-  border-radius: 50%;
-  filter: blur(1px);
+  left: 0;
+  top: 10%;
+  bottom: 10%;
+  width: 1px;
+  background: linear-gradient(
+    to bottom,
+    transparent 0%,
+    rgba(167, 139, 250, 0.35) 25%,
+    rgba(167, 139, 250, 0.55) 50%,
+    rgba(167, 139, 250, 0.35) 75%,
+    transparent 100%
+  );
+  opacity: 0.7;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
 }
-.hp-orb-1 {
-  width: 185px; height: 185px;
-  top: 15px; right: 10px;
-  background: radial-gradient(circle at 35% 35%, rgba(147,197,253,0.34), rgba(96,165,250,0.12) 58%, transparent);
-  border: 1px solid rgba(191,219,254,0.22);
-}
-.hp-orb-2 {
-  width: 118px; height: 118px;
-  top: 50px; right: 68px;
-  background: radial-gradient(circle at 40% 30%, rgba(240,171,252,0.22), transparent 70%);
-  border: 1px solid rgba(240,171,252,0.16);
-}
-.hp-orb-3 {
-  width: 68px; height: 68px;
-  bottom: 68px; right: 34px;
-  background: radial-gradient(circle, rgba(96,165,250,0.38), transparent 70%);
-}
-.hp-glass-card {
-  position: absolute;
-  top: 50%; left: 50%;
-  transform: translate(-50%, -50%);
-  width: 102px; height: 102px;
-  border-radius: 1.7rem;
-  background: rgba(255,255,255,0.075);
-  border: 1px solid rgba(191,219,254,0.2);
-  backdrop-filter: blur(20px);
+/* 内部光晕点缀 — 用 Hero 已有的颜色体系，避免新视觉元素 */
+.hp-ai-orb { display: none; }
+.hp-ai-orb-1 { display: none; }
+.hp-ai-orb-2 { display: none; }
+.hp-ai-header {
+  position: relative;
   display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 0.6rem;
+}
+.hp-ai-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  color: #e0e7ff;
+  font-size: 0.85rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+.hp-ai-beta {
+  display: inline-block;
+  font-size: 0.55rem;
+  font-weight: 700;
+  letter-spacing: 0.15em;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(96, 165, 250, 0.2));
+  color: #f5f3ff;
+  border: 1px solid rgba(167, 139, 250, 0.28);
+}
+.hp-ai-status {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: #86efac;
+}
+.hp-ai-status-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: #4ade80;
+  box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
+  animation: hpStatusPulse 2s ease-in-out infinite;
+}
+@keyframes hpStatusPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.3); opacity: 0.8; }
+}
+.hp-ai-greet {
+  position: relative;
+  color: #cbd5e1;
+  font-size: 0.78rem;
+  font-weight: 500;
+  margin-bottom: 0.55rem;
+  letter-spacing: 0.01em;
+}
+/* 输入区 — 更轻量，像 Hero 内部的功能区 */
+.hp-ai-input-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 4px 4px 12px;
+  background: rgba(15, 23, 42, 0.45);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  border-radius: 9999px;
+  margin-bottom: 0.6rem;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+.hp-ai-input-wrap:focus-within {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(15, 23, 42, 0.6);
+}
+.hp-ai-input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 0.78rem;
+  font-weight: 500;
+  padding: 6px 0;
+}
+.hp-ai-input::placeholder {
+  color: #94a3b8;
+  font-weight: 400;
+}
+.hp-ai-send {
+  display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: 0 24px 60px rgba(2,6,23,0.32);
+  width: 28px; height: 28px;
+  border-radius: 50%;
+  border: none;
+  cursor: pointer;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #ffffff;
+  transition: transform 0.15s ease;
+  flex-shrink: 0;
 }
-.hp-glass-card-inner {
+.hp-ai-send:hover:not(:disabled) { transform: scale(1.08); }
+.hp-ai-send:disabled {
+  background: rgba(99, 102, 241, 0.2);
+  color: rgba(226, 232, 240, 0.5);
+  cursor: not-allowed;
+}
+/* 示例按钮 — 弱化玻璃态感，更像 Hero 内部的标签 */
+.hp-ai-examples {
+  position: relative;
   display: flex;
-  flex-direction: column;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+}
+.hp-ai-chip {
+  display: inline-flex;
   align-items: center;
-  gap: 0.2rem;
-}
-.hp-glass-label { font-size: 0.55rem; font-weight: 800; letter-spacing: 0.2em; color: #93c5fd; text-transform: uppercase; }
-.hp-glass-title { font-size: 2.5rem; font-weight: 900; color: white; line-height: 1; }
-.hp-glass-sub { font-size: 0.5rem; color: #94a3b8; font-weight: 600; }
-
-.hp-float-chip {
-  position: absolute;
-  padding: 0.35rem 0.85rem;
+  padding: 4px 9px;
   border-radius: 9999px;
-  background: rgba(15,23,42,0.28);
-  border: 1px solid rgba(191,219,254,0.18);
-  color: #dbeafe;
-  font-size: 0.7rem;
-  font-weight: 700;
-  backdrop-filter: blur(8px);
+  background: rgba(30, 41, 59, 0.35);
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  color: #cbd5e1;
+  font-size: 0.65rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
 }
-.hp-chip-1 { top: 30px; left: 10px; }
-.hp-chip-2 { bottom: 100px; left: 0; }
-.hp-chip-3 { bottom: 40px; right: 10px; }
+.hp-ai-chip:hover {
+  background: rgba(59, 130, 246, 0.18);
+  border-color: rgba(139, 92, 246, 0.38);
+  color: #e0e7ff;
+}
+.hp-ai-chip-more {
+  background: rgba(139, 92, 246, 0.12);
+  border-color: rgba(139, 92, 246, 0.3);
+  color: #c4b5fd;
+  font-weight: 700;
+}
+.hp-ai-chip-more:hover {
+  background: rgba(139, 92, 246, 0.22);
+  border-color: rgba(167, 139, 250, 0.5);
+}
 
 /* ════════════════════════════════
    分类卡片（横向滚动）
@@ -1057,7 +1271,7 @@ function scrollCategories(dir: number) {
   .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; }
   .hp-hero { padding-left: 1rem; padding-right: 1rem; }
   .hp-hero-inner { grid-template-columns: 1fr; padding: 2rem 1.25rem; border-radius: 1.5rem; }
-  .hp-hero-visual { display: none; }
+  .hp-hero-ai { display: none; }
   .hp-cat-scroll-btn { display: none; }
   .hp-categories-wrapper { padding: 0 1rem; }
   .hp-categories-inner { padding: 0.25rem 0; }

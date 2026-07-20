@@ -509,7 +509,7 @@ onMounted(() => {
 .media-hub {
   max-width: 64rem;
   margin: 0 auto;
-  padding: 5.5rem 1.5rem 1.5rem;
+  padding: 6rem 1.5rem 1.5rem;
   box-sizing: border-box;
 }
 
@@ -958,7 +958,7 @@ onMounted(() => {
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .media-hub { max-width: none; margin: 0; padding: 1rem 0.75rem; }
+  .media-hub { max-width: none; margin: 0; padding: 5.25rem 0.75rem 1rem; }
   .mh-stats { grid-template-columns: repeat(2, 1fr); }
   .mh-filters { flex-direction: column; align-items: flex-start; gap: 0.75rem; }
   .mh-filter-group { flex-wrap: wrap; }

@@ -1,5 +1,8 @@
 import axios from 'axios'
 import type {
+  AIChatRequest,
+  AIChatResponse,
+  AIChatAction,
   ArticleDetail,
   ArticleListItem,
   ArticlePublishRequest,
@@ -121,8 +124,6 @@ axios.interceptors.response.use(
         const code = body?.code
         if (code === 1003 || code === 1004) {
           clearAuthState(code)
-        } else {
-          console.warn('Access denied (403)')
         }
       }
     }
@@ -593,4 +594,45 @@ export async function evaluateAssessment(payload: any, gender: string): Promise<
   })
   const responseData = response.data
   return 'data' in responseData ? responseData.data : response.data
+}
+
+// ═══════════════════════════════════════════════════════════════
+// AI Assistant
+// ═══════════════════════════════════════════════════════════════
+
+export async function chatWithAI(payload: AIChatRequest): Promise<AIChatResponse> {
+  const response = await axios.post<ResultResponse<AIChatResponse>>('/api/agent/chat', payload, {
+    headers: getAuthHeaders(),
+  })
+  const body = response.data
+  // 后端业务错误（code != 成功码）时统一抛出用户友好的错误
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error('服务暂时繁忙，请稍后再试')
+  }
+  const raw = (('data' in body && body.data ? body.data : body) as unknown) as {
+    content?: unknown
+    candidates?: unknown
+    action?: unknown
+  }
+  if (!raw || typeof raw.content !== 'string') {
+    throw new Error('服务暂时繁忙，请稍后再试')
+  }
+  const allowedActions: AIChatAction[] = [
+    'chat',
+    'generate_title',
+    'polish_text',
+    'continue_write',
+    'generate_summary',
+    'check_typo',
+    'generate_outline',
+  ]
+  const action = typeof raw.action === 'string' && allowedActions.includes(raw.action as AIChatAction)
+    ? (raw.action as AIChatAction)
+    : payload.action
+
+  return {
+    content: raw.content,
+    candidates: Array.isArray(raw.candidates) ? raw.candidates : undefined,
+    action,
+  }
 }

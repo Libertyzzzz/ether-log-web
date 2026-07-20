@@ -2036,13 +2036,13 @@ onUnmounted(() => {
   background-size: auto, 42px 42px, 42px 42px;
   color: #111827;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  padding: 24px 20px;
+  padding: 5.5rem 20px 20px;
 }
 
 .assessment-root.is-chat-root {
   display: grid;
   align-items: center;
-  padding: 28px;
+  padding: 5.5rem 28px 28px;
   background:
     linear-gradient(115deg, rgba(239, 246, 255, 0.92), rgba(248, 250, 252, 0.98) 48%, rgba(236, 253, 245, 0.88)),
     #f8fafc;
@@ -5365,11 +5365,11 @@ onUnmounted(() => {
 
 @media (max-width: 960px) {
   .assessment-root {
-    padding: 14px;
+    padding: 5rem 14px 14px;
   }
 
   .assessment-root.is-chat-root {
-    padding: 14px;
+    padding: 5rem 14px 14px;
   }
 
   .assessment-nav,

@@ -89,9 +89,7 @@ async function runRefresh(): Promise<boolean> {
     
     if (typeof newExpire === 'number') {
       setTokenExpire(newExpire)
-      console.log('[auth] token 续约成功，新过期时间:', new Date(newExpire).toISOString())
     } else {
-      console.error('[auth] 无法获取 token 过期时间')
       return false
     }
     
@@ -99,7 +97,6 @@ async function runRefresh(): Promise<boolean> {
     return true
   } catch (e) {
     refreshFailCount++
-    console.warn(`[auth] token 续约失败 (${refreshFailCount}/${MAX_REFRESH_FAILS}):`, e)
     return false
   } finally {
     isRefreshing = false

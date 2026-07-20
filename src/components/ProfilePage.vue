@@ -229,7 +229,7 @@ const toggleEmailNotifications = (event: Event) => {
 
 <style scoped>
 /* ── 页面容器 ── */
-.pp-page { background:#f5f5f7; min-height:100vh; padding-top: 7rem; }
+.pp-page { background:#f5f5f7; min-height:100vh; padding-top: 5.5rem; }
 .pp-body { max-width:64rem; margin:0 auto; padding:2rem 1.5rem 5rem; display:flex; flex-direction:column; gap:2rem; }
 
 /* ── Hero Banner：和 navbar 等宽，两侧留白对齐 ── */
@@ -387,10 +387,13 @@ const toggleEmailNotifications = (event: Event) => {
 
 /* ── 响应式 ── */
 @media (max-width:900px) {
+  .pp-page { padding-top: 5rem; }
+  .pp-body { padding: 1.5rem 1rem 4rem; }
   .pp-settings-grid { grid-template-columns: 1fr; }
   .pp-social-input-grid { grid-template-columns: 1fr; }
 }
 @media (max-width:600px) {
+  .pp-page { padding-top: 4.5rem; }
   .pp-hero-inner { flex-direction: column; text-align: center; }
   .pp-social { justify-content: center; }
   .pp-form-row { grid-template-columns: 1fr; }

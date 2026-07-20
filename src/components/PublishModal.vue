@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { computed, nextTick, onBeforeUnmount, ref, watch, onMounted } from 'vue'
-import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2, ListTree, ChevronRight } from 'lucide-vue-next'
+import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2, ListTree, ChevronRight, Sparkles } from 'lucide-vue-next'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import TiptapImage from '@tiptap/extension-image'
@@ -10,6 +10,9 @@ import TurndownService from 'turndown'
 import type { ComponentPublicInstance } from 'vue'
 import type { ArticlePublishRequest, Category, Tag } from '../types/blog'
 import { renderMarkdown } from '../utils/markdown'
+import { useAIAssistant } from '../composables/useAIAssistantGlobal'
+
+const ai = useAIAssistant()
 
 type PendingMarkdownImage = {
   id: number
@@ -349,7 +352,15 @@ onBeforeUnmount(() => {
             @change="$emit('uploadMarkdownImage', $event)"
           />
           <div class="toolbar-divider"></div>
-          <span class="toolbar-mode-label">所见即所得</span>
+          <button
+            class="toolbar-ai-btn"
+            type="button"
+            @click="ai.open()"
+            title="AI 助手"
+          >
+            <Sparkles :size="14" />
+            <span>AI 助手</span>
+          </button>
         </div>
 
         <div class="breadcrumb-spacer"></div>
@@ -741,6 +752,29 @@ onBeforeUnmount(() => {
   font-weight: 800;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+}
+
+/* AI 助手按钮（顶部工具栏内，紫色主题） */
+.toolbar-ai-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.3rem 0.7rem;
+  border: 1px solid rgba(139, 92, 246, 0.28);
+  border-radius: 9999px;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(99, 102, 241, 0.08) 100%);
+  color: #6d28d9;
+  font-size: 0.72rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s, transform 0.15s, box-shadow 0.2s;
+  width: auto !important;
+}
+.toolbar-ai-btn:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22) 0%, rgba(99, 102, 241, 0.16) 100%);
+  color: #5b21b6;
+  transform: translateY(-1px);
+  box-shadow: 0 3px 10px rgba(139, 92, 246, 0.2);
 }
 
 .file-input-hidden {

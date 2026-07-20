@@ -7,6 +7,8 @@ import confetti from 'canvas-confetti'
 import AboutSection from './components/AboutSection.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
+import AIAssistant from './components/AIAssistant.vue'
+import { useAIAssistant } from './composables/useAIAssistantGlobal'
 import SidebarNav from './components/SidebarNav.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
 import ContactSection from './components/ContactSection.vue'
@@ -97,6 +99,7 @@ const {
 } = useComments()
 
 const { isDark, toggleDark } = useDarkMode()
+const { open: openAIAssistant } = useAIAssistant()
 
 // ── Categories & Tags (real data from backend) ──
 const categories = ref<Category[]>([])
@@ -1094,6 +1097,7 @@ onUnmounted(() => {
         @logout="handleLogout"
         @toggle-dark="toggleDark"
         @close-user-menu="closeUserMenu"
+        @open-ai-assistant="openAIAssistant"
       />
 
       <!-- Global sidebar (hover from left edge) - only on home, posts, about, and article detail -->
@@ -1269,6 +1273,8 @@ onUnmounted(() => {
         @confirm="confirmDeleteArticle"
         @cancel="showDeleteConfirm = false"
       />
+
+      <AIAssistant />
     </div>
 
     <div v-if="!accessGranted && !isCheckingGate" class="access-gate" role="dialog" aria-modal="true" aria-label="主站访问校验">

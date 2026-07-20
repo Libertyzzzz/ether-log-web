@@ -56,6 +56,24 @@ export default defineConfig(({ mode }) => {
           secure: mode !== 'development'
         }
       }
-    }
+    },
+
+    build: {
+      sourcemap: false,
+      minify: 'esbuild',
+      target: 'es2018',
+      cssCodeSplit: true,
+      esbuildOptions: {
+        drop: mode !== 'development' ? ['console', 'debugger'] : [],
+        legalComments: 'none',
+      },
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            'vue-vendor': ['vue', 'vue-router'],
+          },
+        },
+      },
+    },
   }
 })

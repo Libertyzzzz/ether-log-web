@@ -1,9 +1,12 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
-import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen } from 'lucide-vue-next'
+import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen, Sparkles } from 'lucide-vue-next'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
 import { getReadingTime } from '../utils/format'
+import { useAIAssistant } from '../composables/useAIAssistantGlobal'
+
+const ai = useAIAssistant()
 
 const props = defineProps<{
   article: ArticleDetail | ArticleListItem
@@ -164,6 +167,26 @@ onUnmounted(() => {
             <div class="sidebar-progress-fill" :style="{ width: readProgress + '%' }"></div>
           </div>
         </div>
+
+        <!-- AI 助手：阅读页入口（打开全局抽屉，自动带入文章上下文） -->
+        <button
+          type="button"
+          class="sidebar-ai-card"
+          @click="ai.open({
+            title: article.title,
+            content: (selectedArticle?.content || article.summary || '').slice(0, 1500),
+          })"
+          title="让 AI 帮你解读这篇文章"
+        >
+          <span class="sidebar-ai-icon">
+            <Sparkles :size="13" />
+          </span>
+          <span class="sidebar-ai-text">
+            <span class="sidebar-ai-title">AI 助手</span>
+            <span class="sidebar-ai-sub">解读这篇文章 / 摘要 / 问答</span>
+          </span>
+          <ArrowRight :size="11" class="sidebar-ai-arrow" />
+        </button>
 
         <!-- 目录 -->
         <nav v-if="headings.length" class="sidebar-toc">
@@ -432,6 +455,66 @@ onUnmounted(() => {
   border-radius: 9999px;
   background: linear-gradient(90deg, #2563eb, #10b981);
   transition: width 0.25s ease;
+}
+
+/* AI 助手卡片（阅读页 sidebar） */
+.sidebar-ai-card {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  border-radius: 0.75rem;
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.12) 0%, rgba(99, 102, 241, 0.08) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.25);
+  color: #7c3aed;
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, transform 0.15s;
+  text-align: left;
+  width: 100%;
+  box-shadow: 0 1px 3px rgba(139, 92, 246, 0.1), inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+.sidebar-ai-card:hover {
+  background: linear-gradient(135deg, rgba(139, 92, 246, 0.22) 0%, rgba(99, 102, 241, 0.18) 100%);
+  border-color: rgba(139, 92, 246, 0.4);
+  transform: translateY(-1px);
+}
+.sidebar-ai-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: 0.5rem;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #ffffff;
+  flex-shrink: 0;
+}
+.sidebar-ai-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  flex: 1;
+  min-width: 0;
+}
+.sidebar-ai-title {
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #6d28d9;
+  line-height: 1.2;
+}
+.sidebar-ai-sub {
+  font-size: 0.62rem;
+  color: #94a3b8;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.sidebar-ai-arrow {
+  color: #a78bfa;
+  flex-shrink: 0;
+  transition: transform 0.2s;
+}
+.sidebar-ai-card:hover .sidebar-ai-arrow {
+  transform: translateX(2px);
 }
 
 /* 目录 */
