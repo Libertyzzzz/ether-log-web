@@ -1197,9 +1197,9 @@ onUnmounted(() => {
             @open-login="openLoginModal"
           />
 
-          <AboutSection v-if="currentPage === 'home' || currentPage === 'about'" />
+          <AboutSection v-if="currentPage === 'about'" />
           <ContactSection v-if="currentPage === 'home'" />
-          <AppFooter v-if="currentPage === 'home'" />
+          <AppFooter v-if="['home', 'posts', 'about', 'guestbook', 'quant-lab'].includes(currentPage)" />
         </div>
       </Transition>
 

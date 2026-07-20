@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles } from 'lucide-vue-next'
+import { User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Info } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
@@ -141,8 +141,9 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <nav class="nav-standard" :class="{ 'nav-hidden': !isVisible }">
-    <div class="nav-content">
+  <div class="nav-shell">
+    <nav class="nav-standard" :class="{ 'nav-hidden': !isVisible }">
+      <div class="nav-content">
       <!-- 1. 左侧：Logo (始终靠左) -->
       <div class="nav-logo" @click="$emit('navigate', 'home')">
         <div class="logo-box">E</div>
@@ -251,8 +252,48 @@ onUnmounted(() => {
           </Transition>
         </div>
       </div>
+      </div>
+    </nav>
+
+    <div class="mobile-tabbar mobile-only" :class="{ 'tabbar-hidden': !isVisible }" aria-label="移动端主导航">
+      <button
+        type="button"
+        class="mobile-tabbar-item"
+        :class="{ active: route.name === 'home' }"
+        @click="$emit('navigate', 'home')"
+      >
+        <House :size="17" />
+        <span>Home</span>
+      </button>
+      <button
+        type="button"
+        class="mobile-tabbar-item"
+        :class="{ active: route.name === 'posts' }"
+        @click="$emit('navigate', 'posts')"
+      >
+        <FileText :size="17" />
+        <span>Posts</span>
+      </button>
+      <button
+        type="button"
+        class="mobile-tabbar-item"
+        :class="{ active: route.name === 'quant-lab' }"
+        @click="$emit('openQuantLab')"
+      >
+        <FlaskConical :size="17" />
+        <span>Lab</span>
+      </button>
+      <button
+        type="button"
+        class="mobile-tabbar-item"
+        :class="{ active: route.name === 'about' }"
+        @click="$emit('navigate', 'about')"
+      >
+        <Info :size="17" />
+        <span>About</span>
+      </button>
     </div>
-  </nav>
+  </div>
 </template>
 
 <style scoped>
@@ -270,7 +311,7 @@ onUnmounted(() => {
 /* 桌面端永远不隐藏（即 nav-hidden 类对桌面端无视觉效果） */
 .nav-standard.nav-hidden { transform: translateY(0); }
 .nav-content {
-  max-width: 64rem; height: 100%; margin: 0 auto; padding: 0 1.5rem;
+  max-width: 68rem; height: 100%; margin: 0 auto; padding: 0 1.5rem;
   display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
 }
 .nav-right { display: flex; align-items: center; gap: 0.4rem; }
@@ -555,7 +596,9 @@ kbd {
 /* ── 移动端适配 (Safari/Chrome/iOS) ─ */
 @media (max-width: 768px) {
   .nav-standard {
-    height: calc(3rem + env(safe-area-inset-top));
+    height: calc(3.25rem + env(safe-area-inset-top));
+    background: rgba(248, 250, 252, 0.86);
+    border-bottom-color: rgba(203, 213, 225, 0.42);
     will-change: transform;
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
@@ -566,65 +609,112 @@ kbd {
     transform: translate3d(0, -100%, 0);
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
   }
-  /* 移动端：水平 flex 布局 —— [Logo] [Home/Posts/About] [搜索 + 状态] */
   .nav-content {
     display: flex;
     align-items: center;
     justify-content: space-between;
-    padding: 0 0.75rem;
+    padding: 0 0.9rem;
     gap: 0.5rem;
   }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
 
-  /* Logo 适度放大 */
   .nav-logo { gap: 0.45rem; flex-shrink: 0; }
-  .logo-box { width: 1.45rem; height: 1.45rem; border-radius: 0.4rem; font-size: 0.7rem; }
-  .logo-text { font-size: 0.75rem; letter-spacing: 0.05em; }
+  .logo-box { width: 1.65rem; height: 1.65rem; border-radius: 0.48rem; font-size: 0.75rem; }
+  .logo-text { font-size: 0.78rem; letter-spacing: 0.08em; }
 
-  /* 中部：Home Posts About —— 放大字号与间距 */
   .nav-links {
-    gap: 1rem;
-    flex-shrink: 0;
-  }
-  .nav-links button {
-    font-size: 0.78rem;
-    font-weight: 700;
-    letter-spacing: 0.05em;
+    display: none;
   }
 
-  /* 右侧：AI + 搜索 + 状态小圆点 —— 放大间距 */
-  .nav-right { gap: 0.25rem; }
-  .nav-icon-btn { width: 2rem; height: 2rem; }
+  .nav-right { gap: 0.35rem; }
+  .nav-icon-btn,
+  .status-dot-btn {
+    width: 2.15rem;
+    height: 2.15rem;
+    border-radius: 0.72rem;
+    background: rgba(255, 255, 255, 0.74);
+    border: 1px solid rgba(203, 213, 225, 0.52);
+  }
   .nav-icon-btn svg { width: 17px; height: 17px; }
   .nav-icon-ai {
-    color: #8b5cf6;
+    color: #7c3aed;
+    background: rgba(245, 243, 255, 0.84);
+    border-color: rgba(196, 181, 253, 0.55);
   }
   .nav-icon-ai:hover {
     color: #a78bfa;
   }
-  .status-dot-btn { width: 2rem; height: 2rem; }
+  .mobile-tabbar {
+    position: fixed;
+    left: 50%;
+    bottom: max(0.75rem, env(safe-area-inset-bottom));
+    transform: translateX(-50%);
+    width: min(calc(100vw - 1.5rem), 25rem);
+    padding: 0.35rem;
+    border-radius: 1.2rem;
+    background: rgba(255, 255, 255, 0.86);
+    border: 1px solid rgba(203, 213, 225, 0.62);
+    box-shadow: 0 16px 42px rgba(15, 23, 42, 0.16);
+    backdrop-filter: blur(18px);
+    -webkit-backdrop-filter: blur(18px);
+    z-index: 1001;
+    display: grid !important;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0.25rem;
+  }
+  .mobile-tabbar-item {
+    min-width: 0;
+    height: 2.75rem;
+    border: none;
+    border-radius: 0.9rem;
+    background: transparent;
+    color: #64748b;
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 0.12rem;
+    font-family: inherit;
+    font-size: 0.62rem;
+    font-weight: 850;
+    letter-spacing: 0.02em;
+    cursor: pointer;
+    transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+  }
+  .mobile-tabbar-item.active {
+    background: #0f172a;
+    color: #ffffff;
+    box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
+  }
+  .mobile-tabbar.tabbar-hidden {
+    transform: translateX(-50%) translateY(calc(100% + 1.5rem));
+  }
+  .mobile-tabbar-item:active {
+    transform: scale(0.96);
+  }
 }
 @media (max-width: 480px) {
   .nav-standard {
-    height: calc(2.85rem + env(safe-area-inset-top));
+    height: calc(3.1rem + env(safe-area-inset-top));
   }
-  .nav-content { padding: 0 0.7rem; gap: 0.5rem; }
+  .nav-content { padding: 0 0.8rem; gap: 0.5rem; }
 
-  /* 超窄屏：logo 文字隐藏，只保留 E 方框 */
-  .nav-logo { gap: 0; }
-  .logo-text { display: none; }
-  .logo-box { width: 1.3rem; height: 1.3rem; font-size: 0.65rem; }
-
-  /* 超窄屏：链接紧凑 */
-  .nav-links { gap: 0.7rem; }
-  .nav-links button { font-size: 0.7rem; letter-spacing: 0.03em; }
-
-  /* 右侧 */
-  .nav-right { gap: 0.15rem; }
-  .nav-icon-btn { width: 1.8rem; height: 1.8rem; }
+  .logo-box { width: 1.55rem; height: 1.55rem; font-size: 0.7rem; }
+  .logo-text { font-size: 0.74rem; letter-spacing: 0.07em; }
+  .nav-right { gap: 0.25rem; }
+  .nav-icon-btn,
+  .status-dot-btn { width: 2rem; height: 2rem; border-radius: 0.68rem; }
   .nav-icon-btn svg { width: 16px; height: 16px; }
-  .status-dot-btn { width: 1.8rem; height: 1.8rem; }
+  .mobile-tabbar {
+    width: min(calc(100vw - 1rem), 23.5rem);
+    border-radius: 1rem;
+  }
+  .mobile-tabbar-item {
+    height: 2.55rem;
+    border-radius: 0.78rem;
+    font-size: 0.58rem;
+  }
 }
 
 /* 暗色模式 */
