@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
-import { Menu, X, User, LayoutDashboard, LogOut, Home, BookOpen, Info, Search, FlaskConical, Sparkles } from 'lucide-vue-next'
+import { User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 
@@ -28,20 +28,10 @@ const emit = defineEmits<{
   closeUserMenu: []
 }>()
 
-// 移动端中间汉堡菜单的本地状态
-const showMobileNav = ref(false)
 const isMobile = ref(false)
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768
-}
-
-function toggleMobileNav() {
-  showMobileNav.value = !showMobileNav.value
-  // 互斥逻辑：打开中间菜单时，尝试关闭右侧菜单（如果已打开）
-  if (showMobileNav.value && props.showUserMenu) {
-    emit('toggleStatus')
-  }
 }
 
 // ── 滚动隐藏导航栏（Twitter/Medium 风格：向下滚隐藏，向上滚显示） ──
@@ -159,8 +149,8 @@ onUnmounted(() => {
         <span class="logo-text">NEXTIFY</span>
       </div>
 
-      <!-- 2. 中间：PC 链接 / 移动端汉堡 (绝对居中) -->
-      <div class="nav-links desktop-only">
+      <!-- 2. 中间：Home / Posts / About（PC 和移动端都水平显示，移动端缩小字体和间距） -->
+      <div class="nav-links">
         <button type="button" @click="$emit('navigate', 'home')">Home</button>
         <button type="button" @click="$emit('navigate', 'posts')">Posts</button>
         <button type="button" @click="$emit('navigate', 'about')">About</button>
@@ -173,33 +163,6 @@ onUnmounted(() => {
           <span>Search...</span>
           <kbd>⌘K</kbd>
         </button>
-      </div>
-
-      <div class="mobile-nav-wrapper mobile-only">
-        <button
-          class="mobile-menu-btn"
-          :class="{ active: showMobileNav }"
-          @click="toggleMobileNav"
-          type="button"
-        >
-          <Menu v-if="!showMobileNav" :size="20" />
-          <X v-else :size="20" />
-        </button>
-
-        <!-- 汉堡菜单：仅包含 Home, Posts, About -->
-        <Transition name="dropdown-fade">
-          <div v-if="showMobileNav" class="user-dropdown-menu center-menu" @click.stop>
-            <button class="dropdown-item" type="button" @click="showMobileNav = false; $emit('navigate', 'home')">
-              <Home :size="14" /> Home
-            </button>
-            <button class="dropdown-item" type="button" @click="showMobileNav = false; $emit('navigate', 'posts')">
-              <BookOpen :size="14" /> Posts
-            </button>
-            <button class="dropdown-item" type="button" @click="showMobileNav = false; $emit('navigate', 'about')">
-              <Info :size="14" /> About
-            </button>
-          </div>
-        </Transition>
       </div>
 
       <!-- 3. 右侧：PC 操作按钮 + 状态标签 (始终靠右) -->
@@ -224,11 +187,42 @@ onUnmounted(() => {
           <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
         </div>
 
+        <!-- 移动端：AI 助手图标 -->
+        <button
+          class="nav-icon-btn nav-icon-ai mobile-only"
+          type="button"
+          @click.prevent="$emit('openAiAssistant')"
+          title="AI 助手"
+        >
+          <Sparkles :size="16" />
+        </button>
+
+        <!-- 移动端：搜索图标按钮 -->
+        <button
+          class="nav-icon-btn mobile-only"
+          type="button"
+          @click.prevent="$emit('openSearch')"
+          title="搜索"
+        >
+          <Search :size="18" />
+        </button>
+
         <div class="status-badge-wrapper">
-          <div class="status-badge clickable" :class="{ active: showUserMenu }" @click="$emit('toggleStatus')">
+          <!-- PC 端：带文字的 status badge -->
+          <div class="status-badge clickable desktop-only" :class="{ active: showUserMenu }" @click="$emit('toggleStatus')">
             <div class="dot"></div>
             <span>{{ isLoggedIn ? 'IN' : 'SYSTEM READY' }}</span>
           </div>
+          <!-- 移动端：仅小圆点（点击区域放大到 44px） -->
+          <button
+            class="status-dot-btn mobile-only"
+            :class="{ active: showUserMenu, logged: isLoggedIn }"
+            type="button"
+            @click="$emit('toggleStatus')"
+            :title="isLoggedIn ? '账户' : '登录'"
+          >
+            <span class="status-dot-inner"></span>
+          </button>
 
           <Transition name="dropdown-fade">
             <div v-if="showUserMenu" class="user-dropdown-menu right-menu" @click.stop>
@@ -269,6 +263,9 @@ onUnmounted(() => {
   -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--nav-border);
   z-index: 1000; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s;
   box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
+  /* 处理 iOS 刘海/灵动岛 safe-area（移动端生效，PC 端 env() 返回 0，无副作用 */
+  padding-top: env(safe-area-inset-top);
+  box-sizing: border-box;
 }
 /* 桌面端永远不隐藏（即 nav-hidden 类对桌面端无视觉效果） */
 .nav-standard.nav-hidden { transform: translateY(0); }
@@ -435,6 +432,58 @@ kbd {
 .status-badge.active { background: #0f172a; color: white; border-color: #0f172a; }
 .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
 
+/* ── 移动端：图标按钮（搜索/用户） */
+.nav-icon-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 0.55rem;
+  color: #0f172a;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.nav-icon-btn:active {
+  background: #e2e8f0;
+}
+
+/* ── 移动端：status 小圆点按钮（44x44px 点击热区 */
+.status-dot-btn {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.15s ease;
+}
+.status-dot-btn:active {
+  background: #e2e8f0;
+}
+.status-dot-btn.active {
+  background: #0f172a;
+}
+.status-dot-btn.active .status-dot-inner {
+  background: #ffffff;
+}
+.status-dot-inner {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #94a3b8;
+}
+.status-dot-btn.logged .status-dot-inner {
+  background: #10b981;
+}
+
 /* 移动端汉堡与菜单 */
 .mobile-nav-wrapper { position: relative; }
 .mobile-menu-btn {
@@ -506,7 +555,7 @@ kbd {
 /* ── 移动端适配 (Safari/Chrome/iOS) ─ */
 @media (max-width: 768px) {
   .nav-standard {
-    height: 3.75rem;
+    height: calc(3rem + env(safe-area-inset-top));
     will-change: transform;
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
@@ -517,26 +566,65 @@ kbd {
     transform: translate3d(0, -100%, 0);
     box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
   }
-  .nav-content { display: grid; grid-template-columns: auto auto 1fr; padding: 0 0.75rem; gap: 0.5rem; }
+  /* 移动端：水平 flex 布局 —— [Logo] [Home/Posts/About] [搜索 + 状态] */
+  .nav-content {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 0.75rem;
+    gap: 0.5rem;
+  }
   .desktop-only { display: none !important; }
   .mobile-only { display: flex !important; }
-  .nav-logo { grid-column: 1; gap: 0.5rem; }
-  .logo-box { width: 1.55rem; height: 1.55rem; border-radius: 0.4rem; font-size: 0.75rem; }
-  .logo-text { font-size: 0.78rem; letter-spacing: 0.04em; }
-  .mobile-nav-wrapper { grid-column: 2; justify-self: center; }
-  .nav-right { grid-column: 3; justify-self: end; gap: 0.35rem; }
-  .status-badge { padding: 0.25rem 0.5rem; font-size: 0.55rem; gap: 0.3rem; }
-  .status-badge .label-text { display: none; }
-  .nav-search-trigger { padding: 0.3rem 0.4rem; }
-  .nav-search-trigger .search-label { display: none; }
-  .mobile-menu-btn { width: 2rem; height: 2rem; border-radius: 0.5rem; }
+
+  /* Logo 适度放大 */
+  .nav-logo { gap: 0.45rem; flex-shrink: 0; }
+  .logo-box { width: 1.45rem; height: 1.45rem; border-radius: 0.4rem; font-size: 0.7rem; }
+  .logo-text { font-size: 0.75rem; letter-spacing: 0.05em; }
+
+  /* 中部：Home Posts About —— 放大字号与间距 */
+  .nav-links {
+    gap: 1rem;
+    flex-shrink: 0;
+  }
+  .nav-links button {
+    font-size: 0.78rem;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+  }
+
+  /* 右侧：AI + 搜索 + 状态小圆点 —— 放大间距 */
+  .nav-right { gap: 0.25rem; }
+  .nav-icon-btn { width: 2rem; height: 2rem; }
+  .nav-icon-btn svg { width: 17px; height: 17px; }
+  .nav-icon-ai {
+    color: #8b5cf6;
+  }
+  .nav-icon-ai:hover {
+    color: #a78bfa;
+  }
+  .status-dot-btn { width: 2rem; height: 2rem; }
 }
 @media (max-width: 480px) {
-  .nav-standard { height: 3.5rem; }
-  .nav-content { padding: 0 0.6rem; gap: 0.35rem; }
-  .nav-logo { gap: 0.35rem; }
-  .logo-text { font-size: 0.72rem; }
-  .nav-right { gap: 0.3rem; }
+  .nav-standard {
+    height: calc(2.85rem + env(safe-area-inset-top));
+  }
+  .nav-content { padding: 0 0.7rem; gap: 0.5rem; }
+
+  /* 超窄屏：logo 文字隐藏，只保留 E 方框 */
+  .nav-logo { gap: 0; }
+  .logo-text { display: none; }
+  .logo-box { width: 1.3rem; height: 1.3rem; font-size: 0.65rem; }
+
+  /* 超窄屏：链接紧凑 */
+  .nav-links { gap: 0.7rem; }
+  .nav-links button { font-size: 0.7rem; letter-spacing: 0.03em; }
+
+  /* 右侧 */
+  .nav-right { gap: 0.15rem; }
+  .nav-icon-btn { width: 1.8rem; height: 1.8rem; }
+  .nav-icon-btn svg { width: 16px; height: 16px; }
+  .status-dot-btn { width: 1.8rem; height: 1.8rem; }
 }
 
 /* 暗色模式 */

@@ -1264,29 +1264,96 @@ onBeforeUnmount(() => {
 
 /* 响应式 */
 @media (max-width: 768px) {
-  .publish-layout { padding-top: 4.5rem; }
-  .publish-layout-inner { padding: 0 0.75rem; flex-direction: column; }
-  /* 侧边栏和 TOC 移动端均隐藏 */
-  .publish-sidebar,
-  .publish-toc {
-    display: none;
+  .publish-layout { padding-top: 4.25rem; }
+  .publish-breadcrumb-row { padding: 0.4rem 0; }
+
+  /* 核心修复：允许换行 + 自适应高度 */
+  .publish-breadcrumb {
+    height: auto;
+    flex-wrap: wrap;
+    gap: 0.35rem;
+    padding: 0.55rem 0.85rem;
+    border-radius: 0.85rem;
+    margin: 0 0.75rem;
   }
-  /* 主编辑区 */
+
+  /* 精简：面包屑链接 */
+  .breadcrumb-back { padding: 0.28rem 0.55rem; font-size: 0.68rem; }
+  .breadcrumb-action { font-size: 0.7rem; letter-spacing: 0.05em; }
+  .breadcrumb-action svg { width: 11px; height: 11px; }
+  .breadcrumb-site, .breadcrumb-sep { display: none; }
+
+  /* 第一个 spacer 在移动端保留为弹性占位，第二个 spacer 删除 */
+  .breadcrumb-spacer:first-of-type { flex: 1 1 auto; min-width: 0; }
+  .breadcrumb-spacer + .breadcrumb-spacer { display: none; }
+
+  /* 工具栏在移动端隐藏 */
+  .breadcrumb-toolbar { display: none; }
+
+  /* 右侧按钮区：精简，字数隐藏，草稿清除按钮简化 */
+  .breadcrumb-actions {
+    gap: 0.3rem;
+  }
+  .word-count { display: none; }
+  .draft-status {
+    font-size: 0.65rem;
+    max-width: 6rem;
+  }
+  .btn-discard-draft {
+    padding: 0.28rem 0.55rem;
+    font-size: 0.68rem;
+  }
+  .btn-cancel {
+    padding: 0.28rem 0.6rem;
+    font-size: 0.7rem;
+  }
+  .btn-save-draft {
+    padding: 0.3rem 0.65rem;
+    font-size: 0.7rem;
+  }
+  .btn-publish {
+    padding: 0.3rem 0.85rem;
+    font-size: 0.72rem;
+  }
+
+  /* 主体编辑区 */
+  .publish-layout-inner { padding: 0 0.75rem; flex-direction: column; }
+  .publish-sidebar, .publish-toc { display: none; }
   .publish-main {
-    padding: 1rem 0 6rem;
+    padding: 0.75rem 0 5rem;
     overflow-y: auto;
     min-height: 70vh;
   }
   .editor-pane {
     flex: none;
     min-height: 60vh;
-    padding: 1.5rem 1rem 2rem;
+    padding: 1.25rem 0.85rem 1.5rem;
   }
-  .publish-title-input { font-size: 1.5rem; }
-  .breadcrumb-toolbar { display: none; }
-  .breadcrumb-site,
-  .breadcrumb-sep { display: none; }
-  .word-count { display: none; }
+  .publish-title-input { font-size: 1.4rem; }
+}
+
+/* 超窄屏：再压缩 */
+@media (max-width: 480px) {
+  .publish-breadcrumb {
+    padding: 0.5rem 0.7rem;
+    gap: 0.25rem;
+    margin: 0 0.65rem;
+  }
+  .breadcrumb-back { padding: 0.25rem 0.45rem; font-size: 0.65rem; }
+  .breadcrumb-back svg { width: 11px; height: 11px; }
+  .breadcrumb-action { font-size: 0.68rem; }
+  .btn-cancel,
+  .btn-discard-draft,
+  .btn-save-draft {
+    font-size: 0.65rem;
+    padding: 0.25rem 0.5rem;
+  }
+  .btn-publish {
+    font-size: 0.68rem;
+    padding: 0.28rem 0.7rem;
+  }
+  .draft-status { display: none; }
+  .publish-title-input { font-size: 1.25rem; }
 }
 
 </style>

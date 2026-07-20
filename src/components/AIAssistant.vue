@@ -1101,29 +1101,200 @@ const contextIntro = computed(() => {
 }
 
 /* ── 响应式 ── */
-@media (max-width: 640px) {
-  .ai-drawer {
-    width: 100vw;
-    max-width: 100vw;
-  }
-  .ai-fab {
-    right: 16px;
-    bottom: 16px;
-    width: 46px;
-    height: 46px;
-  }
-  .ai-fab:hover,
-  .ai-fab.is-expanded {
-    padding: 10px 14px 10px 12px;
-  }
+@media (max-width: 900px) {
   .ai-actions {
     grid-template-columns: repeat(3, 1fr);
   }
 }
 
-@media (max-width: 900px) {
-  .ai-actions {
-    grid-template-columns: repeat(3, 1fr);
+/* P2-P3: AIAssistant 移动端全面优化 */
+@media (max-width: 640px) {
+  .ai-drawer {
+    width: 100vw;
+    max-width: 100vw;
+    border-radius: 0;
   }
+
+  /* 顶部导航：处理 iOS 刘海/灵动岛 */
+  .ai-header {
+    padding: calc(10px + env(safe-area-inset-top)) 12px 10px 14px;
+    min-height: auto;
+  }
+  .ai-header-left { gap: 10px; }
+  .ai-title { font-size: 13px; letter-spacing: 0.04em; }
+  .ai-title-small { font-size: 10.5px; margin-top: 1px; }
+  .ai-assistant-avatar-animated {
+    width: 30px;
+    height: 30px;
+    font-size: 14px;
+  }
+  .ai-close-btn {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    font-size: 14px;
+  }
+
+  /* 任务面板：紧凑布局 */
+  .ai-task-panel {
+    padding: 12px 12px 12px 12px;
+    gap: 10px;
+    margin: 0;
+  }
+  .ai-task-intro { font-size: 11.5px; line-height: 1.55; }
+  .ai-context-hint {
+    padding: 7px 14px;
+    font-size: 10.5px;
+  }
+
+  /* 风格切换 */
+  .ai-style-row { gap: 6px; padding: 8px 14px 10px; }
+  .ai-style-btn {
+    padding: 5px 9px;
+    font-size: 10.5px;
+    border-radius: 6px;
+    gap: 5px;
+  }
+  .ai-style-emoji { font-size: 10px; }
+
+  /* 快捷操作按钮 */
+  .ai-actions {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 6px;
+  }
+  .ai-action-btn {
+    padding: 8px 9px;
+    min-height: 48px;
+    gap: 8px;
+    border-radius: 7px;
+  }
+  .ai-action-icon {
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
+    font-size: 12px;
+  }
+  .ai-action-label { font-size: 11px; }
+  .ai-action-hint { font-size: 9.5px; }
+
+  /* 消息区：压缩间距与尺寸 */
+  .ai-chat-messages {
+    padding: 10px 12px;
+    gap: 8px;
+  }
+
+  /* 气泡：紧凑 */
+  .ai-bubble {
+    max-width: 92%;
+    padding: 8px 10px;
+    font-size: 11.5px;
+    line-height: 1.6;
+    border-radius: 12px;
+  }
+  .ai-assistant-bubble { gap: 8px; border-bottom-left-radius: 3px; }
+  .ai-user-bubble { border-bottom-right-radius: 3px; }
+
+  .ai-assistant-avatar {
+    width: 22px;
+    height: 22px;
+    font-size: 11px;
+    margin-top: 0;
+  }
+  .ai-assistant-text {
+    font-size: 11.5px;
+    line-height: 1.6;
+    margin: 0 0 6px 0;
+  }
+
+  /* 候选列表：紧凑 */
+  .ai-candidates {
+    gap: 5px;
+    margin: 5px 0 6px 0;
+    padding-top: 6px;
+  }
+  .ai-candidate-item {
+    padding: 6px 8px;
+    border-radius: 6px;
+    gap: 6px;
+  }
+  .ai-candidate-text { font-size: 11px; }
+  .ai-candidate-apply {
+    padding: 3px 7px;
+    font-size: 9.5px;
+    border-radius: 5px;
+    gap: 3px;
+  }
+
+  /* 气泡操作按钮 */
+  .ai-bubble-actions { gap: 4px; }
+  .ai-bubble-btn {
+    padding: 4px 7px;
+    font-size: 10px;
+    border-radius: 5px;
+    gap: 4px;
+  }
+  .ai-bubble-btn svg { width: 11px; height: 11px; }
+
+  /* 思考动画：更紧凑 */
+  .ai-bubble.is-thinking .ai-assistant-content {
+    padding: 2px 0;
+  }
+  .ai-thinking-dot { width: 5px; height: 5px; }
+
+  /* 输入区：紧凑 */
+  .ai-input-area {
+    gap: 6px;
+    padding: 8px 10px calc(8px + env(safe-area-inset-bottom));
+  }
+  .ai-input {
+    padding: 8px 10px;
+    font-size: 12px;
+    line-height: 1.5;
+    min-height: 36px;
+    max-height: 100px;
+    border-radius: 8px;
+  }
+  .ai-input::placeholder { font-size: 11px; }
+
+  .ai-send-btn {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+  }
+  .ai-send-btn svg { width: 16px; height: 16px; }
+
+  /* FAB 悬浮按钮：移动端缩小 */
+  .ai-fab {
+    right: 14px;
+    bottom: 14px;
+    width: 44px;
+    height: 44px;
+  }
+  .ai-fab:hover,
+  .ai-fab.is-expanded {
+    padding: 8px 12px 8px 10px;
+  }
+  .ai-fab-icon svg { width: 18px; height: 18px; }
+}
+
+/* 超窄屏（如 iPhone SE 326px 宽）：快捷按钮改为 2 列，避免文本截断 */
+@media (max-width: 400px) {
+  .ai-actions {
+    grid-template-columns: 1fr;
+    gap: 5px;
+  }
+  .ai-action-btn {
+    min-height: 42px;
+    padding: 7px 8px;
+  }
+
+  /* 超窄屏：气泡进一步压缩 */
+  .ai-chat-messages { padding: 8px 10px; gap: 7px; }
+  .ai-bubble { padding: 7px 9px; font-size: 11px; }
+  .ai-assistant-text { font-size: 11px; }
+
+  /* 输入区 */
+  .ai-input { font-size: 11.5px; min-height: 34px; }
+  .ai-send-btn { width: 34px; height: 34px; }
 }
 </style>

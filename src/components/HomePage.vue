@@ -162,33 +162,54 @@ function heroOpenDrawerOnly() {
             Tracing Thoughts,<br />
             Shaping <span class="hp-hero-accent">Logic.</span>
           </h1>
-          <p class="hp-hero-sub">
+          <!-- PC/平板：完整三行副标题 -->
+          <p class="hp-hero-sub desktop-only">
             万物起手微末，亦如尘埃。<br />
             在繁杂的世界里，捕捉转瞬即逝的审美，<br />
             固化永恒的逻辑。
+          </p>
+          <!-- 移动端：精简一行副标题 -->
+          <p class="hp-hero-sub mobile-only">
+            在繁杂的世界里，捕捉转瞬即逝的审美。
           </p>
           <div class="hp-hero-actions">
             <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')">
               <BookOpen :size="15" />
               开始阅读
             </button>
-            <button class="hp-btn-ghost" :class="{ active: showFeaturedOnly }" type="button" @click="$emit('toggleFeatured', !showFeaturedOnly)">
+            <!-- PC/平板：保留4个按钮 -->
+            <button class="hp-btn-ghost desktop-only" :class="{ active: showFeaturedOnly }" type="button" @click="$emit('toggleFeatured', !showFeaturedOnly)">
               <Star :size="15" />
               <span>{{ showFeaturedOnly ? '查看全部' : '精选文章' }}</span>
             </button>
-            <button class="hp-btn-ghost" type="button" @click="$emit('openAssessment')">
+            <button class="hp-btn-ghost desktop-only" type="button" @click="$emit('openAssessment')">
               <Sparkles :size="15" />
               <span>人间估值</span>
             </button>
-            <button class="hp-btn-ghost" type="button" @click="$emit('navigate', 'guestbook')">
+            <button class="hp-btn-ghost desktop-only" type="button" @click="$emit('navigate', 'guestbook')">
               <MessageCircle :size="15" />
               <span>留言板</span>
             </button>
           </div>
+          <!-- 移动端：次级入口改用 chip 形式 -->
+          <div class="hp-hero-chip-row mobile-only">
+            <button class="hp-hero-chip" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
+              <Star :size="12" />
+              <span>{{ showFeaturedOnly ? '全部' : '精选' }}</span>
+            </button>
+            <button class="hp-hero-chip" type="button" @click="$emit('openAssessment')">
+              <Sparkles :size="12" />
+              <span>估值</span>
+            </button>
+            <button class="hp-hero-chip" type="button" @click="$emit('navigate', 'guestbook')">
+              <MessageCircle :size="12" />
+              <span>留言</span>
+            </button>
+          </div>
         </div>
 
-        <!-- 右侧：AI 助手卡片（贴合 Hero，输入/发送后复用右侧抽屉展开） -->
-        <div class="hp-hero-ai" @click="heroOpenDrawerOnly">
+        <!-- PC/平板：完整 AI 助手卡片 -->
+        <div class="hp-hero-ai desktop-only" @click="heroOpenDrawerOnly">
           <!-- 玻璃态背景点缀（保留原装饰风格） -->
           <span class="hp-ai-orb hp-ai-orb-1"></span>
           <span class="hp-ai-orb hp-ai-orb-2"></span>
@@ -255,6 +276,30 @@ function heroOpenDrawerOnly() {
               @click="toggleHeroExamples"
             >
               收起 ↑
+            </button>
+          </div>
+        </div>
+
+        <!-- 移动端：紧凑 AI 触发条（仅在移动端显示） -->
+        <div class="hp-ai-mobile-bar mobile-only" @click="heroOpenDrawerOnly">
+          <div class="hp-ai-mobile-left">
+            <Sparkles :size="16" />
+            <span>AI 助手</span>
+          </div>
+          <div class="hp-ai-mobile-input" @click.stop>
+            <input
+              v-model="heroInput"
+              type="text"
+              placeholder="有什么可以帮你？"
+              @keyup.enter="heroSendFromInput"
+            />
+            <button
+              class="hp-ai-mobile-send"
+              type="button"
+              :disabled="!heroInput.trim()"
+              @click="heroSendFromInput"
+            >
+              <Send :size="14" />
             </button>
           </div>
         </div>
@@ -1264,24 +1309,268 @@ function heroOpenDrawerOnly() {
 /* ════════════════════════════════
    响应式
 ════════════════════════════════ */
+/* 显示/隐藏工具类（与 Navbar 保持一致，避免泄漏 scoped 类名冲突问题 */
+.desktop-only { display: inherit; }
+.mobile-only { display: none; }
+
+/* ── 移动端：Hero chip 行（次级入口） ── */
+.hp-hero-chip-row {
+  display: flex;
+  gap: 0.45rem;
+  flex-wrap: wrap;
+  margin-top: 0.65rem;
+}
+.hp-hero-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.35);
+  border: 1px solid rgba(191, 219, 254, 0.22);
+  color: #dbeafe;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.hp-hero-chip:hover { background: rgba(59, 130, 246, 0.25); border-color: rgba(147, 197, 253, 0.4); }
+.hp-hero-chip.active {
+  background: rgba(79, 124, 255, 0.32);
+  border-color: rgba(147, 197, 253, 0.55);
+  color: #ffffff;
+}
+
+/* ── 移动端：紧凑 AI 触发条 ── */
+.hp-ai-mobile-bar {
+  margin-top: 1rem;
+  padding: 0.55rem 0.6rem 0.55rem 0.85rem;
+  border-radius: 9999px;
+  background: rgba(15, 23, 42, 0.55);
+  border: 1px solid rgba(191, 219, 254, 0.2);
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+.hp-ai-mobile-bar:hover { background: rgba(15, 23, 42, 0.7); }
+
+.hp-ai-mobile-left {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  color: #c4b5fd;
+  font-size: 0.7rem;
+  font-weight: 700;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.hp-ai-mobile-input {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.3rem;
+  background: rgba(15, 23, 42, 0.35);
+  border-radius: 9999px;
+  padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+  min-width: 0;
+}
+.hp-ai-mobile-input input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: none;
+  outline: none;
+  color: #f1f5f9;
+  font-size: 0.75rem;
+  font-weight: 500;
+  padding: 0;
+}
+.hp-ai-mobile-input input::placeholder { color: #94a3b8; }
+.hp-ai-mobile-send {
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  border: none;
+  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s;
+}
+.hp-ai-mobile-send:hover:not(:disabled) { transform: scale(1.08); }
+.hp-ai-mobile-send:disabled {
+  background: rgba(99, 102, 241, 0.2);
+  color: rgba(226, 232, 240, 0.5);
+  cursor: not-allowed;
+}
+
+/* ── 响应式 ── */
 @media (max-width: 1024px) {
   .hp-posts-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
+/* P1-P3: 移动端全面优化 */
 @media (max-width: 768px) {
-  .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 1rem; }
-  .hp-hero { padding-left: 1rem; padding-right: 1rem; }
-  .hp-hero-inner { grid-template-columns: 1fr; padding: 2rem 1.25rem; border-radius: 1.5rem; }
-  .hp-hero-ai { display: none; }
+  .desktop-only { display: none !important; }
+  .mobile-only { display: flex !important; }
+
+  /* Hero 移动端：压缩间距与字号 */
+  .hp-hero { padding-left: 0.75rem; padding-right: 0.75rem; padding-top: 4.25rem; padding-bottom: 0.25rem; }
+  .hp-hero-inner {
+    grid-template-columns: 1fr;
+    padding: 1rem 1.1rem 1.2rem;
+    border-radius: 1.1rem;
+    gap: 0.85rem;
+  }
+  .hp-hero-label { margin-bottom: 0.55rem; font-size: 0.6rem; gap: 0.35rem; letter-spacing: 0.05em; }
+  .hp-hero-title { margin-bottom: 0.4rem; font-size: 1.25rem; line-height: 1.3; }
+  .hp-hero-sub { margin-bottom: 0.7rem; font-size: 0.8rem; line-height: 1.65; }
+  .hp-hero-actions { gap: 0.45rem; margin-bottom: 0.3rem; }
+  .hp-btn-primary { padding: 0.5rem 0.95rem; font-size: 0.75rem; }
+
+  /* 分类卡片：缩小图标和间距 */
+  .hp-categories { padding: 0.5rem 0 0.3rem; }
   .hp-cat-scroll-btn { display: none; }
-  .hp-categories-wrapper { padding: 0 1rem; }
-  .hp-categories-inner { padding: 0.25rem 0; }
-  .hp-cat-card { width: 170px; min-width: 160px; }
-  .hp-posts-grid { grid-template-columns: 1fr; }
-  .hp-quote-content { padding: 2rem 1.5rem; }
+  .hp-categories-wrapper { padding: 0 0.75rem; gap: 0.3rem; }
+  .hp-categories-inner { padding: 0.2rem 0; gap: 0.5rem; }
+  .hp-cat-card {
+    width: 160px;
+    min-width: 150px;
+    padding: 0.5rem 0.65rem;
+    border-radius: 0.75rem;
+    gap: 0.5rem;
+  }
+  .hp-cat-icon {
+    width: 1.7rem;
+    height: 1.7rem;
+    border-radius: 0.45rem;
+  }
+  .hp-cat-icon svg { width: 16px; height: 16px; }
+  .hp-cat-info strong { font-size: 0.78rem; }
+  .hp-cat-info span { font-size: 0.68rem; }
+  .hp-cat-arrow { width: 12px; height: 12px; }
+
+  /* 文章列表：缩小整体 padding 与卡片尺寸 */
+  .hp-posts { padding: 0.75rem 0 1.5rem; }
+  .hp-posts-inner { padding: 0 0.75rem; }
+
+  /* 区块标题 */
+  .hp-section-header { margin-bottom: 1rem; }
+  .hp-section-title { font-size: 1rem; gap: 0.4rem; }
+  .hp-section-dot { width: 5px; height: 5px; }
+  .hp-view-all { font-size: 0.72rem; gap: 0.25rem; }
+  .hp-view-all svg { width: 12px; height: 12px; }
+
+  /* 文章卡片 */
+  .hp-posts-grid { grid-template-columns: 1fr; gap: 0.85rem; }
+  .hp-article-card { border-radius: 1.15rem; }
+  .hp-card-cover { height: 150px; }
+  .hp-card-category-badge {
+    top: 0.6rem;
+    left: 0.6rem;
+    padding: 0.15rem 0.55rem;
+    font-size: 0.62rem;
+  }
+  .hp-card-body { padding: 0.9rem 1rem 1rem; }
+  .hp-card-title { font-size: 0.88rem; margin-bottom: 0.4rem; line-height: 1.38; }
+  .hp-card-summary { font-size: 0.75rem; margin-bottom: 0.6rem; line-height: 1.55; }
+  .hp-card-meta {
+    font-size: 0.68rem;
+    gap: 0.4rem;
+    flex-wrap: wrap;
+  }
+  .hp-card-date::before,
+  .hp-card-reading-time::before,
+  .hp-card-views::before { margin-right: 0.4rem; }
+  .hp-card-reading-time svg { width: 10px; height: 10px; }
+
+  /* 骨架屏适配 */
+  .hp-skeleton-cover { height: 150px; border-radius: 1.15rem 1.15rem 0 0; }
+  .hp-skeleton-body { padding: 0.9rem 1rem 1rem; gap: 0.4rem; }
+  .hp-skeleton-line { height: 0.8rem; }
+  .hp-skeleton-line.title { height: 0.9rem; }
+  .hp-skeleton-line.meta { height: 0.65rem; }
+
+  /* 状态卡 */
+  .hp-state-card { padding: 1.75rem 1rem; border-radius: 1.15rem; }
+  .hp-state-card p { font-size: 0.85rem; }
+  .hp-state-tag { font-size: 0.65rem; padding: 0.18rem 0.55rem; }
+  .hp-empty-illustration { gap: 0.75rem; margin-top: 1rem; }
+  .hp-empty-illustration svg { width: 40px; height: 40px; }
+  .hp-empty-illustration p { font-size: 0.85rem; }
+
+  /* 加载更多 */
+  .hp-load-more-area { padding: 1.5rem 0 0.75rem; }
+  .hp-load-more-btn {
+    padding: 0.5rem 1.1rem;
+    font-size: 0.78rem;
+    gap: 0.4rem;
+  }
+  .hp-load-more-btn svg { width: 14px; height: 14px; }
+  .hp-load-more-count { font-size: 0.7rem; display: none; }
+
+  /* 底部结束线 */
+  .hp-end-divider { padding: 1.75rem 0 0.75rem; gap: 0.75rem; }
+  .hp-end-line { flex: 0 0 40px; }
+  .hp-end-text { font-size: 0.7rem; }
+
+  /* 引言 banner */
+  .hp-quote { padding: 0 0 1.75rem; }
+  .hp-quote-inner { padding: 0 0.75rem; }
+  .hp-quote-content {
+    padding: 1.25rem 1.15rem;
+    border-radius: 1.1rem;
+    gap: 0.55rem;
+  }
+  .hp-quote-mark { font-size: 2.2rem; }
+  .hp-quote-text { font-size: 0.95rem; line-height: 1.6; }
+  .hp-quote-footer { flex-direction: column; align-items: flex-start; gap: 0.75rem; margin-top: 0.3rem; }
+  .hp-quote-author { font-size: 0.78rem; }
+  .hp-btn-donate { padding: 0.45rem 0.9rem; gap: 0.45rem; }
+  .hp-btn-donate-icon { width: 15px; height: 15px; }
+  .hp-btn-donate-text { font-size: 0.78rem; }
+  .hp-quote-deco { display: none; }
 }
+
 @media (max-width: 480px) {
-  .hp-cat-card { width: 150px; min-width: 140px; padding: 0.5rem 0.6rem; }
+  .hp-hero-inner { padding: 0.85rem 0.9rem 1rem; border-radius: 0.95rem; }
+  .hp-hero-title { font-size: 1.05rem; }
+  .hp-hero-sub { font-size: 0.75rem; }
+
+  /* 移动端 AI 触发条：从横排改竖排（避免更窄屏拥挤 */
+  .hp-ai-mobile-bar {
+    padding: 0.7rem 0.85rem;
+    border-radius: 1rem;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
+  .hp-ai-mobile-left { font-size: 0.75rem; }
+  .hp-ai-mobile-input {
+    width: 100%;
+    padding: 0.35rem 0.4rem 0.35rem 0.8rem;
+  }
+
+  /* 分类卡片：超窄屏进一步压缩，隐藏描述 */
+  .hp-cat-card { width: 135px; min-width: 125px; padding: 0.45rem 0.55rem; gap: 0.4rem; }
+  .hp-cat-icon { width: 1.55rem; height: 1.55rem; border-radius: 0.4rem; }
+  .hp-cat-icon svg { width: 14px; height: 14px; }
   .hp-cat-info span { display: none; }
+  .hp-cat-info strong { font-size: 0.75rem; }
+  .hp-cat-arrow { display: none; }
+
+  /* 文章卡片超窄屏：封面进一步缩小 */
+  .hp-card-cover { height: 135px; }
+  .hp-skeleton-cover { height: 135px; }
+  .hp-card-body { padding: 0.8rem 0.9rem 0.9rem; }
+  .hp-card-title { font-size: 0.82rem; }
+  .hp-card-summary { font-size: 0.72rem; -webkit-line-clamp: 2; }
+  .hp-card-meta { font-size: 0.65rem; gap: 0.3rem; }
 }
 
 /* 暗色模式 */
