@@ -5,9 +5,7 @@ import { Bot, Sparkles, X, Check, RefreshCw, Send } from 'lucide-vue-next'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 import type { AIQuickAction } from '../composables/useAIAssistantGlobal'
 import { toast } from '../utils/toast'
-import { useDarkMode } from '../composables/useDarkMode'
 
-const { isDark } = useDarkMode()
 const {
   isOpen,
   messages,
