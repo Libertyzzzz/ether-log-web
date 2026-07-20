@@ -129,7 +129,6 @@ const contextIntro = computed(() => {
     <aside
       v-if="isOpen"
       class="ai-drawer"
-      :class="{ 'is-dark': isDark }"
     >
       <!-- 顶部标题栏 -->
       <header class="ai-header">
@@ -150,55 +149,57 @@ const contextIntro = computed(() => {
         </div>
       </header>
 
-      <!-- 当前页任务面板 -->
-      <section class="ai-task-panel">
-        <div class="ai-task-head">
-          <div>
-            <p class="ai-task-eyebrow">当前页任务</p>
-            <h2>{{ contextLabel }}</h2>
+      <!-- 可滚动内容区：推荐标签 + 对话内容一起滚动 -->
+      <div :ref="setChatContainerRef" class="ai-chat-scroll">
+        <!-- 当前页任务面板 -->
+        <section class="ai-task-panel">
+          <div class="ai-task-head">
+            <div>
+              <p class="ai-task-eyebrow">当前页任务</p>
+              <h2>{{ contextLabel }}</h2>
+            </div>
+            <span class="ai-context-pill">{{ summary }}</span>
           </div>
-          <span class="ai-context-pill">{{ summary }}</span>
-        </div>
-        <p class="ai-task-intro">{{ contextIntro }}</p>
-        <div class="ai-actions">
-          <button
-            v-for="a in quickActions"
-            :key="a.label"
-            class="ai-action-btn"
-            :class="{ disabled: isLoading }"
-            :disabled="isLoading"
-            @click="onQuickAction(a)"
-            :title="a.hint"
-          >
-            <span class="ai-action-icon">{{ a.icon }}</span>
-            <span class="ai-action-copy">
-              <span class="ai-action-label">{{ a.label }}</span>
-              <span class="ai-action-hint">{{ a.hint }}</span>
-            </span>
-          </button>
-        </div>
-      </section>
+          <p class="ai-task-intro">{{ contextIntro }}</p>
+          <div class="ai-actions">
+            <button
+              v-for="a in quickActions"
+              :key="a.label"
+              class="ai-action-btn"
+              :class="{ disabled: isLoading }"
+              :disabled="isLoading"
+              @click="onQuickAction(a)"
+              :title="a.hint"
+            >
+              <span class="ai-action-icon">{{ a.icon }}</span>
+              <span class="ai-action-copy">
+                <span class="ai-action-label">{{ a.label }}</span>
+                <span class="ai-action-hint">{{ a.hint }}</span>
+              </span>
+            </button>
+          </div>
+        </section>
 
-      <!-- 风格切换 -->
-      <div class="ai-style-row">
-        <span class="ai-style-label">回复风格</span>
-        <div class="ai-style-chips">
-          <button
-            v-for="s in styles"
-            :key="s.key"
-            class="ai-style-chip"
-            :class="{ active: currentStyle === s.key }"
-            @click="currentStyle = s.key"
-          >
-            <span class="ai-style-emoji">{{ s.emoji }}</span>
-            <span class="ai-style-text">{{ s.label }}</span>
-          </button>
+        <!-- 风格切换 -->
+        <div class="ai-style-row">
+          <span class="ai-style-label">回复风格</span>
+          <div class="ai-style-chips">
+            <button
+              v-for="s in styles"
+              :key="s.key"
+              class="ai-style-chip"
+              :class="{ active: currentStyle === s.key }"
+              @click="currentStyle = s.key"
+            >
+              <span class="ai-style-emoji">{{ s.emoji }}</span>
+              <span class="ai-style-text">{{ s.label }}</span>
+            </button>
+          </div>
         </div>
-      </div>
 
-      <!-- 对话区域 -->
-      <div :ref="setChatContainerRef" class="ai-chat-area">
-        <template v-for="msg in messages" :key="msg.id">
+        <!-- 对话消息 -->
+        <div class="ai-chat-messages">
+          <template v-for="msg in messages" :key="msg.id">
           <!-- 用户消息 -->
           <div v-if="msg.role === 'user'" class="ai-bubble-wrap ai-user-wrap">
             <div class="ai-bubble ai-user-bubble">
@@ -251,17 +252,18 @@ const contextIntro = computed(() => {
           </div>
         </template>
 
-        <!-- 加载指示 -->
-        <div v-if="isLoading" class="ai-bubble-wrap ai-assistant-wrap">
-          <div class="ai-bubble ai-assistant-bubble is-thinking">
-            <div class="ai-assistant-avatar">
-              <Bot :size="14" />
-            </div>
-            <div class="ai-thinking">
-              <span></span>
-              <span></span>
-              <span></span>
-              <em>正在思考…</em>
+          <!-- 加载指示 -->
+          <div v-if="isLoading" class="ai-bubble-wrap ai-assistant-wrap">
+            <div class="ai-bubble ai-assistant-bubble is-thinking">
+              <div class="ai-assistant-avatar">
+                <Bot :size="14" />
+              </div>
+              <div class="ai-thinking">
+                <span></span>
+                <span></span>
+                <span></span>
+                <em>正在思考…</em>
+              </div>
             </div>
           </div>
         </div>
@@ -601,12 +603,11 @@ const contextIntro = computed(() => {
   color: var(--ai-text);
 }
 
-/* 当前页任务面板 */
+/* 当前页任务面板（位于滚动区内部，随对话一起滚动） */
 .ai-task-panel {
   padding: 14px 18px 12px;
   border-bottom: 1px solid var(--ai-border-soft);
   background: var(--ai-bg);
-  flex-shrink: 0;
 }
 
 .ai-task-head {
@@ -653,14 +654,13 @@ const contextIntro = computed(() => {
   line-height: 1.55;
 }
 
-/* 风格切换 */
+/* 风格切换（位于滚动区内部，随对话一起滚动） */
 .ai-style-row {
   display: flex;
   align-items: center;
   gap: 10px;
   padding: 10px 18px;
   border-bottom: 1px solid var(--ai-border-soft);
-  flex-shrink: 0;
 }
 
 .ai-style-label {
@@ -797,24 +797,31 @@ const contextIntro = computed(() => {
   text-align: center;
 }
 
-/* 对话区域 */
-.ai-chat-area {
+/* 可滚动内容区：包含推荐标签 + 风格切换 + 对话消息，全部一起滚动 */
+.ai-chat-scroll {
   flex: 1;
   overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  scroll-behavior: smooth;
+  -webkit-overflow-scrolling: touch;
+}
+
+.ai-chat-scroll::-webkit-scrollbar {
+  width: 6px;
+}
+
+.ai-chat-scroll::-webkit-scrollbar-thumb {
+  background: var(--ai-border);
+  border-radius: 3px;
+}
+
+/* 对话消息容器 */
+.ai-chat-messages {
   padding: 16px 18px;
   display: flex;
   flex-direction: column;
   gap: 12px;
-  scroll-behavior: smooth;
-}
-
-.ai-chat-area::-webkit-scrollbar {
-  width: 6px;
-}
-
-.ai-chat-area::-webkit-scrollbar-thumb {
-  background: var(--ai-border);
-  border-radius: 3px;
 }
 
 .ai-bubble-wrap {
