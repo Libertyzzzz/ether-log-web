@@ -1,9 +1,13 @@
 import { ref } from 'vue'
+import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { fetchPublicArticles, fetchArticleDetail } from '../api'
+import { buildArticleUrl, parseArticleIdFromSlug, slugifyTitle } from '../utils/format'
 
 export function useArticles() {
+  const router = useRouter()
+  const route = useRoute()
   const articles = ref<ArticleListItem[]>([])
   const totalArticles = ref(0)
   const currentPage = ref(1)
@@ -52,16 +56,70 @@ export function useArticles() {
   }
 
   async function openArticleDetail(article: ArticleListItem): Promise<void> {
-    selectedArticlePreview.value = article
+    const url = buildArticleUrl(article.id, article.title)
+    await router.push(url)
+  }
+
+  async function loadArticleById(id: number): Promise<void> {
     selectedArticle.value = null
     isLoadingArticleDetail.value = true
     try {
-      const detail = await fetchArticleDetail(article.id)
+      const detail = await fetchArticleDetail(id)
       if (detail) {
         selectedArticle.value = detail
+        selectedArticlePreview.value = {
+          id: detail.id,
+          title: detail.title,
+          summary: detail.summary,
+          coverImg: detail.coverImg,
+          viewCount: detail.viewCount,
+          isTop: detail.isTop,
+          categoryName: detail.categoryName,
+          tagNames: detail.tagNames,
+          createTime: detail.createTime,
+          updateTime: detail.updateTime,
+          status: detail.status,
+          subtitle: detail.subtitle,
+        }
       }
     } finally {
       isLoadingArticleDetail.value = false
+    }
+  }
+
+  async function loadArticleFromRoute(): Promise<boolean> {
+    if (route.name !== 'post-detail') return false
+    const articleSlug = route.params.articleSlug
+    const slugStr = Array.isArray(articleSlug) ? articleSlug[0] : articleSlug
+    
+    let id = parseArticleIdFromSlug(slugStr)
+    
+    if (!id) {
+      id = await findArticleIdBySlug(slugStr)
+    }
+    
+    if (!id) {
+      return false
+    }
+    
+    await loadArticleById(id)
+    return true
+  }
+
+  async function findArticleIdBySlug(slugStr: string): Promise<number | null> {
+    try {
+      const slug = slugStr.split('-').slice(1).join('-')
+      if (!slug) return null
+      
+      const result = await fetchPublicArticles(1, 100)
+      const matched = result.records.find(article => {
+        const articleSlug = slugifyTitle(article.title)
+        return articleSlug === slug || slug.includes(articleSlug)
+      })
+      
+      return matched ? matched.id : null
+    } catch {
+      return null
     }
   }
 
@@ -83,5 +141,6 @@ export function useArticles() {
     loadMoreArticles,
     openArticleDetail,
     closeArticleDetail,
+    loadArticleFromRoute,
   }
 }

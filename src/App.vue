@@ -53,7 +53,30 @@ import {
 const route = useRoute()
 const router = useRouter()
 
-// ── Composables ──
+const {
+  articles,
+  totalArticles,
+  articleError,
+  isLoadingArticles,
+  isLoadingMore,
+  selectedArticle,
+  selectedArticlePreview,
+  isLoadingArticleDetail,
+  fetchArticles,
+  loadMoreArticles,
+  openArticleDetail,
+  closeArticleDetail,
+  loadArticleFromRoute,
+} = useArticles()
+
+const adminArticles = ref<ArticleListItem[]>([])
+const isLoadingAdminArticles = ref(false)
+const adminPage = ref(1)
+const adminTotal = ref(0)
+const ADMIN_PAGE_SIZE = 6
+
+const { accessGranted, isCheckingGate, checkGateStatus, validateAccessCode } = useGate()
+
 const {
   isLoggedIn,
   loginUser,
@@ -68,29 +91,6 @@ const {
 } = useAuth()
 
 const {
-  articles,
-  totalArticles,
-  articleError,
-  isLoadingArticles,
-  isLoadingMore,
-  selectedArticle,
-  selectedArticlePreview,
-  isLoadingArticleDetail,
-  fetchArticles,
-  loadMoreArticles,
-  openArticleDetail,
-  closeArticleDetail,
-} = useArticles()
-
-const adminArticles = ref<ArticleListItem[]>([])
-const isLoadingAdminArticles = ref(false)
-const adminPage = ref(1)
-const adminTotal = ref(0)
-const ADMIN_PAGE_SIZE = 6
-
-const { accessGranted, isCheckingGate, checkGateStatus, validateAccessCode } = useGate()
-
-const {
   pendingComments,
   isLoadingPending,
   fetchPendingComments,
@@ -100,6 +100,19 @@ const {
 
 const { isDark, toggleDark } = useDarkMode()
 const { open: openAIAssistant } = useAIAssistant()
+
+// ── Route watching for article detail ──
+watch(
+  () => route.name,
+  async (newRouteName) => {
+    if (newRouteName === 'post-detail') {
+      await loadArticleFromRoute()
+    } else {
+      closeArticleDetail()
+    }
+  },
+  { immediate: true }
+)
 
 // ── Categories & Tags (real data from backend) ──
 const categories = ref<Category[]>([])

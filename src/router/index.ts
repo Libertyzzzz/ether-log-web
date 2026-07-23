@@ -67,6 +67,12 @@ const router = createRouter({
       meta: { page: 'publish', requiresAuth: true }
     },
     {
+      path: '/post/:articleSlug',
+      name: 'post-detail',
+      component: App,
+      meta: { page: 'post-detail' }
+    },
+    {
       path: '/quant-lab',
       name: 'quant-lab',
       component: App,

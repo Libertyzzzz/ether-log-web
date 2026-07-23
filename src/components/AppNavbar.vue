@@ -255,7 +255,7 @@ onUnmounted(() => {
       </div>
     </nav>
 
-    <div class="mobile-tabbar mobile-only" :class="{ 'tabbar-hidden': !isVisible }" aria-label="移动端主导航">
+    <div class="mobile-tabbar" :class="{ 'tabbar-hidden': !isVisible }" aria-label="移动端主导航">
       <button
         type="button"
         class="mobile-tabbar-item"
@@ -565,6 +565,7 @@ kbd {
 
 .desktop-only { display: flex; }
 .mobile-only { display: none; }
+.mobile-tabbar { display: none; }
 
 @media (max-width: 1080px) {
   .nav-search-trigger {
@@ -647,6 +648,7 @@ kbd {
   }
   .mobile-tabbar {
     position: fixed;
+    top: auto !important;
     left: 50%;
     bottom: max(0.75rem, env(safe-area-inset-bottom));
     transform: translateX(-50%);
@@ -659,7 +661,7 @@ kbd {
     backdrop-filter: blur(18px);
     -webkit-backdrop-filter: blur(18px);
     z-index: 1001;
-    display: grid !important;
+    display: grid;
     grid-template-columns: repeat(4, 1fr);
     gap: 0.25rem;
   }
