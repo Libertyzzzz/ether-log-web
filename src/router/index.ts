@@ -67,7 +67,7 @@ const router = createRouter({
       meta: { page: 'publish', requiresAuth: true }
     },
     {
-      path: '/post/:articleSlug',
+      path: '/read',
       name: 'post-detail',
       component: App,
       meta: { page: 'post-detail' }

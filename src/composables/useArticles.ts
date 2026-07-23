@@ -3,7 +3,7 @@ import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { fetchPublicArticles, fetchArticleDetail } from '../api'
-import { buildArticleUrl, parseArticleIdFromSlug, slugifyTitle } from '../utils/format'
+import { buildArticleUrl, parseArticleIdFromSlug } from '../utils/format'
 
 export function useArticles() {
   const router = useRouter()
@@ -56,7 +56,7 @@ export function useArticles() {
   }
 
   async function openArticleDetail(article: ArticleListItem): Promise<void> {
-    const url = buildArticleUrl(article.id, article.title)
+    const url = buildArticleUrl(article.id)
     await router.push(url)
   }
 
@@ -89,38 +89,16 @@ export function useArticles() {
 
   async function loadArticleFromRoute(): Promise<boolean> {
     if (route.name !== 'post-detail') return false
-    const articleSlug = route.params.articleSlug
-    const slugStr = Array.isArray(articleSlug) ? articleSlug[0] : articleSlug
+    const p = route.query.p
+    const pStr = Array.isArray(p) ? p[0] : p
     
-    let id = parseArticleIdFromSlug(slugStr)
+    if (!pStr) return false
     
-    if (!id) {
-      id = await findArticleIdBySlug(slugStr)
-    }
-    
-    if (!id) {
-      return false
-    }
+    const id = parseArticleIdFromSlug(pStr)
+    if (!id) return false
     
     await loadArticleById(id)
     return true
-  }
-
-  async function findArticleIdBySlug(slugStr: string): Promise<number | null> {
-    try {
-      const slug = slugStr.split('-').slice(1).join('-')
-      if (!slug) return null
-      
-      const result = await fetchPublicArticles(1, 100)
-      const matched = result.records.find(article => {
-        const articleSlug = slugifyTitle(article.title)
-        return articleSlug === slug || slug.includes(articleSlug)
-      })
-      
-      return matched ? matched.id : null
-    } catch {
-      return null
-    }
   }
 
   function closeArticleDetail(): void {
