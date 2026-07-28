@@ -100,7 +100,7 @@ axios.interceptors.request.use(
 
 // ═══════════════════════════════════════════════════════════════════════
 // Global auth lifecycle handler
-//   401 → 未登录 / token 过期 → 清本地状态
+//   401 → 未登录 / token 过期 → 清本地状态 + 提示需要登录
 //   403 → 已登录但权限不足 → 静默记录
 //   code=1003 (TOKEN_INVALID) / code=1004 (MAX_EXPIRED) → 清本地状态 + 提示重新登录
 // ═══════════════════════════════════════════════════════════════════════
@@ -119,6 +119,10 @@ axios.interceptors.response.use(
       const status = error.response?.status
       if (status === 401) {
         clearAuthState(undefined)
+        // 触发未登录提示事件
+        window.dispatchEvent(new CustomEvent('auth:need-login', { 
+          detail: { message: '需要登录才能执行此操作，请先登录' } 
+        }))
       } else if (status === 403) {
         const body = error.response?.data
         const code = body?.code

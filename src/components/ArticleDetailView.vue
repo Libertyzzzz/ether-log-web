@@ -4,6 +4,7 @@ import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen, Sparkl
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
 import { getReadingTime } from '../utils/format'
+import { renderMarkdown } from '../utils/markdown'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 
 const ai = useAIAssistant()
@@ -16,9 +17,6 @@ const props = defineProps<{
   previousArticle: ArticleListItem | null
   nextArticle: ArticleListItem | null
 }>()
-
-const isMobile = ref(typeof window !== 'undefined' && window.innerWidth <= 768)
-const sidebarCollapsed = ref(isMobile.value)
 
 defineEmits<{
   close: []
@@ -45,11 +43,14 @@ const readingMinutes = computed(() => {
   return getReadingTime(props.selectedArticle?.content || props.selectedArticle?.renderContent || props.article.summary || '')
 })
 
-// 注入锚点 id 到正文标题
 const processedContent = computed(() => {
-  if (!props.selectedArticle?.renderContent) return ''
+  let html = props.selectedArticle?.contentHtml || props.selectedArticle?.renderContent || ''
+  if (!html && props.selectedArticle?.content) {
+    html = renderMarkdown(props.selectedArticle.content)
+  }
+  if (!html) return ''
   let idx = 0
-  return props.selectedArticle.renderContent.replace(
+  return html.replace(
     /<h([123])([^>]*)>/gi,
     (_, level, attrs) => `<h${level}${attrs} id="heading-${idx++}">`
   )
@@ -76,7 +77,6 @@ function setupObserver() {
   targets.forEach(el => observer!.observe(el))
 }
 
-// 当内容加载或切换时重新初始化观察者
 watch(() => props.selectedArticle?.id, () => {
   nextTick(setupObserver)
 })
@@ -88,6 +88,7 @@ function scrollToHeading(id: string) {
 
 onUnmounted(() => {
   observer?.disconnect()
+  window.removeEventListener('scroll', onWindowScroll)
 })
 
 // 阅读进度（监听 window 滚动）
@@ -102,9 +103,6 @@ function onWindowScroll() {
 onMounted(() => {
   window.addEventListener('scroll', onWindowScroll, { passive: true })
 })
-onUnmounted(() => {
-  window.removeEventListener('scroll', onWindowScroll)
-})
 </script>
 
 <template>
@@ -113,15 +111,8 @@ onUnmounted(() => {
     <!-- ── 主体：左侧导航 + 右侧正文，整体从 navbar 下方开始 ── -->
     <div class="article-layout-inner">
 
-      <!-- 移动端遮罩层 -->
-      <div
-        v-if="!sidebarCollapsed && isMobile"
-        class="article-mobile-overlay"
-        @click="sidebarCollapsed = true"
-      ></div>
-
       <!-- 左侧导航栏 -->
-      <aside class="article-sidebar" :class="{ collapsed: sidebarCollapsed }">
+      <aside class="article-sidebar">
 
         <!-- 返回按钮 -->
         <button class="sidebar-back" type="button" @click="$emit('close')">
@@ -857,22 +848,11 @@ onUnmounted(() => {
   /* 分割线 */
   .article-divider { margin: 1.25rem 0 1.5rem; }
 
-  /* 阅读进度条缩小 */
-  .article-reading-progress { height: 2px; }
-
   /* 骨架屏 */
   .loading-skeleton.title { height: 1.8rem; width: 90%; margin-bottom: 0.75rem; }
   .loading-skeleton.subtitle { height: 1rem; width: 75%; margin-bottom: 0.75rem; }
   .loading-skeleton.meta { height: 0.85rem; width: 45%; margin-bottom: 0.4rem; }
   .loading-skeleton.tags { height: 0.85rem; width: 35%; margin-bottom: 1.5rem; }
-
-  /* 移动端遮罩层 */
-  .article-mobile-overlay {
-    position: fixed;
-    inset: 0;
-    background: rgba(0, 0, 0, 0.3);
-    z-index: 99;
-  }
 }
 
 /* 超窄屏文章优化 */
@@ -886,5 +866,78 @@ onUnmounted(() => {
   .article-main-date, .article-main-views { font-size: 0.7rem; }
 }
 
-/* 暗色模式 */
+/* ─ 表格样式（与编辑器保持一致）── */
+:deep(.markdown-body) table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:deep(.markdown-body) table th,
+:deep(.markdown-body) table td {
+  border: 1px solid #cbd5e1;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  min-width: 80px;
+  min-height: 36px;
+  position: relative;
+}
+
+:deep(.markdown-body) table th {
+  background: #e2e8f0;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+:deep(.markdown-body) table td {
+  background: #f8fafc;
+  color: #334155;
+}
+
+:deep(.markdown-body) table td p,
+:deep(.markdown-body) table th p {
+  margin: 0;
+  line-height: 1.6;
+}
+
+:deep(.markdown-body) table td p:empty::after,
+:deep(.markdown-body) table th p:empty::after {
+  content: '\00a0';
+}
+
+:deep(.markdown-body) table td:empty::before {
+  content: '\00a0';
+  display: inline-block;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+:deep(.markdown-body) table tr:hover td {
+  background: #e2e8f0;
+}
+
+/* 暗色模式表格 */
+.dark :deep(.markdown-body) table {
+  border-color: #334155;
+}
+
+.dark :deep(.markdown-body) table th {
+  background: #1e293b;
+  color: #e2e8f0;
+  border-color: #334155;
+}
+
+.dark :deep(.markdown-body) table td {
+  background: #0f172a;
+  color: #cbd5e1;
+  border-color: #334155;
+}
+
+.dark :deep(.markdown-body) table tr:hover td {
+  background: #1e293b;
+}
 </style>

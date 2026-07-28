@@ -1,11 +1,15 @@
 <script setup lang="ts">
-import { computed, nextTick, onBeforeUnmount, ref, watch, onMounted } from 'vue'
-import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2, ListTree, ChevronRight, Sparkles } from 'lucide-vue-next'
+import { computed, nextTick, onBeforeUnmount, ref, watch, onMounted, onUnmounted } from 'vue'
+import { Bold, Code2, Heading, Image, Italic, List, ListOrdered, Quote, X, PenLine, Settings2, ListTree, ChevronRight, Table2, Plus, Minus, Trash2 } from 'lucide-vue-next'
 import { EditorContent, useEditor } from '@tiptap/vue-3'
 import StarterKit from '@tiptap/starter-kit'
 import TiptapImage from '@tiptap/extension-image'
 import Link from '@tiptap/extension-link'
 import Placeholder from '@tiptap/extension-placeholder'
+import { Table } from '@tiptap/extension-table'
+import { TableRow } from '@tiptap/extension-table-row'
+import { TableCell } from '@tiptap/extension-table-cell'
+import { TableHeader } from '@tiptap/extension-table-header'
 import TurndownService from 'turndown'
 import type { ComponentPublicInstance } from 'vue'
 import type { ArticlePublishRequest, Category, Tag } from '../types/blog'
@@ -74,6 +78,33 @@ turndown.addRule('fencedCodeBlocks', {
   }
 })
 
+turndown.addRule('tables', {
+  filter: ['table'],
+  replacement: (_content, node) => {
+    const table = node as HTMLTableElement
+    const rows = Array.from(table.querySelectorAll('tr'))
+    if (rows.length === 0) return ''
+
+    const cells = (row: HTMLTableRowElement) =>
+      Array.from(row.cells).map(cell => cell.textContent.trim().replace(/\|/g, '\\|'))
+
+    const headerRow = rows[0]
+    const headerCells = cells(headerRow)
+    if (headerCells.length === 0) return ''
+
+    const separator = headerCells.map(() => '---').join(' | ')
+    const headerLine = `| ${headerCells.join(' | ')} |`
+    const separatorLine = `| ${separator} |`
+
+    const dataRows = rows.slice(1).map(row => {
+      const rowCells = cells(row)
+      return `| ${rowCells.join(' | ')} |`
+    })
+
+    return `\n\n${headerLine}\n${separatorLine}\n${dataRows.join('\n')}\n\n`
+  }
+})
+
 function getEditorHtml() {
   if (props.publishForm.contentHtml) return props.publishForm.contentHtml
   if (props.publishForm.content?.trim()) return renderMarkdown(props.publishForm.content)
@@ -119,7 +150,25 @@ const editor = useEditor({
     }),
     Placeholder.configure({
       placeholder: '开始写作... 支持直接输入 Markdown 快捷语法'
-    })
+    }),
+    Table.configure({
+      resizable: true,
+      lastColumnResizable: false,
+      HTMLAttributes: {
+        class: 'tiptap-table'
+      }
+    }),
+    TableRow,
+    TableHeader.configure({
+      HTMLAttributes: {
+        class: 'tiptap-table-header'
+      }
+    }),
+    TableCell.configure({
+      HTMLAttributes: {
+        class: 'tiptap-table-cell'
+      }
+    }),
   ],
   editorProps: {
     attributes: {
@@ -202,6 +251,59 @@ const isQuoteActive = computed(() => editor.value?.isActive('blockquote') || fal
 const isListActive = computed(() => editor.value?.isActive('bulletList') || false)
 const isOrderedListActive = computed(() => editor.value?.isActive('orderedList') || false)
 const isCodeBlockActive = computed(() => editor.value?.isActive('codeBlock') || false)
+const isInTable = computed(() => editor.value?.isActive('tableCell') || editor.value?.isActive('tableHeader') || false)
+
+const showTableOps = ref(false)
+
+function toggleTableOps() {
+  showTableOps.value = !showTableOps.value
+}
+
+// ── 表格插入对话框 ──
+const showTableDialog = ref(false)
+const tableRows = ref(3)
+const tableCols = ref(3)
+
+function insertTable() {
+  if (!editor.value) return
+  editor.value.chain().focus().insertTable({ rows: tableRows.value, cols: tableCols.value, withHeaderRow: true }).run()
+  showTableDialog.value = false
+}
+
+function addRowBefore() {
+  if (!editor.value) return
+  editor.value.chain().focus().addRowBefore().run()
+}
+
+function addRowAfter() {
+  if (!editor.value) return
+  editor.value.chain().focus().addRowAfter().run()
+}
+
+function addColumnBefore() {
+  if (!editor.value) return
+  editor.value.chain().focus().addColumnBefore().run()
+}
+
+function addColumnAfter() {
+  if (!editor.value) return
+  editor.value.chain().focus().addColumnAfter().run()
+}
+
+function deleteRow() {
+  if (!editor.value) return
+  editor.value.chain().focus().deleteRow().run()
+}
+
+function deleteColumn() {
+  if (!editor.value) return
+  editor.value.chain().focus().deleteColumn().run()
+}
+
+function deleteTable() {
+  if (!editor.value) return
+  editor.value.chain().focus().deleteTable().run()
+}
 
 // ── TOC 目录导航 ──
 type TocItem = { id: string; text: string; level: number; pos: number }
@@ -285,7 +387,19 @@ watch(
 onMounted(() => {
   extractTocFromEditor()
   nextTick(() => setupTocObserver())
+  document.addEventListener('click', handleOutsideClick)
 })
+
+onUnmounted(() => {
+  document.removeEventListener('click', handleOutsideClick)
+})
+
+function handleOutsideClick(event: MouseEvent) {
+  const target = event.target as HTMLElement
+  if (!target.closest('.table-ops-dropdown')) {
+    showTableOps.value = false
+  }
+}
 
 onBeforeUnmount(() => {
   tocObserver?.disconnect()
@@ -353,14 +467,32 @@ onBeforeUnmount(() => {
           />
           <div class="toolbar-divider"></div>
           <button
-            class="toolbar-ai-btn"
             type="button"
-            @click="ai.open()"
-            title="AI 助手"
+            class="toolbar-tip"
+            aria-label="插入表格"
+            data-tooltip="插入表格"
+            @click="showTableDialog = true"
           >
-            <Sparkles :size="14" />
-            <span>AI 助手</span>
+            <Table2 :size="14" />
           </button>
+          <template v-if="isInTable">
+            <div class="toolbar-divider"></div>
+            <div class="table-ops-dropdown">
+              <button type="button" class="toolbar-tip" :class="{ active: showTableOps }" aria-label="表格操作" data-tooltip="表格操作" @click="toggleTableOps">
+                <Settings2 :size="14" />
+              </button>
+              <div class="table-ops-menu" :class="{ show: showTableOps }">
+                <button type="button" @click="addRowBefore(); showTableOps = false"><Plus :size="12" /> 上方插入行</button>
+                <button type="button" @click="addRowAfter(); showTableOps = false"><Plus :size="12" /> 下方插入行</button>
+                <button type="button" @click="addColumnBefore(); showTableOps = false"><Plus :size="12" /> 左侧插入列</button>
+                <button type="button" @click="addColumnAfter(); showTableOps = false"><Plus :size="12" /> 右侧插入列</button>
+                <div class="table-ops-divider"></div>
+                <button type="button" @click="deleteRow(); showTableOps = false"><Minus :size="12" /> 删除行</button>
+                <button type="button" @click="deleteColumn(); showTableOps = false"><Minus :size="12" /> 删除列</button>
+                <button type="button" class="danger" @click="deleteTable(); showTableOps = false"><Trash2 :size="12" /> 删除表格</button>
+              </div>
+            </div>
+          </template>
         </div>
 
         <div class="breadcrumb-spacer"></div>
@@ -539,6 +671,27 @@ onBeforeUnmount(() => {
         </template>
       </aside>
 
+    </div>
+
+    <!-- 表格插入对话框 -->
+    <div v-if="showTableDialog" class="table-dialog-overlay" @click.self="showTableDialog = false">
+      <div class="table-dialog">
+        <h3 class="table-dialog-title">插入表格</h3>
+        <div class="table-dialog-row">
+          <label class="table-dialog-label">
+            <span>行数</span>
+            <input type="number" v-model.number="tableRows" min="1" max="20" class="table-dialog-input" />
+          </label>
+          <label class="table-dialog-label">
+            <span>列数</span>
+            <input type="number" v-model.number="tableCols" min="1" max="10" class="table-dialog-input" />
+          </label>
+        </div>
+        <div class="table-dialog-actions">
+          <button class="btn-cancel" type="button" @click="showTableDialog = false">取消</button>
+          <button class="btn-publish" type="button" @click="insertTable">插入</button>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -1354,6 +1507,209 @@ onBeforeUnmount(() => {
   }
   .draft-status { display: none; }
   .publish-title-input { font-size: 1.25rem; }
+}
+
+/* ─ 表格样式 ── */
+:deep(.rich-editor-content) table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  font-size: 0.9rem;
+  border: 2px solid #cbd5e1;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+:deep(.rich-editor-content) table th,
+:deep(.rich-editor-content) table td {
+  border: 1px solid #cbd5e1;
+  padding: 0.6rem 0.8rem;
+  text-align: left;
+  min-width: 80px;
+  min-height: 36px;
+  position: relative;
+}
+
+:deep(.rich-editor-content) table th {
+  background: #e2e8f0;
+  font-weight: 600;
+  color: #1e293b;
+}
+
+:deep(.rich-editor-content) table td {
+  background: #f8fafc;
+  color: #334155;
+}
+
+:deep(.rich-editor-content) table td:empty::before {
+  content: '\00a0';
+  display: inline-block;
+  min-width: 20px;
+  min-height: 20px;
+}
+
+:deep(.rich-editor-content) table tr:hover td {
+  background: #e2e8f0;
+}
+
+/* Tiptap 表格选中状态 */
+:deep(.rich-editor-content) table .selectedCell {
+  background: #dbeafe !important;
+  outline: 2px solid #3b82f6;
+  outline-offset: -2px;
+}
+
+:deep(.rich-editor-content) table .column-resize-handle {
+  position: absolute;
+  right: -2px;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  cursor: col-resize;
+  background: #3b82f6;
+  z-index: 10;
+}
+
+/* 表格操作下拉菜单 */
+.table-ops-dropdown {
+  position: relative;
+  display: inline-block;
+}
+
+.table-ops-menu {
+  display: none;
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 0.5rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+  padding: 0.4rem 0;
+  min-width: 140px;
+  z-index: 1000;
+}
+
+.table-ops-menu.show {
+  display: block;
+}
+
+.table-ops-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: 100%;
+  padding: 0.5rem 0.8rem;
+  font-size: 0.8rem;
+  color: #475569;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.table-ops-menu button:hover {
+  background: #f1f5f9;
+  color: #1e293b;
+}
+
+.table-ops-menu button.danger {
+  color: #dc2626;
+}
+
+.table-ops-menu button.danger:hover {
+  background: #fef2f2;
+  color: #dc2626;
+}
+
+.table-ops-divider {
+  height: 1px;
+  background: #e2e8f0;
+  margin: 0.3rem 0;
+}
+
+/* 表格插入对话框 */
+.table-dialog-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+
+.table-dialog {
+  background: #ffffff;
+  border-radius: 0.75rem;
+  padding: 1.5rem;
+  min-width: 280px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.15);
+}
+
+.table-dialog-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #1e293b;
+  margin: 0 0 1rem;
+}
+
+.table-dialog-row {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.2rem;
+}
+
+.table-dialog-label {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.table-dialog-label span {
+  font-size: 0.85rem;
+  font-weight: 600;
+  color: #475569;
+}
+
+.table-dialog-input {
+  width: 100%;
+  padding: 0.5rem 0.7rem;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.5rem;
+  font-size: 0.9rem;
+  color: #1e293b;
+  background: #f8fafc;
+  outline: none;
+  transition: all 0.15s;
+}
+
+.table-dialog-input:focus {
+  border-color: #6366f1;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.1);
+}
+
+.table-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.75rem;
+}
+
+.table-dialog-actions .btn-cancel {
+  padding: 0.5rem 1rem;
+  font-size: 0.85rem;
+}
+
+.table-dialog-actions .btn-publish {
+  padding: 0.5rem 1.2rem;
+  font-size: 0.85rem;
 }
 
 </style>

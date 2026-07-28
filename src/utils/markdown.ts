@@ -39,7 +39,51 @@ function renderCodeBlock(code: string, language = '') {
   return `<figure class="code-block"><figcaption><span>${langLabel}</span></figcaption><pre><code class="language-${langLabel}">${code.replace(/\n$/, '')}</code></pre></figure>`
 }
 
+function renderTable(block: string): string {
+  const lines = block.split('\n').filter(l => l.trim())
+  if (lines.length < 2) return ''
+
+  const parseRow = (line: string): string[] => {
+    const trimmed = line.replace(/^\|/, '').replace(/\|$/, '').trim()
+    if (!trimmed) return []
+    // 先保护转义的 \|，分割后再还原
+    const protected_str = trimmed.replace(/\\\|/g, '\x00PIPE\x00')
+    return protected_str.split('|').map(cell => cell.trim().replace(/\x00PIPE\x00/g, '|'))
+  }
+
+  const headerCells = parseRow(lines[0])
+  if (headerCells.length === 0) return ''
+
+  const rows = lines.slice(2).map(line => parseRow(line))
+
+  let html = '<table><thead><tr>'
+  headerCells.forEach(cell => {
+    html += `<th>${renderInlineMarkdown(cell)}</th>`
+  })
+  html += '</tr></thead><tbody>'
+
+  rows.forEach(row => {
+    html += '<tr>'
+    row.forEach((cell, i) => {
+      if (i < headerCells.length) {
+        html += `<td>${renderInlineMarkdown(cell)}</td>`
+      }
+    })
+    html += '</tr>'
+  })
+
+  html += '</tbody></table>'
+  return html
+}
+
 function renderBlock(block: string) {
+  const trimmed = block.trim()
+
+  // 检测 Markdown 表格
+  if (/^\|.+\|/.test(trimmed) && /\|[\s-:|]+\|/.test(trimmed.split('\n')[1] || '')) {
+    return renderTable(trimmed)
+  }
+
   if (/^###\s+/.test(block)) {
     return `<h3>${renderInlineMarkdown(block.replace(/^###\s+/, ''))}</h3>`
   }

@@ -1053,6 +1053,13 @@ onMounted(async () => {
     showLoginModal.value = true
   })
 
+  // 监听未登录提示事件
+  window.addEventListener('auth:need-login', (evt: Event) => {
+    const detail = (evt as CustomEvent).detail
+    showAppToast(detail?.message || '需要登录才能执行此操作', 'info')
+    showLoginModal.value = true
+  })
+
   await checkGateStatus()
   initFromLocalStorage()
   fetchUserProfile()

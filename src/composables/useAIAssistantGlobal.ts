@@ -12,11 +12,22 @@ import type {
 function extractErrorMessage(err: unknown): string {
   if (axios.isAxiosError(err)) {
     const status = err.response?.status
+    const data = err.response?.data
+    const code = data?.code
+    // 后端返回的 code 优先级更高（注意：后端可能返回 HTTP 200 + code: 401）
+    if (code === 1003 || code === 1004 || code === 401) return '需要登录后使用 AI 助手'
     if (status === 401) return '需要登录后使用 AI 助手'
     if (status === 403) return '暂无权限使用 AI 助手'
     if (status && status >= 500) return '服务暂时繁忙，请稍后再试'
     if (status) return `请求失败，请稍后再试`
     return '网络连接异常，请检查网络'
+  }
+  // 处理非 AxiosError（如拦截器创建的新 Error）
+  if (err instanceof Error) {
+    const msg = err.message
+    if (msg.includes('登录') || msg.includes('过期') || msg.includes('TOKEN')) {
+      return '需要登录后使用 AI 助手'
+    }
   }
   return 'AI 暂时没有回复，请稍后再试。'
 }

@@ -20,11 +20,11 @@ const emptyLoginUser: Partial<LoginUser> = {
 
 export { hasAuthToken, getAuthHeaders } from '../api'
 
-// token 续约定时器：只要 token 还没过期就排 refresh
-//   - 过期前一半时间点触发，最少 5s，最多 30s
-//   - 已过期 → 不主动刷，等后端返回 1004
-// 续约成功 → 覆盖本地 token 并重新排下一次
-// 续约失败（code=1003/1004）→ 由响应拦截器清登录态
+// Token 自动续约机制
+// 触发时机：token 过期前一半时间点（最少 5s，最多 30min）
+// 续约成功 → 重置失败计数，用新 token 的过期时间重新排定时器
+// 续约失败 → 停止续约，等 token 真正过期时由请求拦截器触发重新登录
+// 连续失败 3 次后放弃续约（防止无效重试）
 const MIN_REFRESH_INTERVAL_MS = 5 * 1000
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
@@ -59,10 +59,14 @@ function scheduleRefresh() {
   if (delay < minAllowed) delay = minAllowed
 
   refreshTimer = setTimeout(async () => {
+    console.log('[Token Refresh] Timer triggered, attempting refresh...')
     const ok = await runRefresh()
     if (ok) {
+      console.log('[Token Refresh] Success, rescheduling...')
       refreshFailCount = 0
       scheduleRefresh()
+    } else {
+      console.warn('[Token Refresh] Failed, timer stopped. Will rely on request interceptor.')
     }
   }, delay)
 }
@@ -90,12 +94,14 @@ async function runRefresh(): Promise<boolean> {
     if (typeof newExpire === 'number') {
       setTokenExpire(newExpire)
     } else {
+      console.warn('[Token Refresh] No valid expire time from API or JWT')
       return false
     }
     
     lastRefreshAt = Date.now()
     return true
   } catch (e) {
+    console.error('[Token Refresh] Failed:', e)
     refreshFailCount++
     return false
   } finally {
