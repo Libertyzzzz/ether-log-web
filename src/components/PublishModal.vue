@@ -631,7 +631,7 @@ onBeforeUnmount(() => {
 
           <hr class="publish-divider" />
 
-          <EditorContent v-if="editor" :editor="editor" class="rich-editor-shell" />
+          <EditorContent v-if="editor" v-memo="[editor]" :editor="editor" class="rich-editor-shell" />
         </div>
       </main>
 
