@@ -63,20 +63,21 @@ const markdownImageInputId = 'publish-markdown-image-input'
 let lastEditorHtml = ''
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
 let isSyncingFromEditor = false
+let isComposing = false
 
 function scheduleSyncToForm() {
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
   syncDebounceTimer = setTimeout(() => {
     doSyncToForm()
-  }, 300)
+  }, 500)
 }
 
 function doSyncToForm() {
   if (!editor.value) return
+  if (isComposing) return
   const html = editor.value.getHTML()
   const isEmpty = editor.value.isEmpty
   lastEditorHtml = html
-  // 同步锁：告诉 watch 这是编辑器自己的同步，不要回写 setContent
   isSyncingFromEditor = true
   props.publishForm.contentHtml = isEmpty ? '' : html
   props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
@@ -131,7 +132,8 @@ function getEditorHtml() {
 
 function syncPublishContentFromEditor() {
   if (!editor.value) return
-  // 击键时立即更新 lastEditorHtml（用于 watch 判断），但延迟同步到 form
+  // IME 输入期间：完全跳过同步，避免干扰 contenteditable 组合输入状态
+  if (isComposing) return
   lastEditorHtml = editor.value.getHTML()
   scheduleSyncToForm()
 }
@@ -183,6 +185,17 @@ const editor = useEditor({
   editorProps: {
     attributes: {
       class: 'rich-editor-content markdown-body'
+    },
+    handleDOMEvents: {
+      compositionstart: () => { isComposing = true; return false },
+      compositionend: () => {
+        isComposing = false
+        // IME 结束后立即同步一次，同时重置 debounce 定时器
+        lastEditorHtml = editor.value?.getHTML() || ''
+        if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+        scheduleSyncToForm()
+        return false
+      },
     }
   },
   onUpdate: syncPublishContentFromEditor
@@ -226,6 +239,7 @@ watch(
 )
 
 onBeforeUnmount(() => {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
   editor.value?.destroy()
 })
 
