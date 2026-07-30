@@ -8,6 +8,7 @@ import {
   Info,
   MoveRight,
   Plus,
+  BookOpen,
 } from 'lucide-vue-next'
 import type { ArticleDirectory, ArticleListItem, Category } from '../types/blog'
 
@@ -39,9 +40,9 @@ const allowSidebar = computed(() => {
 })
 
 const navItems = [
-  { id: 'home', label: '首页', icon: Home },
-  { id: 'posts', label: '文章', icon: FileText },
-  { id: 'about', label: '关于我', icon: Info },
+  { id: 'home', label: '首页', icon: Home, filled: true },
+  { id: 'posts', label: '文章', icon: FileText, filled: true },
+  { id: 'about', label: '关于我', icon: Info, filled: true },
 ]
 
 // directories 由 props.categories 计算，文章归属按 categoryName 匹配
@@ -55,14 +56,29 @@ const directories = computed<ArticleDirectory[]>(() => {
       .map((a) => a.id),
     sortOrder: c.sort || 0,
   }))
-  return mapped.sort((a, b) => a.sortOrder - b.sortOrder)
+  return mapped
 })
 
 const articleMap = computed(() => new Map(props.articles.map((article) => [article.id, article])))
 
+// 排序规则：1. 有文章的置顶  2. 文章数倒序  3. sortOrder 升序
 const sortedDirectories = computed(() =>
-  [...directories.value].sort((a, b) => a.sortOrder - b.sortOrder)
+  [...directories.value]
+    .filter((d) => d.articleIds.length > 0)
+    .sort((a, b) => {
+      if (b.articleIds.length !== a.articleIds.length) return b.articleIds.length - a.articleIds.length
+      return a.sortOrder - b.sortOrder
+    })
 )
+
+// 当前页面高亮（从 route.meta.page 读取）
+const activeNavId = computed(() => (route.meta?.page as string) || 'home')
+const isNavActive = (id: string) => {
+  if (id === 'home') return activeNavId.value === 'home'
+  if (id === 'posts') return activeNavId.value === 'posts'
+  if (id === 'about') return activeNavId.value === 'about'
+  return false
+}
 
 function handleNavigate(page: string) {
   emit('navigate', page)
@@ -176,23 +192,33 @@ function toggleSidebar() {
     </div>
 
     <aside class="smart-sidebar" :aria-hidden="!isOpen" aria-label="侧边目录导航栏">
-      <nav class="sidebar-section" aria-label="页面导航">
-        <p class="section-label">导航</p>
+      <nav class="sidebar-section nav-section" aria-label="页面导航">
+        <p class="section-label">
+          <span class="section-label-dot"></span>
+          导航
+          <span class="section-label-en">Navigate</span>
+        </p>
         <button
           v-for="item in navItems"
           :key="item.id"
           class="nav-row"
+          :class="{ active: isNavActive(item.id) }"
           type="button"
           @click="handleNavigate(item.id)"
         >
-          <component :is="item.icon" :size="15" />
+          <span class="nav-row-indicator" aria-hidden="true"></span>
+          <component :is="item.icon" :size="15" :fill="item.filled ? 'currentColor' : 'none'" />
           <span>{{ item.label }}</span>
         </button>
       </nav>
 
       <div class="sidebar-section directory-section">
         <div class="section-title-row">
-          <p class="section-label">目录</p>
+          <p class="section-label">
+            <BookOpen :size="11" class="section-label-icon" />
+            目录
+            <span class="section-label-en">Categories</span>
+          </p>
           <button class="add-directory-button" type="button" title="新建目录" @click="addDirectory">
             <Plus :size="13" />
           </button>
@@ -205,12 +231,16 @@ function toggleSidebar() {
             :class="{ active: activeDirectoryId === directory.id }"
           >
             <button class="directory-button" type="button" @click="selectDirectory(directory.id)">
+              <span class="nav-row-indicator" aria-hidden="true"></span>
               <Folder :size="15" />
               <span class="directory-copy">
                 <strong>{{ directory.name }}</strong>
                 <small>{{ directory.description }}</small>
               </span>
-              <span class="directory-count">{{ directory.articleIds.length }}</span>
+              <span
+                v-if="directory.articleIds.length > 0"
+                class="directory-count"
+              >{{ directory.articleIds.length }}</span>
             </button>
 
             <div v-if="activeDirectoryId === directory.id" class="directory-articles">
@@ -272,14 +302,14 @@ function toggleSidebar() {
   bottom: 0;
   left: 0;
   z-index: 1200;
-  width: 18rem;
+  width: 14.5rem;
   pointer-events: none;
 }
 
 .sidebar-hover-bridge {
   position: absolute;
   inset: 0;
-  width: 18rem;
+  width: 14.5rem;
   pointer-events: none;
 }
 .smart-sidebar-shell.open .sidebar-hover-bridge {
@@ -319,17 +349,17 @@ function toggleSidebar() {
 .smart-sidebar-shell.open .sidebar-hotspot { opacity: 0; pointer-events: none; }
 
 .smart-sidebar {
-  width: 15.5rem;
+  width: 13rem;
   height: 100%;
   margin: 0;
-  padding: 1rem 0.85rem;
+  padding: 1rem 0.7rem;
   display: flex;
   flex-direction: column;
   gap: 1.05rem;
   border-radius: 0;
   background: transparent;
   color: #0f172a;
-  border-right: 1px solid rgba(226, 232, 240, 0.3);
+  border-right: none;
   box-shadow: none;
   pointer-events: auto;
   overflow: hidden auto;
@@ -338,8 +368,9 @@ function toggleSidebar() {
   opacity: 0;
   transition: transform 0.18s ease, opacity 0.14s ease;
   position: relative;
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
+  /* 右侧羽化边缘：向右边透明渐变，完全融入背景 */
+  -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,1) 92%, rgba(0,0,0,0.5) 97%, rgba(0,0,0,0) 100%);
+  mask-image: linear-gradient(90deg, rgba(0,0,0,1) 92%, rgba(0,0,0,0.5) 97%, rgba(0,0,0,0) 100%);
 }
 .smart-sidebar::-webkit-scrollbar {
   display: none;
@@ -361,65 +392,131 @@ function toggleSidebar() {
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.5rem;
 }
+.directory-section { margin-top: 0.75rem; }
+
 .section-label {
   margin: 0;
-  padding: 0 0.45rem;
-  font-size: 0.62rem;
-  font-weight: 800;
+  padding: 0.15rem 0.45rem 0.35rem;
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.03em;
   color: #94a3b8;
+  line-height: 1;
+  text-transform: none;
+}
+.section-label-dot {
+  width: 0.28rem;
+  height: 0.28rem;
+  border-radius: 999px;
+  background: #cbd5e1;
+  flex-shrink: 0;
+}
+.section-label-icon {
+  color: #94a3b8;
+  flex-shrink: 0;
+  opacity: 0.85;
+}
+.section-label-en {
+  margin-left: auto;
+  font-size: 0.58rem;
+  font-weight: 500;
+  color: #cbd5e1;
+  letter-spacing: 0.08em;
 }
 .section-title-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 0.5rem;
+  margin-bottom: 0.1rem;
 }
 .add-directory-button {
-  width: 1.55rem;
-  height: 1.55rem;
+  width: 1.5rem;
+  height: 1.5rem;
   display: grid;
   place-items: center;
-  border-radius: 0.5rem;
-  background: rgba(239, 246, 255, 0.9);
-  color: #2563eb;
+  border-radius: 0.55rem;
+  background: rgba(255, 255, 255, 0.5);
+  color: #94a3b8;
+  border: 1px solid rgba(226, 232, 240, 0.6);
 }
 .add-directory-button:hover {
-  background: rgba(219, 234, 254, 0.96);
+  background: rgba(255, 255, 255, 0.8);
+  color: #64748b;
 }
+
 .nav-row,
 .directory-button {
+  position: relative;
   width: 100%;
   display: flex;
   align-items: center;
   gap: 0.65rem;
   border-radius: 0.62rem;
-  padding: 0.62rem 0.65rem;
+  padding: 0.6rem 0.7rem 0.6rem 0.85rem;
   background: transparent;
-  color: #334155;
+  color: #475569;
   text-align: left;
-  transition: background 0.18s ease, color 0.18s ease;
+  transition: background 0.16s ease, color 0.16s ease;
+  overflow: hidden;
+}
+.nav-row-indicator {
+  position: absolute;
+  left: 0.12rem;
+  top: 50%;
+  width: 2px;
+  height: 0;
+  border-radius: 999px;
+  background: #94a3b8;
+  transform: translateY(-50%);
+  transition: height 0.18s ease, opacity 0.18s ease, background 0.18s ease;
+  opacity: 0;
 }
 .nav-row:hover,
-.directory-button:hover,
+.directory-button:hover {
+  background: rgba(255, 255, 255, 0.45);
+  color: #334155;
+}
+.nav-row:hover .nav-row-indicator,
+.directory-button:hover .nav-row-indicator {
+  height: 50%;
+  opacity: 0.5;
+}
+.nav-row.active,
 .directory-group.active .directory-button {
-  background: linear-gradient(135deg, rgba(79, 124, 255, 0.96), rgba(124, 58, 237, 0.9));
-  color: #ffffff;
-  box-shadow: 0 10px 22px rgba(79, 124, 255, 0.22);
+  background: rgba(255, 255, 255, 0.7);
+  color: #0f172a;
+  font-weight: 600;
+}
+.nav-row.active .nav-row-indicator,
+.directory-group.active .directory-button .nav-row-indicator {
+  height: 62%;
+  opacity: 1;
+  background: #475569;
 }
 .nav-row span {
-  font-size: 0.78rem;
-  font-weight: 800;
+  font-size: 0.8rem;
+  font-weight: 500;
+}
+.nav-row.active span {
+  font-weight: 600;
+}
+.nav-row.active > svg {
+  color: #1e293b;
 }
 
 .directory-list {
   display: flex;
   flex-direction: column;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 .directory-group {
-  border-radius: 0.75rem;
+  border-radius: 0.7rem;
 }
 .directory-copy {
   flex: 1;
@@ -431,6 +528,7 @@ function toggleSidebar() {
 .directory-copy strong {
   font-size: 0.78rem;
   line-height: 1.2;
+  font-weight: 500;
 }
 .directory-copy small {
   font-size: 0.62rem;
@@ -439,37 +537,35 @@ function toggleSidebar() {
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+.directory-group.active .directory-copy strong {
+  font-weight: 600;
+}
 .directory-group.active .directory-copy small,
 .directory-button:hover .directory-copy small {
-  color: rgba(255, 255, 255, 0.68);
+  color: #64748b;
 }
 .directory-count {
-  min-width: 1.25rem;
-  height: 1.25rem;
-  padding: 0 0.35rem;
+  min-width: 1.3rem;
+  height: 1.15rem;
+  padding: 0 0.38rem;
   display: grid;
   place-items: center;
   border-radius: 999px;
-  background: rgba(226, 232, 240, 0.78);
+  background: rgba(255, 255, 255, 0.6);
   color: #64748b;
   font-size: 0.62rem;
-  font-weight: 900;
+  font-weight: 600;
+  line-height: 1;
+  border: 1px solid rgba(226, 232, 240, 0.55);
 }
-.newdir-overlay {
-  position: fixed; inset: 0; display: grid; place-items: center; z-index: 4200;
-  background: rgba(2,6,23,0.4);
-}
-.newdir-card { width: 20rem; padding: 1rem; border-radius: 0.8rem; background: #fff; box-shadow: 0 20px 50px rgba(2,6,23,0.24); }
-.newdir-card h4 { margin: 0 0 0.6rem; }
-.newdir-card input { width: 100%; padding: 8px 10px; border: 1px solid #e6eef6; border-radius: 6px; margin-bottom: 0.6rem; }
-.newdir-actions { display:flex; gap:0.5rem; justify-content:flex-end; }
-.btn { padding: 8px 12px; border-radius: 8px; border: 0; cursor: pointer; }
-.btn.ghost { background: #f1f5f9; color: #374151; }
-.btn.primary { background: #2563eb; color: #fff; }
-.directory-button:hover .directory-count,
 .directory-group.active .directory-count {
-  background: rgba(255, 255, 255, 0.18);
-  color: #ffffff;
+  background: rgba(148, 163, 184, 0.14);
+  color: #334155;
+  border-color: rgba(148, 163, 184, 0.2);
+}
+.directory-button:hover .directory-count {
+  background: rgba(255, 255, 255, 0.85);
+  color: #475569;
 }
 
 .directory-articles {
