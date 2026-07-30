@@ -62,6 +62,7 @@ const markdownImageInput = ref<HTMLInputElement | null>(null)
 const markdownImageInputId = 'publish-markdown-image-input'
 let lastEditorHtml = ''
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+let isSyncingFromEditor = false
 
 function scheduleSyncToForm() {
   if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
@@ -75,8 +76,11 @@ function doSyncToForm() {
   const html = editor.value.getHTML()
   const isEmpty = editor.value.isEmpty
   lastEditorHtml = html
+  // 同步锁：告诉 watch 这是编辑器自己的同步，不要回写 setContent
+  isSyncingFromEditor = true
   props.publishForm.contentHtml = isEmpty ? '' : html
   props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
+  isSyncingFromEditor = false
 }
 const turndown = new TurndownService({
   headingStyle: 'atx',
@@ -188,6 +192,8 @@ watch(
   () => [props.publishForm.contentHtml, props.publishForm.content],
   () => {
     if (!editor.value) return
+    // 同步锁：如果是编辑器自己的同步，直接跳过
+    if (isSyncingFromEditor) return
 
     const nextHtml = getEditorHtml()
     const currentHtml = editor.value.getHTML()
