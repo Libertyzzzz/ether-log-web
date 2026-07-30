@@ -60,8 +60,24 @@ function setImageInput(element: Element | ComponentPublicInstance | null) {
 const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图文件输入框的引用
 const markdownImageInput = ref<HTMLInputElement | null>(null)
 const markdownImageInputId = 'publish-markdown-image-input'
-const isSyncingEditor = ref(false)
 let lastEditorHtml = ''
+let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null
+
+function scheduleSyncToForm() {
+  if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
+  syncDebounceTimer = setTimeout(() => {
+    doSyncToForm()
+  }, 300)
+}
+
+function doSyncToForm() {
+  if (!editor.value) return
+  const html = editor.value.getHTML()
+  const isEmpty = editor.value.isEmpty
+  lastEditorHtml = html
+  props.publishForm.contentHtml = isEmpty ? '' : html
+  props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
+}
 const turndown = new TurndownService({
   headingStyle: 'atx',
   bulletListMarker: '-',
@@ -111,18 +127,9 @@ function getEditorHtml() {
 
 function syncPublishContentFromEditor() {
   if (!editor.value) return
-
-  isSyncingEditor.value = true
-  const html = editor.value.getHTML()
-  const isEmpty = editor.value.isEmpty
-
-  lastEditorHtml = html
-  props.publishForm.contentHtml = isEmpty ? '' : html
-  props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
-
-  nextTick(() => {
-    isSyncingEditor.value = false
-  })
+  // 击键时立即更新 lastEditorHtml（用于 watch 判断），但延迟同步到 form
+  lastEditorHtml = editor.value.getHTML()
+  scheduleSyncToForm()
 }
 
 const editor = useEditor({
@@ -180,16 +187,16 @@ const editor = useEditor({
 watch(
   () => [props.publishForm.contentHtml, props.publishForm.content],
   () => {
-    if (isSyncingEditor.value || !editor.value) return
+    if (!editor.value) return
 
     const nextHtml = getEditorHtml()
     const currentHtml = editor.value.getHTML()
-    // 如果和编辑器当前内容一致，跳过（避免 setContent 重置 DOM 导致抖动）
+    // 如果和编辑器当前内容一致，跳过
     if (nextHtml === currentHtml) {
       lastEditorHtml = currentHtml
       return
     }
-    // 如果和上次记录的编辑器内容一致，说明是外部更新，才执行 setContent
+    // 如果和上次记录的编辑器内容一致，说明是外部更新（如加载草稿），才执行 setContent
     if (nextHtml === lastEditorHtml) return
 
     lastEditorHtml = nextHtml
