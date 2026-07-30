@@ -65,12 +65,12 @@ export function getTokenExpire(): number | null {
     const n = Number(stored)
     if (!Number.isNaN(n)) return n
   }
-  // 回退：从 token 本身解析 exp（后端约定 exp 也是毫秒
+  // 回退：从 token 本身解析 exp（JWT exp 单位是秒，需转为毫秒）
   const token = sessionStorage.getItem(TOKEN_KEY)
   if (!token) return null
   const payload = parseJwt<{ exp: number }>(token)
   if (payload && typeof payload.exp === 'number') {
-    return payload.exp
+    return normalizeExpire(payload.exp) ?? null
   }
   return null
 }
@@ -381,11 +381,11 @@ export async function searchArticles(keyword: string): Promise<any[]> {
 // Auth
 // ═══════════════════════════════════════════════════════════════
 
-// 后端返回的 expire 以及 JWT payload 中的 exp 统一都是毫秒时间戳（epoch milliseconds）
-// —— 前端不再做任何单位换算，仅做有效性校验
+// 后端返回的 expire 以及 JWT payload 中的 exp/iat 单位是秒，统一转为毫秒
 function normalizeExpire(value: number | undefined | null): number | undefined {
   if (typeof value !== 'number' || Number.isNaN(value)) return undefined
-  return value
+  // 秒级时间戳（< 1e12，约 33658 年），转为毫秒
+  return value < 1_000_000_000_000 ? value * 1000 : value
 }
 
 export async function login(email: string, password: string): Promise<LoginData> {
@@ -400,14 +400,14 @@ export async function login(email: string, password: string): Promise<LoginData>
   if (!loginData?.token || !loginData.user) {
     throw new Error('登录返回数据格式不正确')
   }
-  // 优先用接口返回的 expire（已经是毫秒）；接口没给再从 token payload 解析（也是毫秒）
+  // 优先用接口返回的 expire（normalizeExpire 会处理秒/毫秒）；接口没给再从 token payload 解析
   const fromApi = normalizeExpire(loginData.expire)
   if (fromApi) {
     loginData.expire = fromApi
   } else {
     const payload = parseJwt(loginData.token)
     if (payload && typeof payload.exp === 'number') {
-      loginData.expire = payload.exp
+      loginData.expire = normalizeExpire(payload.exp)!
     }
   }
   return loginData

@@ -84,11 +84,12 @@ async function runRefresh(): Promise<boolean> {
     sessionStorage.setItem('authToken', token)
     
     // 【关键】确保获取新 token 的过期时间
-    // 优先使用 API 返回的 expire；如果没有或无效，从 JWT payload 解析
+    // 优先使用 API 返回的 expire（已由 refreshToken 内部 normalizeExpire 转为毫秒）；
+    // 如果没有或无效，从 JWT payload 解析（exp 单位是秒，需转为毫秒）
     let newExpire: number | undefined = typeof apiExpire === 'number' ? apiExpire : undefined
     if (typeof newExpire !== 'number') {
       const payload = parseJwt<{ exp: number }>(token)
-      newExpire = payload?.exp
+      newExpire = payload?.exp != null ? payload.exp * 1000 : undefined
     }
     
     if (typeof newExpire === 'number') {
