@@ -659,7 +659,8 @@ function heroOpenDrawerOnly() {
     radial-gradient(circle at 10% 80%, rgba(59, 130, 246, 0.18), transparent 16rem),
     linear-gradient(145deg, rgba(12, 18, 32, 0.96) 0%, rgba(24, 35, 55, 0.92) 46%, rgba(49, 46, 129, 0.82) 100%);
   border: 1px solid rgba(191, 219, 254, 0.22);
-  border-radius: 1.5rem;
+  /* 左侧取消圆角 —— 和侧边栏 / 页面左区域直线对接，浑然一体；右侧保留圆润感 */
+  border-radius: 0 1.5rem 1.5rem 0;
   overflow: hidden;
   padding: 1.15rem 1.6rem;
   display: grid;

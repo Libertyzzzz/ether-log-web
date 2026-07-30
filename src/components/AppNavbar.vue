@@ -301,9 +301,8 @@ onUnmounted(() => {
 .nav-standard {
   position: fixed; top: 0; left: 0; right: 0; height: 5rem;
   background: var(--nav-bg); backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px); border-bottom: 1px solid var(--nav-border);
+  -webkit-backdrop-filter: blur(20px);
   z-index: 1000; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s;
-  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.04);
   /* 处理 iOS 刘海/灵动岛 safe-area（移动端生效，PC 端 env() 返回 0，无副作用 */
   padding-top: env(safe-area-inset-top);
   box-sizing: border-box;
@@ -599,7 +598,6 @@ kbd {
   .nav-standard {
     height: calc(3.25rem + env(safe-area-inset-top));
     background: rgba(248, 250, 252, 0.86);
-    border-bottom-color: rgba(203, 213, 225, 0.42);
     will-change: transform;
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
@@ -608,7 +606,6 @@ kbd {
   .nav-standard.nav-hidden {
     -webkit-transform: translate3d(0, -100%, 0);
     transform: translate3d(0, -100%, 0);
-    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.1);
   }
   .nav-content {
     display: flex;

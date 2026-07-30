@@ -45,7 +45,6 @@ const navItems = [
   { id: 'about', label: '关于我', icon: Info, filled: true },
 ]
 
-// directories 由 props.categories 计算，文章归属按 categoryName 匹配
 const directories = computed<ArticleDirectory[]>(() => {
   const mapped = props.categories.map((c) => ({
     id: c.id,
@@ -61,7 +60,6 @@ const directories = computed<ArticleDirectory[]>(() => {
 
 const articleMap = computed(() => new Map(props.articles.map((article) => [article.id, article])))
 
-// 排序规则：1. 有文章的置顶  2. 文章数倒序  3. sortOrder 升序
 const sortedDirectories = computed(() =>
   [...directories.value]
     .filter((d) => d.articleIds.length > 0)
@@ -71,14 +69,8 @@ const sortedDirectories = computed(() =>
     })
 )
 
-// 当前页面高亮（从 route.meta.page 读取）
 const activeNavId = computed(() => (route.meta?.page as string) || 'home')
-const isNavActive = (id: string) => {
-  if (id === 'home') return activeNavId.value === 'home'
-  if (id === 'posts') return activeNavId.value === 'posts'
-  if (id === 'about') return activeNavId.value === 'about'
-  return false
-}
+const isNavActive = (id: string) => activeNavId.value === id
 
 function handleNavigate(page: string) {
   emit('navigate', page)
@@ -106,9 +98,7 @@ function addDirectory() {
   emit('navigate', 'dashboard')
 }
 
-function moveArticle(_articleId: number, _targetDirectoryId: number) {
-  // 仅前端操作：文章归属由后端 categoryName 决定，这里不做本地目录改动
-}
+function moveArticle(_articleId: number, _targetDirectoryId: number) {}
 
 let mouseMoveListener: ((e: MouseEvent) => void) | null = null
 let lastMouseX: number | null = null
@@ -117,28 +107,19 @@ onMounted(() => {
   checkMobile()
   window.addEventListener('resize', checkMobile)
 
-  // open when cursor moves leftwards and crosses left 20% of the viewport (desktop only)
   mouseMoveListener = (e: MouseEvent) => {
-    if (isMobile.value) return
-    if (isOpen.value) return
-    if (!allowSidebar.value) return
-    if (!shellRef.value) return
+    if (isMobile.value || isOpen.value || !allowSidebar.value || !shellRef.value) return
     const threshold = window.innerWidth * 0.2
     const prevX = lastMouseX ?? e.clientX
     const delta = e.clientX - prevX
     lastMouseX = e.clientX
-    if (delta < 0 && e.clientX <= threshold) {
-      openSidebar()
-    }
+    if (delta < 0 && e.clientX <= threshold) openSidebar()
   }
   window.addEventListener('mousemove', mouseMoveListener)
 })
 
-// when route changes, ensure sidebar is closed if not allowed
 watch(() => route.fullPath, () => {
-  if (!allowSidebar.value) {
-    isOpen.value = false
-  }
+  if (!allowSidebar.value) isOpen.value = false
 })
 
 onUnmounted(() => {
@@ -157,16 +138,11 @@ function closeSidebar() {
 }
 
 function toggleSidebar() {
-  if (isOpen.value) {
-    closeSidebar()
-  } else {
-    openSidebar()
-  }
+  isOpen.value ? closeSidebar() : openSidebar()
 }
 </script>
 
 <template>
-  <!-- Backdrop overlay (mobile/tablet only) -->
   <div
     v-if="isOpen && isMobile"
     class="sidebar-backdrop"
@@ -206,7 +182,6 @@ function toggleSidebar() {
           type="button"
           @click="handleNavigate(item.id)"
         >
-          <span class="nav-row-indicator" aria-hidden="true"></span>
           <component :is="item.icon" :size="15" :fill="item.filled ? 'currentColor' : 'none'" />
           <span>{{ item.label }}</span>
         </button>
@@ -231,7 +206,6 @@ function toggleSidebar() {
             :class="{ active: activeDirectoryId === directory.id }"
           >
             <button class="directory-button" type="button" @click="selectDirectory(directory.id)">
-              <span class="nav-row-indicator" aria-hidden="true"></span>
               <Folder :size="15" />
               <span class="directory-copy">
                 <strong>{{ directory.name }}</strong>
@@ -276,14 +250,11 @@ function toggleSidebar() {
           </section>
         </div>
       </div>
-
-      <!-- 目录的新增/删除在控制面板中管理 -->
     </aside>
   </div>
 </template>
 
 <style scoped>
-/* ── Backdrop overlay ── */
 .sidebar-backdrop {
   position: fixed;
   inset: 0;
@@ -298,7 +269,7 @@ function toggleSidebar() {
 
 .smart-sidebar-shell {
   position: fixed;
-  top: 5rem;
+  top: 0;
   bottom: 0;
   left: 0;
   z-index: 1200;
@@ -320,16 +291,11 @@ function toggleSidebar() {
   position: absolute;
   top: 0;
   bottom: 0;
-  /* hotspot flush to the left edge for predictable hover */
   left: 0;
   width: 1.5rem;
-  /* subtle visible handle to indicate interactive edge */
-  background: linear-gradient(90deg, rgba(79,124,255,0.06), rgba(79,124,255,0));
-  border-right: 1px solid rgba(79,124,255,0.06);
   z-index: 1210;
   pointer-events: auto;
 }
-.sidebar-hotspot:hover { background: linear-gradient(90deg, rgba(79,124,255,0.12), rgba(79,124,255,0)); }
 .sidebar-hotspot span {
   position: absolute;
   top: 50%;
@@ -337,8 +303,8 @@ function toggleSidebar() {
   width: 2rem;
   height: 0.22rem;
   border-radius: 999px;
-  background: rgba(79,124,255,0.42);
-  opacity: 0.6;
+  background: rgba(99, 102, 241, 0.35);
+  opacity: 0;
   transform: translate(-50%, -50%);
   transition: opacity 0.12s ease, transform 0.12s ease;
 }
@@ -352,12 +318,15 @@ function toggleSidebar() {
   width: 13rem;
   height: 100%;
   margin: 0;
-  padding: 1rem 0.7rem;
+  padding: 5.6rem 0.65rem 2rem;
   display: flex;
   flex-direction: column;
-  gap: 1.05rem;
+  gap: 1.1rem;
   border-radius: 0;
-  background: transparent;
+  background:
+    radial-gradient(circle at 12% 5%, rgba(68, 105, 255, 0.14), transparent 32rem),
+    radial-gradient(circle at 88% 0%, rgba(255, 223, 207, 0.42), transparent 30rem),
+    linear-gradient(180deg, #eaf0fb 0%, #f8faff 48%, #eef3fb 100%);
   color: #0f172a;
   border-right: none;
   box-shadow: none;
@@ -368,9 +337,6 @@ function toggleSidebar() {
   opacity: 0;
   transition: transform 0.18s ease, opacity 0.14s ease;
   position: relative;
-  /* 右侧羽化边缘：向右边透明渐变，完全融入背景 */
-  -webkit-mask-image: linear-gradient(90deg, rgba(0,0,0,1) 92%, rgba(0,0,0,0.5) 97%, rgba(0,0,0,0) 100%);
-  mask-image: linear-gradient(90deg, rgba(0,0,0,1) 92%, rgba(0,0,0,0.5) 97%, rgba(0,0,0,0) 100%);
 }
 .smart-sidebar::-webkit-scrollbar {
   display: none;
@@ -392,41 +358,41 @@ function toggleSidebar() {
 .sidebar-section {
   display: flex;
   flex-direction: column;
-  gap: 0.5rem;
+  gap: 0.45rem;
 }
-.directory-section { margin-top: 0.75rem; }
+.directory-section { margin-top: 0.6rem; }
 
 .section-label {
   margin: 0;
-  padding: 0.15rem 0.45rem 0.35rem;
+  padding: 0.15rem 0.55rem 0.28rem;
   display: flex;
   align-items: center;
-  gap: 0.35rem;
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.03em;
+  gap: 0.4rem;
+  font-size: 0.66rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
   color: #94a3b8;
   line-height: 1;
-  text-transform: none;
+  text-transform: uppercase;
 }
 .section-label-dot {
   width: 0.28rem;
   height: 0.28rem;
   border-radius: 999px;
-  background: #cbd5e1;
+  background: linear-gradient(135deg, #6366f1, #a78bfa);
   flex-shrink: 0;
 }
 .section-label-icon {
-  color: #94a3b8;
+  color: #a78bfa;
   flex-shrink: 0;
-  opacity: 0.85;
+  opacity: 0.9;
 }
 .section-label-en {
   margin-left: auto;
-  font-size: 0.58rem;
-  font-weight: 500;
+  font-size: 0.56rem;
+  font-weight: 600;
   color: #cbd5e1;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
 }
 .section-title-row {
   display: flex;
@@ -441,12 +407,12 @@ function toggleSidebar() {
   display: grid;
   place-items: center;
   border-radius: 0.55rem;
-  background: rgba(255, 255, 255, 0.5);
+  background: rgba(255, 255, 255, 0.55);
   color: #94a3b8;
-  border: 1px solid rgba(226, 232, 240, 0.6);
+  border: 1px solid rgba(226, 232, 240, 0.65);
 }
 .add-directory-button:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.85);
   color: #64748b;
 }
 
@@ -456,58 +422,37 @@ function toggleSidebar() {
   width: 100%;
   display: flex;
   align-items: center;
-  gap: 0.65rem;
-  border-radius: 0.62rem;
-  padding: 0.6rem 0.7rem 0.6rem 0.85rem;
-  background: transparent;
-  color: #475569;
+  gap: 0.6rem;
+  border-radius: 9999px;
+  padding: 0.52rem 0.8rem 0.52rem 0.95rem;
+  background: rgba(255, 255, 255, 0.45);
+  border: 1px solid rgba(203, 213, 225, 0.35);
+  color: #64748b;
   text-align: left;
-  transition: background 0.16s ease, color 0.16s ease;
-  overflow: hidden;
+  transition: background 0.18s ease, border-color 0.18s ease, color 0.18s ease, transform 0.12s ease;
 }
-.nav-row-indicator {
-  position: absolute;
-  left: 0.12rem;
-  top: 50%;
-  width: 2px;
-  height: 0;
-  border-radius: 999px;
-  background: #94a3b8;
-  transform: translateY(-50%);
-  transition: height 0.18s ease, opacity 0.18s ease, background 0.18s ease;
-  opacity: 0;
-}
+.nav-row-indicator { display: none; }
 .nav-row:hover,
 .directory-button:hover {
-  background: rgba(255, 255, 255, 0.45);
-  color: #334155;
-}
-.nav-row:hover .nav-row-indicator,
-.directory-button:hover .nav-row-indicator {
-  height: 50%;
-  opacity: 0.5;
+  background: #ffffff;
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #4f46e5;
 }
 .nav-row.active,
 .directory-group.active .directory-button {
-  background: rgba(255, 255, 255, 0.7);
-  color: #0f172a;
-  font-weight: 600;
-}
-.nav-row.active .nav-row-indicator,
-.directory-group.active .directory-button .nav-row-indicator {
-  height: 62%;
-  opacity: 1;
-  background: #475569;
+  background: #111827;
+  border-color: #111827;
+  color: #ffffff;
+  box-shadow: 0 6px 18px rgba(15, 23, 42, 0.16);
 }
 .nav-row span {
   font-size: 0.8rem;
-  font-weight: 500;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
-.nav-row.active span {
-  font-weight: 600;
-}
-.nav-row.active > svg {
-  color: #1e293b;
+.nav-row.active > svg,
+.directory-group.active .directory-button > svg {
+  color: #a78bfa;
 }
 
 .directory-list {
@@ -528,7 +473,7 @@ function toggleSidebar() {
 .directory-copy strong {
   font-size: 0.78rem;
   line-height: 1.2;
-  font-weight: 500;
+  font-weight: 700;
 }
 .directory-copy small {
   font-size: 0.62rem;
@@ -538,34 +483,38 @@ function toggleSidebar() {
   text-overflow: ellipsis;
 }
 .directory-group.active .directory-copy strong {
-  font-weight: 600;
+  font-weight: 700;
 }
 .directory-group.active .directory-copy small,
 .directory-button:hover .directory-copy small {
-  color: #64748b;
+  color: rgba(255, 255, 255, 0.72);
+}
+.directory-button:hover .directory-copy small {
+  color: #4f46e5;
 }
 .directory-count {
-  min-width: 1.3rem;
+  min-width: 1.35rem;
   height: 1.15rem;
-  padding: 0 0.38rem;
+  padding: 0 0.4rem;
   display: grid;
   place-items: center;
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.6);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.65);
   color: #64748b;
   font-size: 0.62rem;
-  font-weight: 600;
+  font-weight: 700;
   line-height: 1;
-  border: 1px solid rgba(226, 232, 240, 0.55);
+  border: 1px solid rgba(203, 213, 225, 0.55);
 }
 .directory-group.active .directory-count {
-  background: rgba(148, 163, 184, 0.14);
-  color: #334155;
-  border-color: rgba(148, 163, 184, 0.2);
+  background: rgba(255, 255, 255, 0.12);
+  color: #c4b5fd;
+  border-color: rgba(167, 139, 250, 0.35);
 }
 .directory-button:hover .directory-count {
-  background: rgba(255, 255, 255, 0.85);
-  color: #475569;
+  background: #ffffff;
+  color: #4f46e5;
+  border-color: rgba(99, 102, 241, 0.3);
 }
 
 .directory-articles {
@@ -627,7 +576,6 @@ function toggleSidebar() {
   line-height: 1.45;
 }
 
-/* ── Mobile / Tablet: hide sidebar entirely ── */
 @media (max-width: 1024px) {
   .smart-sidebar-shell,
   .sidebar-backdrop {
