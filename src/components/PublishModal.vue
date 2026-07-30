@@ -61,6 +61,7 @@ const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图
 const markdownImageInput = ref<HTMLInputElement | null>(null)
 const markdownImageInputId = 'publish-markdown-image-input'
 const isSyncingEditor = ref(false)
+let lastEditorHtml = ''
 const turndown = new TurndownService({
   headingStyle: 'atx',
   bulletListMarker: '-',
@@ -115,6 +116,7 @@ function syncPublishContentFromEditor() {
   const html = editor.value.getHTML()
   const isEmpty = editor.value.isEmpty
 
+  lastEditorHtml = html
   props.publishForm.contentHtml = isEmpty ? '' : html
   props.publishForm.content = isEmpty ? '' : turndown.turndown(html).trim()
 
@@ -181,8 +183,16 @@ watch(
     if (isSyncingEditor.value || !editor.value) return
 
     const nextHtml = getEditorHtml()
-    if (nextHtml === editor.value.getHTML()) return
+    const currentHtml = editor.value.getHTML()
+    // 如果和编辑器当前内容一致，跳过（避免 setContent 重置 DOM 导致抖动）
+    if (nextHtml === currentHtml) {
+      lastEditorHtml = currentHtml
+      return
+    }
+    // 如果和上次记录的编辑器内容一致，说明是外部更新，才执行 setContent
+    if (nextHtml === lastEditorHtml) return
 
+    lastEditorHtml = nextHtml
     editor.value.commands.setContent(nextHtml, { emitUpdate: false })
   },
   { flush: 'post' }
