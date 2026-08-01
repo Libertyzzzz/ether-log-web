@@ -1,4 +1,4 @@
-import { ref, computed, onUnmounted } from 'vue'
+import { ref, computed } from 'vue'
 import axios from 'axios'
 import type { LoginUser } from '../types/blog'
 import {
@@ -10,6 +10,7 @@ import {
   getTokenExpire,
   setTokenExpire,
   parseJwt,
+  normalizeExpire,
 } from '../api'
 
 const emptyLoginUser: Partial<LoginUser> = {
@@ -18,20 +19,12 @@ const emptyLoginUser: Partial<LoginUser> = {
   email: '',
 }
 
-export { hasAuthToken, getAuthHeaders } from '../api'
+export { hasAuthToken } from '../api'
 
-// Token 自动续约机制
-// 触发时机：token 过期前一半时间点（最少 5s，最多 30min）
-// 续约成功 → 重置失败计数，用新 token 的过期时间重新排定时器
-// 续约失败 → 停止续约，等 token 真正过期时由请求拦截器触发重新登录
-// 连续失败 3 次后放弃续约（防止无效重试）
 const MIN_REFRESH_INTERVAL_MS = 5 * 1000
+const MAX_REFRESH_INTERVAL_MS = 30 * 60 * 1000
 
 let refreshTimer: ReturnType<typeof setTimeout> | null = null
-let isRefreshing = false
-let lastRefreshAt = 0
-let refreshFailCount = 0
-const MAX_REFRESH_FAILS = 3
 
 function clearRefreshTimer() {
   if (refreshTimer !== null) {
@@ -45,68 +38,35 @@ function scheduleRefresh() {
   const expire = getTokenExpire()
   if (!expire) return
 
-  const now = Date.now()
-  const msUntilExpire = expire - now
-  if (msUntilExpire <= 0) return
-
-  // 过期前一半时间点触发，最少 5s，最多 30min
-  let delay = Math.floor(msUntilExpire / 2)
+  let delay = Math.floor((expire - Date.now()) / 2)
   if (delay < MIN_REFRESH_INTERVAL_MS) delay = MIN_REFRESH_INTERVAL_MS
-  const MAX_REFRESH_INTERVAL_MS = 30 * 60 * 1000
   if (delay > MAX_REFRESH_INTERVAL_MS) delay = MAX_REFRESH_INTERVAL_MS
-
-  const minAllowed = Math.max(0, lastRefreshAt + MIN_REFRESH_INTERVAL_MS - now)
-  if (delay < minAllowed) delay = minAllowed
+  if (delay < 0) delay = 0
 
   refreshTimer = setTimeout(async () => {
-    console.log('[Token Refresh] Timer triggered, attempting refresh...')
-    const ok = await runRefresh()
-    if (ok) {
-      console.log('[Token Refresh] Success, rescheduling...')
-      refreshFailCount = 0
-      scheduleRefresh()
-    } else {
-      console.warn('[Token Refresh] Failed, timer stopped. Will rely on request interceptor.')
-    }
+    if (await runRefresh()) scheduleRefresh()
   }, delay)
 }
 
 async function runRefresh(): Promise<boolean> {
-  if (isRefreshing) return false
   if (!hasAuthToken()) return false
-  if (refreshFailCount >= MAX_REFRESH_FAILS) return false
-  const now = Date.now()
-  if (now - lastRefreshAt < MIN_REFRESH_INTERVAL_MS) return false
-
-  isRefreshing = true
   try {
     const { token, expire: apiExpire } = await apiRefreshToken()
     sessionStorage.setItem('authToken', token)
-    
-    // 【关键】确保获取新 token 的过期时间
-    // 优先使用 API 返回的 expire（已由 refreshToken 内部 normalizeExpire 转为毫秒）；
-    // 如果没有或无效，从 JWT payload 解析（exp 单位是秒，需转为毫秒）
-    let newExpire: number | undefined = typeof apiExpire === 'number' ? apiExpire : undefined
-    if (typeof newExpire !== 'number') {
-      const payload = parseJwt<{ exp: number }>(token)
-      newExpire = payload?.exp != null ? payload.exp * 1000 : undefined
-    }
-    
-    if (typeof newExpire === 'number') {
-      setTokenExpire(newExpire)
+
+    let newExpire: number | undefined
+    if (typeof apiExpire === 'number') {
+      newExpire = apiExpire
     } else {
-      console.warn('[Token Refresh] No valid expire time from API or JWT')
-      return false
+      const payload = parseJwt<{ exp: number }>(token)
+      newExpire = payload?.exp != null ? normalizeExpire(payload.exp) : undefined
     }
-    
-    lastRefreshAt = Date.now()
+    if (typeof newExpire !== 'number') return false
+
+    setTokenExpire(newExpire)
     return true
-  } catch (e) {
-    console.error('[Token Refresh] Failed:', e)
-    refreshFailCount++
+  } catch {
     return false
-  } finally {
-    isRefreshing = false
   }
 }
 
@@ -122,22 +82,20 @@ export function useAuth() {
   })
 
   function initFromLocalStorage() {
-    if (hasAuthToken()) {
-      const stored = sessionStorage.getItem('authUser')
-      if (stored) {
-        try {
-          loginUser.value = JSON.parse(stored)
-          isLoggedIn.value = true
-        } catch {
-          clearLoginState()
-          return
-        }
-      } else {
+    if (!hasAuthToken()) return
+    const stored = sessionStorage.getItem('authUser')
+    if (stored) {
+      try {
+        loginUser.value = JSON.parse(stored)
         isLoggedIn.value = true
+      } catch {
+        clearLoginState()
+        return
       }
-      // 已有登录态 → 立刻安排下一次刷新
-      scheduleRefresh()
+    } else {
+      isLoggedIn.value = true
     }
+    scheduleRefresh()
   }
 
   function clearLoginState() {
@@ -160,19 +118,13 @@ export function useAuth() {
 
     try {
       const loginData = await apiLogin(email, password)
-
       sessionStorage.setItem('authToken', loginData.token)
-      if (typeof loginData.expire === 'number') {
-        setTokenExpire(loginData.expire)
-      }
+      if (typeof loginData.expire === 'number') setTokenExpire(loginData.expire)
       sessionStorage.setItem('authUser', JSON.stringify(loginData.user))
       loginUser.value = loginData.user
       isLoggedIn.value = true
-
-      // 安排 token 自动续约
       scheduleRefresh()
 
-      // 静默更新最后登录时间
       const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
         .toISOString()
         .slice(0, 19)
@@ -209,8 +161,8 @@ export function useAuth() {
         loginUser.value = user
         sessionStorage.setItem('authUser', JSON.stringify(user))
       }
-    } catch (error) {
-      console.warn('[auth] fetchUserProfile failed')
+    } catch {
+      // no-op
     }
   }
 
@@ -246,10 +198,6 @@ export function useAuth() {
       return false
     }
   }
-
-  onUnmounted(() => {
-    clearRefreshTimer()
-  })
 
   return {
     isLoggedIn,

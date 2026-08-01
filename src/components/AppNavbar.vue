@@ -36,7 +36,6 @@ const checkMobile = () => {
 
 // ── 滚动隐藏导航栏（Twitter/Medium 风格：向下滚隐藏，向上滚显示） ──
 
-// 内容阅读页（移动端需要滚动隐藏，让出阅读空间）
 const contentPageNames = new Set([
   'posts', 'about', 'guestbook', 'profile',
   'publish', 'publish-edit', 'quant-lab',
@@ -45,28 +44,23 @@ const contentPageNames = new Set([
 ])
 const isContentPage = computed(() => contentPageNames.has(String(route.name)))
 
-// 是否允许滚动隐藏导航栏：仅「移动端 + 内容阅读页」才启用
 const allowAutoHide = computed(() => isMobile.value && isContentPage.value)
 
-// 导航栏可见性
 const isVisible = ref(true)
 let lastScrollY = 0
 let ticking = false
-const MIN_DELTA = 8     // 最小滚动位移（避免抖动）
-const TOP_BUFFER = 120  // 在页面顶部区域始终显示
+const MIN_DELTA = 8
+const TOP_BUFFER = 120
 
-// 获取当前滚动位置（兼容性处理）
 function getScrollY() {
   return window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
 }
 
-// 滚动处理（核心：向下滚隐藏，向上滚显示）
 function handleScroll() {
   if (!ticking) {
     window.requestAnimationFrame(() => {
       const currentY = getScrollY()
 
-      // 场景1：当前不允许自动隐藏 → 强制显示，不做滚动计算
       if (!allowAutoHide.value) {
         isVisible.value = true
         lastScrollY = currentY
@@ -74,7 +68,6 @@ function handleScroll() {
         return
       }
 
-      // 场景2：在页面顶部区域 → 始终显示
       if (currentY < TOP_BUFFER) {
         isVisible.value = true
         lastScrollY = currentY
@@ -82,16 +75,12 @@ function handleScroll() {
         return
       }
 
-      // 场景3：滚动位移过小 → 忽略（防抖）
       const delta = currentY - lastScrollY
       if (Math.abs(delta) < MIN_DELTA) {
         ticking = false
         return
       }
 
-      // 场景4：核心判断
-      // 向下滚 (delta > 0) → 隐藏导航栏，让出阅读空间
-      // 向上滚 (delta < 0) → 显示导航栏，方便用户导航
       if (delta > 0) {
         isVisible.value = false
       } else {
@@ -105,7 +94,6 @@ function handleScroll() {
   }
 }
 
-// 重置导航栏状态（路由切换 / 窗口大小变化）
 function resetNavState() {
   isVisible.value = true
   lastScrollY = getScrollY()
@@ -113,16 +101,13 @@ function resetNavState() {
 
 // ── 监听器注册 ──
 
-// 监听路由变化：每次切页都重置为显示，并更新基准滚动位置
 watch(
   () => route.fullPath,
   () => {
-    // 稍等页面内容渲染完成后再重置，避免滚动值跳动
     setTimeout(resetNavState, 50)
   }
 )
 
-// 窗口大小变化：切换桌面/移动模式时重置
 watch(isMobile, () => {
   setTimeout(resetNavState, 50)
 })

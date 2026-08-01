@@ -107,7 +107,6 @@ onUnmounted(() => {
   sentinelObserver?.disconnect()
 })
 
-// 文章封面占位渐变（当 coverImg 为空时使用）
 const coverGradients = [
   'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
   'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)',
@@ -128,20 +127,18 @@ function formatDate(dateStr: string) {
 const ai = useAIAssistant()
 const heroInput = ref('')
 
-// Hero 示例问题（和右侧抽屉中首页的快捷操作呼应）
 const heroExampleQuestions = [
   'Spring Security 登录流程',
   'JWT 如何工作？',
   'Docker 最佳实践',
   'Redis 缓存设计',
 ]
-let heroExampleIndex = ref(3) // 默认显示 3 个，点"更多"显示全部
+let heroExampleIndex = ref(3)
 
 function toggleHeroExamples() {
   heroExampleIndex.value = heroExampleIndex.value === 3 ? heroExampleQuestions.length : 3
 }
 
-// 在 Hero 输入框发送 → 打开右侧抽屉 + 发送消息
 async function heroSendFromInput() {
   const text = heroInput.value.trim()
   if (!text) return
@@ -150,14 +147,12 @@ async function heroSendFromInput() {
   await ai.sendFreeChat(text)
 }
 
-// 点击 Hero 示例 → 打开右侧抽屉 + 发送示例
 async function heroSendExample(text: string) {
   heroInput.value = ''
   ai.open()
   await ai.sendFreeChat(text)
 }
 
-// 仅打开右侧抽屉（点击卡片空白区域或"展开"按钮）
 function heroOpenDrawerOnly() {
   ai.open()
 }

@@ -45,8 +45,8 @@ const emit = defineEmits<{
   'update:isPreviewingMarkdown': [value: boolean]
   contentTextareaReady: [textarea: HTMLTextAreaElement | null]
   imageInputReady: [input: HTMLInputElement | null]
-  uploadCoverImage: [event: Event] // 新增：上传封面图事件
-  removeCoverImage: [] // 新增：移除封面图事件
+  uploadCoverImage: [event: Event]
+  removeCoverImage: []
   discardDraft: []
   saveDraft: []
 }>()
@@ -57,7 +57,7 @@ function setImageInput(element: Element | ComponentPublicInstance | null) {
   emit('imageInputReady', input)
 }
 
-const coverImageInput = ref<HTMLInputElement | null>(null) // 新增：封面图文件输入框的引用
+const coverImageInput = ref<HTMLInputElement | null>(null)
 const markdownImageInput = ref<HTMLInputElement | null>(null)
 const markdownImageInputId = 'publish-markdown-image-input'
 let lastEditorHtml = ''
@@ -132,7 +132,6 @@ function getEditorHtml() {
 
 function syncPublishContentFromEditor() {
   if (!editor.value) return
-  // IME 输入期间：完全跳过同步，避免干扰 contenteditable 组合输入状态
   if (isComposing) return
   lastEditorHtml = editor.value.getHTML()
   scheduleSyncToForm()
@@ -190,7 +189,6 @@ const editor = useEditor({
       compositionstart: () => { isComposing = true; return false },
       compositionend: () => {
         isComposing = false
-        // IME 结束后立即同步一次，同时重置 debounce 定时器
         lastEditorHtml = editor.value?.getHTML() || ''
         if (syncDebounceTimer) clearTimeout(syncDebounceTimer)
         scheduleSyncToForm()
@@ -205,17 +203,14 @@ watch(
   () => [props.publishForm.contentHtml, props.publishForm.content],
   () => {
     if (!editor.value) return
-    // 同步锁：如果是编辑器自己的同步，直接跳过
     if (isSyncingFromEditor) return
 
     const nextHtml = getEditorHtml()
     const currentHtml = editor.value.getHTML()
-    // 如果和编辑器当前内容一致，跳过
     if (nextHtml === currentHtml) {
       lastEditorHtml = currentHtml
       return
     }
-    // 如果和上次记录的编辑器内容一致，说明是外部更新（如加载草稿），才执行 setContent
     if (nextHtml === lastEditorHtml) return
 
     lastEditorHtml = nextHtml
@@ -373,7 +368,6 @@ function scrollToTocItem(id: string) {
   const headings = editor.value.view.dom.querySelectorAll('h1, h2, h3')
   const target = headings[idx] as HTMLElement | undefined
   if (!target) return
-  // .editor-pane 就是滚动容器
   const editorPane = document.querySelector('.editor-pane') as HTMLElement | null
   if (!editorPane) return
   const targetTop = target.offsetTop - editorPane.offsetTop - 20
@@ -385,7 +379,6 @@ function setupTocObserver() {
   tocObserver?.disconnect()
   if (!editor.value) return
   const container = editor.value.view.dom
-  // 重新给 DOM 中的标题设置 id
   const headings = container.querySelectorAll('h1, h2, h3')
   headings.forEach((h, i) => {
     if (tocItems.value[i]) {

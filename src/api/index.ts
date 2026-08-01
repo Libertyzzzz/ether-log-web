@@ -25,10 +25,6 @@ import type {
   UploadImageData,
 } from '../types/blog'
 
-// ═══════════════════════════════════════════════════════════════
-// Auth Helpers
-// ═══════════════════════════════════════════════════════════════
-
 const TOKEN_KEY = 'authToken'
 const TOKEN_EXPIRE_KEY = 'authTokenExpire'
 
@@ -36,12 +32,6 @@ export function hasAuthToken(): boolean {
   return !!sessionStorage.getItem(TOKEN_KEY)
 }
 
-export function getAuthHeaders(): Record<string, string> {
-  const token = sessionStorage.getItem(TOKEN_KEY)
-  return token ? { Authorization: token } : {}
-}
-
-// 解析 JWT 的 payload 部分（不做签名校验，仅用于读取 exp / maxExpire）
 export function parseJwt<T = any>(token: string): T | null {
   try {
     const parts = token.split('.')
@@ -54,7 +44,7 @@ export function parseJwt<T = any>(token: string): T | null {
         .join('')
     )
     return JSON.parse(json)
-  } catch (e) {
+  } catch {
     return null
   }
 }
@@ -65,7 +55,6 @@ export function getTokenExpire(): number | null {
     const n = Number(stored)
     if (!Number.isNaN(n)) return n
   }
-  // 回退：从 token 本身解析 exp（JWT exp 单位是秒，需转为毫秒）
   const token = sessionStorage.getItem(TOKEN_KEY)
   if (!token) return null
   const payload = parseJwt<{ exp: number }>(token)
@@ -88,22 +77,16 @@ function clearAuthState(code?: number) {
 
 axios.interceptors.request.use(
   (config) => {
-    const expire = getTokenExpire()
-    if (expire !== null && Date.now() >= expire && hasAuthToken()) {
-      clearAuthState(1004)
-      return Promise.reject(new Error('登录已过期'))
+    const token = sessionStorage.getItem(TOKEN_KEY)
+    if (token) {
+      config.headers = config.headers || {}
+      if (!config.headers.Authorization) config.headers.Authorization = token
     }
     return config
   },
   (error) => Promise.reject(error),
 )
 
-// ═══════════════════════════════════════════════════════════════════════
-// Global auth lifecycle handler
-//   401 → 未登录 / token 过期 → 清本地状态 + 提示需要登录
-//   403 → 已登录但权限不足 → 静默记录
-//   code=1003 (TOKEN_INVALID) / code=1004 (MAX_EXPIRED) → 清本地状态 + 提示重新登录
-// ═══════════════════════════════════════════════════════════════════════
 axios.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -119,16 +102,13 @@ axios.interceptors.response.use(
       const status = error.response?.status
       if (status === 401) {
         clearAuthState(undefined)
-        // 触发未登录提示事件
-        window.dispatchEvent(new CustomEvent('auth:need-login', { 
-          detail: { message: '需要登录才能执行此操作，请先登录' } 
+        window.dispatchEvent(new CustomEvent('auth:need-login', {
+          detail: { message: '需要登录才能执行此操作，请先登录' }
         }))
       } else if (status === 403) {
         const body = error.response?.data
         const code = body?.code
-        if (code === 1003 || code === 1004) {
-          clearAuthState(code)
-        }
+        if (code === 1003 || code === 1004) clearAuthState(code)
       }
     }
     return Promise.reject(error)
@@ -153,17 +133,17 @@ export async function fetchCategories(): Promise<Category[]> {
 }
 
 export async function createCategory(payload: { name: string; sort?: number }): Promise<Category> {
-  const resp = await axios.post('/api/categories', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const resp = await axios.post('/api/categories', payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || Date.now(), name: payload.name, sort: payload.sort }
 }
 
 export async function deleteCategory(id: number): Promise<void> {
-  await axios.delete(`/api/categories/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  await axios.delete(`/api/categories/${id}`)
 }
 
 export async function updateCategory(id: number, payload: { name: string; sort?: number }): Promise<Category> {
-  const resp = await axios.put(`/api/categories/${id}`, payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const resp = await axios.put(`/api/categories/${id}`, payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, sort: payload.sort }
 }
@@ -186,17 +166,17 @@ export async function fetchTags(): Promise<Tag[]> {
 }
 
 export async function createTag(payload: { name: string; color?: string }): Promise<Tag> {
-  const resp = await axios.post('/api/tags', payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const resp = await axios.post('/api/tags', payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || Date.now(), name: payload.name, color: payload.color }
 }
 
 export async function deleteTag(id: number): Promise<void> {
-  await axios.delete(`/api/tags/${id}`, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  await axios.delete(`/api/tags/${id}`)
 }
 
 export async function updateTag(id: number, payload: { name: string; color?: string }): Promise<Tag> {
-  const resp = await axios.put(`/api/tags/${id}`, payload, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  const resp = await axios.put(`/api/tags/${id}`, payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, color: payload.color }
 }
@@ -208,7 +188,7 @@ export async function updateTag(id: number, payload: { name: string; color?: str
 export async function fetchSensitiveWords(params: SensitiveWordQueryDto = {}): Promise<PageResponse<SensitiveWordItem>> {
   const response = await axios.get<ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>>(
     '/api/admin/sensitive-words',
-    { params, headers: getAuthHeaders() },
+    { params },
   )
   const body = response.data as ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>
   const payload = (body as any)?.data ?? body
@@ -225,9 +205,7 @@ export async function fetchSensitiveWords(params: SensitiveWordQueryDto = {}): P
 }
 
 export async function createSensitiveWord(payload: SensitiveWordCreateRequest): Promise<SensitiveWordItem> {
-  const response = await axios.post<ResultResponse<SensitiveWordItem>>('/api/admin/sensitive-words', payload, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.post<ResultResponse<SensitiveWordItem>>('/api/admin/sensitive-words', payload)
   if (response.data?.code === 200) {
     return (response.data.data ?? {}) as SensitiveWordItem
   }
@@ -235,9 +213,7 @@ export async function createSensitiveWord(payload: SensitiveWordCreateRequest): 
 }
 
 export async function deleteSensitiveWord(id: number): Promise<void> {
-  const response = await axios.delete<ResultResponse<null>>(`/api/admin/sensitive-words/${id}`, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.delete<ResultResponse<null>>(`/api/admin/sensitive-words/${id}`)
   if (response.data?.code !== 200) {
     throw new Error(response.data?.message || '删除敏感词失败')
   }
@@ -293,11 +269,11 @@ export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ a
   const [publishedRes, draftRes] = await Promise.all([
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum, pageSize, status: 1 }, headers: getAuthHeaders() },
+      { params: { pageNum, pageSize, status: 1 } },
     ),
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
+      { params: { pageNum, pageSize: 200, status: 0 } },
     ),
   ])
   const { records: publishedRecords, total } = extractRecords(publishedRes)
@@ -306,11 +282,10 @@ export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ a
   return { articles, total }
 }
 
-export async function fetchArticleDetail(articleId: number, useAuth = false, status?: number): Promise<ArticleDetail | null> {
-  const headers = useAuth && hasAuthToken() ? getAuthHeaders() : undefined
+export async function fetchArticleDetail(articleId: number, _useAuth = false, status?: number): Promise<ArticleDetail | null> {
   const params: Record<string, number> = {}
   if (status !== undefined) params.status = status
-  const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, { headers, params })
+  const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, { params })
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -321,10 +296,7 @@ export async function fetchAdminArticleDetail(articleId: number, status?: number
   try {
     const params: Record<string, number> = {}
     if (status !== undefined) params.status = status
-    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, {
-      headers: getAuthHeaders(),
-      params,
-    })
+    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, { params })
     if (response.data.code === 200 && response.data.data) {
       return response.data.data
     }
@@ -335,9 +307,7 @@ export async function fetchAdminArticleDetail(articleId: number, status?: number
 }
 
 export async function createArticle(payload: ArticlePublishRequest): Promise<number> {
-  const response = await axios.post<ResultResponse<number>>('/api/admin/articles', payload, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.post<ResultResponse<number>>('/api/admin/articles', payload)
   if (response.data.code === 200 && response.data.data !== undefined) {
     return response.data.data
   }
@@ -345,9 +315,7 @@ export async function createArticle(payload: ArticlePublishRequest): Promise<num
 }
 
 export async function updateArticle(id: number, payload: ArticlePublishRequest): Promise<number> {
-  const response = await axios.put<ResultResponse<number>>(`/api/admin/articles/${id}`, payload, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.put<ResultResponse<number>>(`/api/admin/articles/${id}`, payload)
   if (response.data.code === 200 && response.data.data !== undefined) {
     return response.data.data
   }
@@ -355,13 +323,11 @@ export async function updateArticle(id: number, payload: ArticlePublishRequest):
 }
 
 export async function updateArticleField(id: number, fields: Record<string, any>): Promise<void> {
-  await axios.put(`/api/articles/${id}`, fields, hasAuthToken() ? { headers: getAuthHeaders() } : undefined)
+  await axios.put(`/api/articles/${id}`, fields)
 }
 
 export async function deleteArticle(articleId: number): Promise<void> {
-  const response = await axios.delete<ResultResponse<null>>(`/api/admin/articles/${articleId}`, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.delete<ResultResponse<null>>(`/api/admin/articles/${articleId}`)
   if (response.data.code !== 200) {
     throw new Error(response.data.message || '删除失败')
   }
@@ -381,10 +347,8 @@ export async function searchArticles(keyword: string): Promise<any[]> {
 // Auth
 // ═══════════════════════════════════════════════════════════════
 
-// 后端返回的 expire 以及 JWT payload 中的 exp/iat 单位是秒，统一转为毫秒
-function normalizeExpire(value: number | undefined | null): number | undefined {
+export function normalizeExpire(value: number | undefined | null): number | undefined {
   if (typeof value !== 'number' || Number.isNaN(value)) return undefined
-  // 秒级时间戳（< 1e12，约 33658 年），转为毫秒
   return value < 1_000_000_000_000 ? value * 1000 : value
 }
 
@@ -400,7 +364,6 @@ export async function login(email: string, password: string): Promise<LoginData>
   if (!loginData?.token || !loginData.user) {
     throw new Error('登录返回数据格式不正确')
   }
-  // 优先用接口返回的 expire（normalizeExpire 会处理秒/毫秒）；接口没给再从 token payload 解析
   const fromApi = normalizeExpire(loginData.expire)
   if (fromApi) {
     loginData.expire = fromApi
@@ -413,16 +376,11 @@ export async function login(email: string, password: string): Promise<LoginData>
   return loginData
 }
 
-// 刷新 token —— 请求头携带当前 Authorization；
-// 续约成功：更新本地 token 和 expire；
-// 续约失败：响应拦截器会根据后端返回的 code (1003/1004) 处理登录态清理，这里不做额外判断。
 export async function refreshToken(): Promise<RefreshTokenData> {
-  const token = sessionStorage.getItem(TOKEN_KEY)
-  if (!token) throw new Error('当前无登录态，无法刷新 token')
+  if (!hasAuthToken()) throw new Error('当前无登录态，无法刷新 token')
   const response = await axios.post<ResultResponse<RefreshTokenData>>(
     '/api/auth/refresh',
     {},
-    { headers: { Authorization: token } }
   )
   if (response.data.code !== 200) {
     throw new Error(response.data.message || '刷新 token 失败')
@@ -435,9 +393,7 @@ export async function refreshToken(): Promise<RefreshTokenData> {
 }
 
 export async function fetchUserProfile(userId: number): Promise<LoginUser | null> {
-  const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${userId}`, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${userId}`)
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -445,9 +401,7 @@ export async function fetchUserProfile(userId: number): Promise<LoginUser | null
 }
 
 export async function updateUserProfile(payload: Record<string, any>): Promise<boolean> {
-  const response = await axios.post<ResultResponse<any>>('/api/user/save', payload, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.post<ResultResponse<any>>('/api/user/save', payload)
   return response.data.code === 200
 }
 
@@ -467,10 +421,7 @@ export async function fetchComments(articleId: number): Promise<BackendCommentVO
 export async function fetchPendingComments(): Promise<BackendCommentVO[]> {
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(
     '/api/comment/list/guest-book',
-    {
-      headers: getAuthHeaders(),
-      params: { status: 0 },
-    },
+    { params: { status: 0 } },
   )
   if (response.data.code === 200) {
     return response.data.data || []
@@ -482,26 +433,20 @@ export async function reviewComment(commentId: number, status: number): Promise<
   const response = await axios.put<ResultResponse<boolean>>(
     '/api/comment/review',
     null,
-    {
-      headers: getAuthHeaders(),
-      params: { commentId, status },
-    },
+    { params: { commentId, status } },
   )
   return response.data.code === 200 && response.data.data === true
 }
 
 export async function deleteComment(commentId: number): Promise<boolean> {
   const response = await axios.delete<ResultResponse<boolean>>('/api/comment/delete', {
-    headers: getAuthHeaders(),
     params: { commentId },
   })
   return response.data.code === 200 && response.data.data === true
 }
 
 export async function submitComment(body: CommentSubmitRequest): Promise<boolean> {
-  const response = await axios.post<ResultResponse<void>>('/api/comment/publish', body, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.post<ResultResponse<void>>('/api/comment/publish', body)
   return response.data.code === 200
 }
 
@@ -532,7 +477,6 @@ export async function uploadImage(formData: FormData): Promise<UploadImageData |
   const response = await axios.post<ResultResponse<UploadImageData>>(
     '/api/image/upload/with-reference',
     formData,
-    { headers: getAuthHeaders() },
   )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
@@ -543,7 +487,7 @@ export async function uploadImage(formData: FormData): Promise<UploadImageData |
 export async function fetchImageList(params: ImageQueryDto = {}): Promise<PageResponse<ImageInfoVo>> {
   const response = await axios.get<ResultResponse<PageResponse<ImageInfoVo>>>(
     '/api/image/list',
-    { params, headers: getAuthHeaders() },
+    { params },
   )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
@@ -554,7 +498,7 @@ export async function fetchImageList(params: ImageQueryDto = {}): Promise<PageRe
 export async function fetchImageReference(imageId: string): Promise<ImageReferenceVo[]> {
   const response = await axios.get<ResultResponse<ImageReferenceVo[]>>(
     '/api/image/reference',
-    { params: { imageId }, headers: getAuthHeaders() },
+    { params: { imageId } },
   )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
@@ -565,7 +509,7 @@ export async function fetchImageReference(imageId: string): Promise<ImageReferen
 export async function deleteImages(ids: number[]): Promise<ImageDeleteResultVo> {
   const response = await axios.delete<ResultResponse<ImageDeleteResultVo>>(
     '/api/image/delete',
-    { data: { ids }, headers: getAuthHeaders() },
+    { data: { ids } },
   )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
@@ -605,11 +549,8 @@ export async function evaluateAssessment(payload: any, gender: string): Promise<
 // ═══════════════════════════════════════════════════════════════
 
 export async function chatWithAI(payload: AIChatRequest): Promise<AIChatResponse> {
-  const response = await axios.post<ResultResponse<AIChatResponse>>('/api/agent/chat', payload, {
-    headers: getAuthHeaders(),
-  })
+  const response = await axios.post<ResultResponse<AIChatResponse>>('/api/agent/chat', payload)
   const body = response.data
-  // 后端业务错误（code != 成功码）时统一抛出用户友好的错误
   if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
     throw new Error('服务暂时繁忙，请稍后再试')
   }
