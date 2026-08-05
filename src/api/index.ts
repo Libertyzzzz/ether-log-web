@@ -3,6 +3,11 @@ import type {
   AIChatRequest,
   AIChatResponse,
   AIChatAction,
+  AgentChatRequestPayload,
+  AgentConversationCreateRequest,
+  AgentConversationListItem,
+  AgentConversationResponse,
+  AgentMessageVo,
   ArticleDetail,
   ArticleListItem,
   ArticlePublishRequest,
@@ -549,7 +554,34 @@ export async function evaluateAssessment(payload: any, gender: string): Promise<
 // ═══════════════════════════════════════════════════════════════
 
 export async function chatWithAI(payload: AIChatRequest): Promise<AIChatResponse> {
-  const response = await axios.post<ResultResponse<AIChatResponse>>('/api/agent/chat', payload)
+  const contextKey = payload.contextKey || 'generic'
+  const rawContext = typeof payload.context === 'object' && payload.context !== null
+    ? payload.context
+    : {
+        key: contextKey,
+        payload: {
+          title: payload.title || '',
+          content: typeof payload.context === 'string' ? payload.context : '',
+        },
+      }
+
+  const conversationId = payload.conversationId
+  if (!conversationId) {
+    const created = await createAIAssistantConversation({
+      title: payload.title || '新会话',
+      contextKey,
+    })
+    const nextConversationId = created.id || created.conversationId
+    if (!nextConversationId) throw new Error('创建会话失败')
+    payload.conversationId = nextConversationId
+  }
+
+  const response = await axios.post<ResultResponse<any>>(`/api/agent/chat/${payload.conversationId}`, {
+    message: payload.message,
+    action: payload.action,
+    context: rawContext,
+    stream: false,
+  })
   const body = response.data
   if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
     throw new Error('服务暂时繁忙，请稍后再试')
@@ -580,4 +612,76 @@ export async function chatWithAI(payload: AIChatRequest): Promise<AIChatResponse
     candidates: Array.isArray(raw.candidates) ? raw.candidates : undefined,
     action,
   }
+}
+
+export async function createAIAssistantConversation(payload: AgentConversationCreateRequest): Promise<AgentConversationResponse> {
+  const response = await axios.post<ResultResponse<AgentConversationResponse>>('/api/agent/conversations', payload)
+  const body = response.data
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error(body.message || '创建会话失败')
+  }
+  return (body && typeof body === 'object' && 'data' in body ? body.data : body) as AgentConversationResponse
+}
+
+export async function fetchAIAssistantConversations(page = 1, pageSize = 20): Promise<{ records: AgentConversationListItem[]; total: number }> {
+  const response = await axios.get<ResultResponse<any>>('/api/agent/conversations', {
+    params: { page, pageSize },
+  })
+  const body = response.data
+  const payload = body && typeof body === 'object' && 'data' in body ? body.data : body
+  const records = Array.isArray(payload?.records) ? payload.records : []
+  return {
+    records: records as AgentConversationListItem[],
+    total: typeof payload?.total === 'number' ? payload.total : records.length,
+  }
+}
+
+export async function updateAIAssistantConversation(conversationId: string, title: string): Promise<boolean> {
+  const response = await axios.put<ResultResponse<boolean>>(`/api/agent/chat/${conversationId}`, null, {
+    params: { title },
+  })
+  const body = response.data
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error(body.message || '更新会话失败')
+  }
+  return typeof body.data === 'boolean' ? body.data : false
+}
+
+export async function deleteAIAssistantConversation(conversationId: string): Promise<boolean> {
+  const response = await axios.delete<ResultResponse<boolean>>(`/api/agent/chat/${conversationId}`)
+  const body = response.data
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error(body.message || '删除会话失败')
+  }
+  return typeof body.data === 'boolean' ? body.data : false
+}
+
+export async function chatWithAIAssistantConversation(conversationId: string, payload: AgentChatRequestPayload): Promise<AIChatResponse> {
+  const response = await axios.post<ResultResponse<AIChatResponse>>(`/api/agent/chat/${conversationId}`, payload)
+  const body = response.data
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error(body.message || '会话聊天失败')
+  }
+  const raw = (body && typeof body === 'object' && 'data' in body ? body.data : body) as unknown as {
+    content?: unknown
+    candidates?: unknown
+    action?: unknown
+  }
+  if (!raw || typeof raw.content !== 'string') {
+    throw new Error('服务暂时繁忙，请稍后再试')
+  }
+  return {
+    content: raw.content,
+    candidates: Array.isArray(raw.candidates) ? raw.candidates : undefined,
+    action: typeof raw.action === 'string' ? raw.action as AIChatAction : payload.action,
+  }
+}
+
+export async function fetchAIAssistantConversationContext(conversationId: string): Promise<AgentMessageVo[]> {
+  const response = await axios.get<ResultResponse<AgentMessageVo[]>>(`/api/agent/chat/${conversationId}`)
+  const body = response.data
+  if (body && typeof body === 'object' && 'code' in body && body.code !== 0 && body.code !== 200) {
+    throw new Error(body.message || '加载会话上下文失败')
+  }
+  return (body && typeof body === 'object' && 'data' in body ? body.data : body) as AgentMessageVo[]
 }

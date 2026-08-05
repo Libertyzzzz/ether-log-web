@@ -90,6 +90,13 @@ export interface RefreshTokenData {
   expire: number
 }
 
+export interface AgentMessageVo {
+  conversationId: string
+  content: string
+  role: string
+  createTime: string
+}
+
 export interface UploadImageData {
   id: number
   url: string
@@ -232,10 +239,44 @@ export interface AIChatMessage {
 export interface AIChatRequest {
   action: AIChatAction
   message: string
-  context: string
+  context?: string | AgentChatRequestContext
   title?: string
   style?: AIStyleKey
-  history: AIChatMessage[]
+  conversationId?: string
+  contextKey?: string
+}
+
+export interface AgentChatRequestContext {
+  key?: string
+  payload?: Record<string, unknown>
+}
+
+export interface AgentChatRequestPayload {
+  message: string
+  action: AIChatAction
+  context?: AgentChatRequestContext
+  stream?: boolean
+}
+
+export interface AgentConversationCreateRequest {
+  title?: string
+  contextKey?: string
+}
+
+export interface AgentConversationListItem {
+  id?: string
+  conversationId?: string
+  title?: string
+  createdAt?: string
+  updatedAt?: string
+}
+
+export interface AgentConversationResponse {
+  id?: string
+  conversationId?: string
+  title?: string
+  createdAt?: string
+  updatedAt?: string
 }
 
 export type AIStyleKey = 'humor' | 'academic' | 'minimal' | 'viral' | 'casual'

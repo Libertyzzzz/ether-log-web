@@ -1,11 +1,12 @@
 import { ref, computed, nextTick } from 'vue'
 import axios from 'axios'
-import { chatWithAI } from '../api'
+import { chatWithAI, createAIAssistantConversation, fetchAIAssistantConversations, updateAIAssistantConversation, deleteAIAssistantConversation, fetchAIAssistantConversationContext } from '../api'
 import { useRoute } from 'vue-router'
 import type {
   AIChatAction,
   AIChatMessage,
   AIStyleKey,
+  AgentMessageVo,
 } from '../types/blog'
 
 /** 从错误对象提取友好的用户消息（一律不暴露后端原始错误） */
@@ -15,8 +16,8 @@ function extractErrorMessage(err: unknown): string {
     const data = err.response?.data
     const code = data?.code
     // 后端返回的 code 优先级更高（注意：后端可能返回 HTTP 200 + code: 401）
-    if (code === 1003 || code === 1004 || code === 401) return '需要登录后使用 AI 助手'
-    if (status === 401) return '需要登录后使用 AI 助手'
+    if (code === 1003 || code === 1004) return '登录态已失效，请重新登录后继续使用 AI 助手'
+    if (code === 401 || status === 401) return '你尚未登录，请先登录后再使用 AI 助手'
     if (status === 403) return '暂无权限使用 AI 助手'
     if (status && status >= 500) return '服务暂时繁忙，请稍后再试'
     if (status) return `请求失败，请稍后再试`
@@ -147,6 +148,9 @@ const _context = ref<AIAssistantContext>({
   content: '',
   selection: '',
 })
+const _conversations = ref<Array<{ id: string; title: string; updatedAt: string }>>([])
+const _activeConversationId = ref<string | null>(null)
+const _conversationHistory = ref<AgentMessageVo[]>([])
 
 function scrollToBottom() {
   nextTick(() => {
@@ -190,14 +194,17 @@ function ensureWelcomeMessage() {
   }
 }
 
-function buildHistoryForRequest(): AIChatMessage[] {
-  return _messages.value.slice(-10).map((m) => ({
-    id: m.id,
-    role: m.role,
-    content: m.content,
-    timestamp: m.timestamp,
-    action: m.action,
-  }))
+function buildContextPayload(context: AIAssistantContext): Record<string, unknown> {
+  return {
+    title: context.title || '',
+    content: context.content || '',
+    selection: context.selection || '',
+    subtitle: context.subtitle || '',
+  }
+}
+
+function resolveContextKey(contextKey: AIAssistantContextKey): string {
+  return contextKey || 'generic'
 }
 
 function buildUserPromptForAction(
@@ -249,13 +256,127 @@ export function useAIAssistant() {
     return map[_context.value.key] || '当前页'
   })
 
-  function open(presetContext?: Partial<AIAssistantContext>) {
+  async function loadConversations() {
+    try {
+      const result = await fetchAIAssistantConversations(1, 20)
+      _conversations.value = (result.records || []).map((item: any) => ({
+        id: item.id || item.conversationId || '',
+        title: item.title || '新会话',
+        updatedAt: item.updatedAt || item.createdAt || '',
+      })).filter((item) => item.id)
+      if (!_activeConversationId.value && _conversations.value.length > 0) {
+        _activeConversationId.value = _conversations.value[0].id
+      }
+    } catch {
+      _conversations.value = []
+    }
+  }
+
+  async function refreshConversations() {
+    await loadConversations()
+    return _conversations.value
+  }
+
+  async function renameConversation(conversationId: string, newTitle: string) {
+    const idx = _conversations.value.findIndex((c) => c.id === conversationId)
+    const prev = idx >= 0 ? { ..._conversations.value[idx] } : null
+    if (idx >= 0) _conversations.value[idx].title = newTitle
+    try {
+      const updated = await updateAIAssistantConversation(conversationId, newTitle)
+      if (!updated) throw new Error('更新会话标题失败')
+    } catch (e) {
+      // rollback on error
+      if (prev && idx >= 0) _conversations.value[idx] = prev
+      throw e
+    }
+  }
+
+  async function deleteConversation(conversationId: string) {
+    const idx = _conversations.value.findIndex((c) => c.id === conversationId)
+    const prev = idx >= 0 ? _conversations.value[idx] : null
+    if (idx >= 0) _conversations.value.splice(idx, 1)
+    if (_activeConversationId.value === conversationId) {
+      _activeConversationId.value = _conversations.value.length > 0 ? _conversations.value[0].id : null
+      _messages.value = [
+        {
+          id: 'switched-' + Date.now(),
+          role: 'assistant',
+          content: '已切换到新的会话。',
+          timestamp: Date.now(),
+          action: 'chat',
+        },
+      ]
+    }
+    try {
+      const deleted = await deleteAIAssistantConversation(conversationId)
+      if (!deleted) throw new Error('删除会话失败')
+    } catch (e) {
+      // rollback
+      if (prev) _conversations.value.splice(idx, 0, prev)
+      throw e
+    }
+  }
+
+  async function createConversation() {
+    try {
+      const conversation = await createAIAssistantConversation({
+        title: _context.value.title || '新会话',
+        contextKey: resolveContextKey(_context.value.key),
+      })
+      const conversationId = conversation.id || conversation.conversationId
+      if (!conversationId) return null
+      _activeConversationId.value = conversationId
+      await loadConversations()
+      _messages.value = [
+        {
+          id: 'welcome-' + Date.now(),
+          role: 'assistant',
+          content: '已切换到新的会话 🌿\n\n你可以继续聊下去，当前上下文会一起带过去。',
+          timestamp: Date.now(),
+          action: 'chat',
+        },
+      ]
+      return conversationId
+    } catch {
+      return null
+    }
+  }
+
+  async function switchConversation(conversationId: string) {
+    _activeConversationId.value = conversationId
+    _conversationHistory.value = []
+    _messages.value = []
+    try {
+      const history = await fetchAIAssistantConversationContext(conversationId)
+      _conversationHistory.value = history
+      _messages.value = history.map((item) => ({
+        id: `${item.conversationId}-${item.createTime}-${Math.random().toString(36).slice(2, 7)}`,
+        role: item.role === 'assistant' || item.role === 'AI' ? 'assistant' : 'user',
+        content: item.content,
+        timestamp: new Date(item.createTime).getTime() || Date.now(),
+        action: 'chat',
+      }))
+    } catch (err) {
+      _messages.value = [
+        {
+          id: 'switched-' + Date.now(),
+          role: 'assistant',
+          content: '切换会话失败，请稍后重试。',
+          timestamp: Date.now(),
+          action: 'chat',
+        },
+      ]
+    }
+  }
+
+  async function open(presetContext?: Partial<AIAssistantContext>) {
     if (presetContext) {
       _context.value = { ..._context.value, ...presetContext }
     } else {
       autoDetectContextFromRoute()
     }
     _isOpen.value = true
+    await refreshConversations()
     nextTick(() => ensureWelcomeMessage())
   }
 
@@ -287,6 +408,25 @@ export function useAIAssistant() {
     ]
   }
 
+  async function ensureConversation(ctx: AIAssistantContext): Promise<string | null> {
+    if (_activeConversationId.value) return _activeConversationId.value
+    try {
+      const conversation = await createAIAssistantConversation({
+        title: ctx.title || '新会话',
+        contextKey: resolveContextKey(ctx.key),
+      })
+      const conversationId = conversation.id || conversation.conversationId
+      if (conversationId) {
+        _activeConversationId.value = conversationId
+        await loadConversations()
+        return conversationId
+      }
+    } catch {
+      // 保持现有体验，后续请求仍可继续尝试
+    }
+    return null
+  }
+
   async function sendQuickAction(action: AIChatAction | 'chat', promptOverride?: string): Promise<AIChatMessage | null> {
     if (_isLoading.value) return null
     const ctx = _context.value
@@ -304,13 +444,15 @@ export function useAIAssistant() {
     scrollToBottom()
 
     try {
+      const conversationId = await ensureConversation(ctx)
       const response = await chatWithAI({
         action: actualAction,
         message: userPrompt,
-        context: ctx.content,
-        title: ctx.title,
+        context: buildContextPayload(ctx),
+        title: ctx.title || '新会话',
         style: _currentStyle.value,
-        history: buildHistoryForRequest(),
+        conversationId: conversationId || undefined,
+        contextKey: resolveContextKey(ctx.key),
       })
       const msg: AIChatMessage = {
         id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
@@ -354,13 +496,15 @@ export function useAIAssistant() {
     scrollToBottom()
 
     try {
+      const conversationId = await ensureConversation(ctx)
       const response = await chatWithAI({
         action: 'chat',
         message: userText,
-        context: ctx.content,
-        title: ctx.title,
+        context: buildContextPayload(ctx),
+        title: ctx.title || '新会话',
         style: _currentStyle.value,
-        history: buildHistoryForRequest(),
+        conversationId: conversationId || undefined,
+        contextKey: resolveContextKey(ctx.key),
       })
       const msg: AIChatMessage = {
         id: Date.now().toString() + Math.random().toString(36).slice(2, 7),
@@ -440,12 +584,19 @@ export function useAIAssistant() {
     quickActions,
     contextLabel,
     styles,
+    conversations: _conversations,
+    activeConversationId: _activeConversationId,
     // 方法
     open,
     close,
     toggle,
     setContext,
     clearChat,
+    createConversation,
+    switchConversation,
+    refreshConversations,
+    renameConversation,
+    deleteConversation,
     sendQuickAction,
     sendFreeChat,
     autoDetectContextFromRoute,

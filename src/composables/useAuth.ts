@@ -33,6 +33,8 @@ function clearRefreshTimer() {
   }
 }
 
+const REFRESH_RETRY_INTERVAL_MS = 60 * 1000
+
 function scheduleRefresh() {
   clearRefreshTimer()
   const expire = getTokenExpire()
@@ -43,9 +45,23 @@ function scheduleRefresh() {
   if (delay > MAX_REFRESH_INTERVAL_MS) delay = MAX_REFRESH_INTERVAL_MS
   if (delay < 0) delay = 0
 
-  refreshTimer = setTimeout(async () => {
-    if (await runRefresh()) scheduleRefresh()
-  }, delay)
+  console.debug('[auth] schedule token refresh in', delay, 'ms')
+  refreshTimer = setTimeout(executeRefreshOnce, delay)
+}
+
+async function executeRefreshOnce(): Promise<void> {
+  if (!hasAuthToken()) return
+  const success = await runRefresh()
+  const expire = getTokenExpire()
+  if (success && expire && expire > Date.now()) {
+    scheduleRefresh()
+    return
+  }
+
+  if (expire && expire > Date.now()) {
+    console.warn('[auth] token refresh failed, retry in', REFRESH_RETRY_INTERVAL_MS, 'ms')
+    refreshTimer = setTimeout(executeRefreshOnce, REFRESH_RETRY_INTERVAL_MS)
+  }
 }
 
 async function runRefresh(): Promise<boolean> {
@@ -65,7 +81,8 @@ async function runRefresh(): Promise<boolean> {
 
     setTokenExpire(newExpire)
     return true
-  } catch {
+  } catch (error) {
+    console.error('[auth] refreshToken failed', error)
     return false
   }
 }

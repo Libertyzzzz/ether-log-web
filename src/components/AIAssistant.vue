@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { computed, onMounted, onBeforeUnmount, ref } from 'vue'
+import { computed, onMounted, onBeforeUnmount, ref, nextTick } from 'vue'
 import type { ComponentPublicInstance } from 'vue'
-import { Bot, Sparkles, X, Check, RefreshCw, Send } from 'lucide-vue-next'
+import { Bot, Sparkles, X, Check, RefreshCw, Send, MessageSquarePlus, History, Trash2 } from 'lucide-vue-next'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 import type { AIQuickAction } from '../composables/useAIAssistantGlobal'
 import { toast } from '../utils/toast'
+import { formatTime } from '../utils/format'
 
 const {
   isOpen,
@@ -22,9 +23,19 @@ const {
   clearChat,
   sendQuickAction,
   sendFreeChat,
+  conversations,
+  activeConversationId,
+  createConversation,
+  switchConversation,
+  refreshConversations,
+  renameConversation,
+  deleteConversation,
 } = useAIAssistant()
+const showSessionPanel = ref(true)
 
 const copiedId = ref<string | null>(null)
+const editingId = ref<string | null>(null)
+const editingTitle = ref<string>('')
 
 function setChatContainerRef(el: Element | ComponentPublicInstance | null) {
   chatContainerRef.value = el as HTMLElement | null
@@ -37,6 +48,66 @@ function onQuickAction(action: AIQuickAction) {
 function onSendChat() {
   if (!userInput.value.trim() || isLoading.value) return
   void sendFreeChat(userInput.value)
+}
+
+async function onToggleSessionPanel() {
+  showSessionPanel.value = !showSessionPanel.value
+  if (showSessionPanel.value && conversations.value.length === 0) {
+    await refreshConversations()
+  }
+}
+
+async function onCreateConversation() {
+  const created = await createConversation()
+  if (created) {
+    toast('已创建新会话', 'success')
+  }
+}
+
+function onSwitchConversation(conversationId: string) {
+  switchConversation(conversationId)
+}
+
+function startEdit(item: any) {
+  editingId.value = item.id
+  editingTitle.value = item.title || ''
+  nextTick(() => {
+    const el = document.querySelector('.ai-session-edit-input') as HTMLInputElement | null
+    el?.focus()
+    el?.select()
+  })
+}
+
+function cancelEdit() {
+  editingId.value = null
+  editingTitle.value = ''
+}
+
+async function finishEdit(item: any) {
+  const newTitle = editingTitle.value.trim()
+  if (!newTitle || newTitle === (item.title || '')) {
+    cancelEdit()
+    return
+  }
+  try {
+    await renameConversation(item.id, newTitle)
+    toast('会话标题已更新', 'success')
+  } catch (e) {
+    toast('更新失败', 'error')
+  } finally {
+    cancelEdit()
+  }
+}
+
+async function confirmDelete(item: any) {
+  const ok = window.confirm('确定要删除此会话吗？此操作不可撤销。')
+  if (!ok) return
+  try {
+    await deleteConversation(item.id)
+    toast('会话已删除', 'success')
+  } catch (e) {
+    toast('删除失败', 'error')
+  }
 }
 
 async function copyContent(text: string, id: string) {
@@ -138,7 +209,10 @@ const contextIntro = computed(() => {
           <span class="ai-subtitle">{{ contextLabel }}</span>
         </div>
         <div class="ai-header-right">
-          <button class="ai-icon-btn" @click="clearChat" title="重置对话">
+          <button class="ai-icon-btn" @click="onToggleSessionPanel" title="会话历史">
+            <History :size="14" />
+          </button>
+          <button class="ai-icon-btn ai-header-action" @click="clearChat" title="重置对话">
             <RefreshCw :size="14" />
           </button>
           <button class="ai-icon-btn" @click="close" title="关闭（Esc）">
@@ -149,6 +223,42 @@ const contextIntro = computed(() => {
 
       <!-- 可滚动内容区：推荐标签 + 对话内容一起滚动 -->
       <div :ref="setChatContainerRef" class="ai-chat-scroll">
+        <section v-if="showSessionPanel" class="ai-session-panel">
+          <div class="ai-session-head">
+            <div class="ai-session-title-wrap">
+              <History :size="14" />
+              <span>会话历史</span>
+            </div>
+            <button class="ai-session-new" @click="onCreateConversation">
+              <MessageSquarePlus :size="14" />
+              新建
+            </button>
+          </div>
+          <div class="ai-session-list">
+            <template v-if="conversations.length > 0">
+              <div v-for="item in conversations" :key="item.id" class="ai-session-item" :class="{ active: activeConversationId === item.id }">
+                <div class="ai-session-left" @click="onSwitchConversation(item.id)">
+                  <template v-if="editingId === item.id">
+                    <input class="ai-session-edit-input" v-model="editingTitle" @blur="finishEdit(item)" @keyup.enter="finishEdit(item)" @keyup.esc="cancelEdit" />
+                  </template>
+                  <template v-else>
+                    <div class="ai-session-title" @dblclick.stop="startEdit(item)">{{ item.title || '新会话' }}</div>
+                  </template>
+                </div>
+                <div class="ai-session-right">
+                    <div class="ai-session-meta">{{ formatTime(item.updatedAt) }}</div>
+                    <button class="ai-session-delete" @click.stop="confirmDelete(item)" title="删除">
+                      <Trash2 :size="14" />
+                    </button>
+                </div>
+              </div>
+            </template>
+            <div v-else class="ai-session-empty">
+              目前还没有历史会话。
+            </div>
+          </div>
+        </section>
+
         <!-- 当前页任务面板 -->
         <section class="ai-task-panel">
           <div class="ai-task-head">
@@ -599,6 +709,177 @@ const contextIntro = computed(() => {
   background: var(--ai-surface);
   border-color: var(--ai-border);
   color: var(--ai-text);
+}
+
+.ai-header-action {
+  position: relative;
+}
+
+.ai-header-action::after {
+  content: '';
+  position: absolute;
+  top: -2px;
+  right: -2px;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--ai-brand);
+}
+
+.ai-header-session {
+  width: auto;
+  min-width: 92px;
+  padding: 6px 10px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 999px;
+  color: var(--ai-text);
+  border: 1px solid var(--ai-border);
+  background: var(--ai-surface);
+}
+
+.ai-header-session span {
+  font-size: 12px;
+  line-height: 1;
+}
+
+/* 会话列表 */
+.ai-session-panel {
+  padding: 12px 18px;
+  border-bottom: 1px solid var(--ai-border-soft);
+  background: var(--ai-bg);
+}
+
+.ai-session-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ai-session-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--ai-text);
+}
+
+.ai-session-new {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  border: 1px solid var(--ai-border);
+  border-radius: 999px;
+  background: var(--ai-surface);
+  color: var(--ai-text-soft);
+  font-size: 11px;
+  cursor: pointer;
+}
+
+.ai-session-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.ai-session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--ai-text-soft);
+  text-align: left;
+  cursor: pointer;
+  position: relative;
+}
+
+.ai-session-left {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.ai-session-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-right: 28px; /* leave space for floating icon */
+}
+
+.ai-session-title {
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-session-edit-input {
+  padding: 6px 8px;
+  border: 1px solid var(--ai-border);
+  border-radius: 8px;
+  background: var(--ai-bg);
+  color: var(--ai-text);
+  min-width: 160px;
+}
+
+.ai-session-delete {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%) translateX(6px);
+  padding: 6px;
+  border-radius: 8px;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #ef4444; /* red-500 */
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s ease, transform 0.12s ease, color 0.12s ease;
+  z-index: 2;
+}
+
+.ai-session-item:hover .ai-session-delete {
+  opacity: 1;
+  transform: translateY(-50%) translateX(0);
+}
+
+.ai-session-delete:hover {
+  background: rgba(239,68,68,0.08);
+  border-color: rgba(239,68,68,0.15);
+  color: #dc2626; /* red-600 */
+}
+
+.ai-session-item.active {
+  background: var(--ai-brand-soft);
+  border-color: rgba(99, 102, 241, 0.16);
+  color: var(--ai-text);
+}
+
+.ai-session-name {
+  flex: 1;
+  font-size: 12px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.ai-session-meta {
+  font-size: 11px;
+  color: var(--ai-text-muted);
+  white-space: nowrap;
 }
 
 /* 当前页任务面板（位于滚动区内部，随对话一起滚动） */
