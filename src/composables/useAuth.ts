@@ -7,6 +7,7 @@ import {
   refreshToken as apiRefreshToken,
   fetchUserProfile as apiFetchUserProfile,
   updateUserProfile as apiUpdateUserProfile,
+  logout as apiLogout,
   getTokenExpire,
   setTokenExpire,
   parseJwt,
@@ -65,7 +66,6 @@ async function executeRefreshOnce(): Promise<void> {
 }
 
 async function runRefresh(): Promise<boolean> {
-  if (!hasAuthToken()) return false
   try {
     const { token, expire: apiExpire } = await apiRefreshToken()
     sessionStorage.setItem('authToken', token)
@@ -85,6 +85,93 @@ async function runRefresh(): Promise<boolean> {
     console.error('[auth] refreshToken failed', error)
     return false
   }
+}
+
+// Single-flight wrapper for refresh to avoid concurrent refresh calls.
+let _refreshingPromise: Promise<boolean> | null = null
+let _axiosInterceptorInstalled = false
+
+async function runRefreshOnce(): Promise<boolean> {
+  if (_refreshingPromise) return _refreshingPromise
+  _refreshingPromise = (async () => {
+    try {
+      return await runRefresh()
+    } finally {
+      _refreshingPromise = null
+    }
+  })()
+  return _refreshingPromise
+}
+
+function runRefreshIfNeeded(): Promise<boolean> | undefined {
+  const expire = getTokenExpire()
+  const now = Date.now()
+  if (!expire) {
+    const storedUser = sessionStorage.getItem('authUser')
+    if (storedUser) {
+      // Attempt to restore session via HttpOnly refresh cookie when access token is absent.
+      return runRefreshOnce()
+    }
+    return undefined
+  }
+  // If token will expire within the next 60 seconds, refresh
+  if (expire - now < 60 * 1000) {
+    return runRefreshOnce()
+  }
+  return undefined
+}
+
+function setupAxiosInterceptor() {
+  if (_axiosInterceptorInstalled) return
+  _axiosInterceptorInstalled = true
+  axios.interceptors.response.use(
+    (res) => res,
+    async (err) => {
+      const cfg = err?.config
+      if (!cfg) throw err
+      if ((cfg as any)._retry) throw err
+      const status = err.response?.status
+      if (status === 401 && hasAuthToken()) {
+        ;(cfg as any)._retry = true
+        try {
+          await runRefreshOnce()
+          return axios(cfg)
+        } catch (e) {
+          // refresh failed, fallthrough to original error
+          throw err
+        }
+      }
+      throw err
+    }
+  )
+}
+
+function handleVisibilityChange() {
+  if (document.visibilityState === 'visible') {
+    runRefreshIfNeeded()
+  }
+}
+
+function handleWindowFocus() {
+  runRefreshIfNeeded()
+}
+
+function handleWindowOnline() {
+  runRefreshIfNeeded()
+}
+
+function addAuthEventListeners() {
+  document.addEventListener('visibilitychange', handleVisibilityChange)
+  window.addEventListener('focus', handleWindowFocus)
+  window.addEventListener('pageshow', handleWindowFocus)
+  window.addEventListener('online', handleWindowOnline)
+}
+
+function removeAuthEventListeners() {
+  document.removeEventListener('visibilitychange', handleVisibilityChange)
+  window.removeEventListener('focus', handleWindowFocus)
+  window.removeEventListener('pageshow', handleWindowFocus)
+  window.removeEventListener('online', handleWindowOnline)
 }
 
 export function useAuth() {
@@ -113,6 +200,8 @@ export function useAuth() {
       isLoggedIn.value = true
     }
     scheduleRefresh()
+    addAuthEventListeners()
+    setupAxiosInterceptor()
   }
 
   function clearLoginState() {
@@ -123,6 +212,7 @@ export function useAuth() {
     sessionStorage.removeItem('authTokenExpire')
     sessionStorage.removeItem('authUser')
     clearRefreshTimer()
+    removeAuthEventListeners()
   }
 
   async function login(email: string, password: string): Promise<boolean> {
@@ -141,6 +231,8 @@ export function useAuth() {
       loginUser.value = loginData.user
       isLoggedIn.value = true
       scheduleRefresh()
+      addAuthEventListeners()
+      setupAxiosInterceptor()
 
       const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
         .toISOString()
@@ -166,8 +258,20 @@ export function useAuth() {
     }
   }
 
-  function logout() {
-    clearLoginState()
+  async function logout(): Promise<void> {
+    try {
+      await apiLogout()
+    } catch (e) {
+      console.warn('[auth] api logout failed', e)
+    } finally {
+      clearLoginState()
+      // Notify other parts of the app that logout occurred
+      try {
+        window.dispatchEvent(new CustomEvent('auth:logged-out', { detail: { message: '用户已退出登录' } }))
+      } catch (e) {
+        // ignore
+      }
+    }
   }
 
   async function fetchUserProfile(): Promise<void> {

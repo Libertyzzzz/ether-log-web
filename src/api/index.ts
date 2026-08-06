@@ -361,6 +361,8 @@ export async function login(email: string, password: string): Promise<LoginData>
   const response = await axios.post<ResultResponse<LoginData>>('/api/auth/login', {
     username: email,
     password,
+  }, {
+    withCredentials: true,
   })
   if (response.data.code !== 200) {
     throw new Error(response.data.message || '登录失败')
@@ -382,10 +384,12 @@ export async function login(email: string, password: string): Promise<LoginData>
 }
 
 export async function refreshToken(): Promise<RefreshTokenData> {
-  if (!hasAuthToken()) throw new Error('当前无登录态，无法刷新 token')
   const response = await axios.post<ResultResponse<RefreshTokenData>>(
     '/api/auth/refresh',
     {},
+    {
+      withCredentials: true,
+    }
   )
   if (response.data.code !== 200) {
     throw new Error(response.data.message || '刷新 token 失败')
@@ -408,6 +412,12 @@ export async function fetchUserProfile(userId: number): Promise<LoginUser | null
 export async function updateUserProfile(payload: Record<string, any>): Promise<boolean> {
   const response = await axios.post<ResultResponse<any>>('/api/user/save', payload)
   return response.data.code === 200
+}
+
+export async function logout(): Promise<void> {
+  await axios.post('/api/auth/logout', null, {
+    withCredentials: true,
+  })
 }
 
 // ═══════════════════════════════════════════════════════════════
