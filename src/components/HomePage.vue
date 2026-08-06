@@ -639,8 +639,8 @@ function heroOpenDrawerOnly() {
    HERO
 ════════════════════════════════ */
 .hp-hero {
-  padding-top: 5.1rem;
-  max-width: 68rem;
+  padding-top: 6.1rem;
+  max-width: var(--content-max-width);
   margin: 0 auto;
   padding-left: 1.5rem;
   padding-right: 1.5rem;
@@ -657,10 +657,10 @@ function heroOpenDrawerOnly() {
   /* 左侧取消圆角 —— 和侧边栏 / 页面左区域直线对接，浑然一体；右侧保留圆润感 */
   border-radius: 0 1.5rem 1.5rem 0;
   overflow: hidden;
-  padding: 1.15rem 1.6rem;
+  padding: 0.55rem 0.55rem;
   display: grid;
   grid-template-columns: 1.1fr 0.9fr;
-  gap: 1.2rem;
+  gap: 0.14rem;
   align-items: center;
   z-index: 1;
   box-shadow:
@@ -682,8 +682,8 @@ function heroOpenDrawerOnly() {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.85rem;
-  gap: 0.75rem;
+  margin-bottom: 0.22rem;
+  gap: 0.18rem;
   flex-wrap: wrap;
 }
 
@@ -691,7 +691,7 @@ function heroOpenDrawerOnly() {
 .hp-hero-greeting {
   display: inline-flex;
   align-items: center;
-  gap: 0.5rem;
+  gap: 0.25rem;
   font-size: 0.7rem;
   font-weight: 700;
   color: #cbd5e1;
@@ -713,7 +713,7 @@ function heroOpenDrawerOnly() {
 .hp-hero-meta {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
+  gap: 0.18rem;
   font-size: 0.7rem;
   color: #cbd5e1;
   font-weight: 600;
@@ -723,7 +723,7 @@ function heroOpenDrawerOnly() {
 }
 
 .hp-hero-title {
-  margin: 0 0 0.65rem;
+  margin: 0 0 0.35rem;
   font-size: clamp(1.55rem, 2.65vw, 2.15rem);
   font-weight: 900;
   line-height: 1.1;
@@ -739,7 +739,7 @@ function heroOpenDrawerOnly() {
 }
 
 .hp-hero-sub {
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.25rem;
   font-size: 0.8rem;
   color: #cbd5e1;
   line-height: 1.75;
@@ -749,14 +749,14 @@ function heroOpenDrawerOnly() {
 .hp-hero-actions {
   display: flex;
   align-items: center;
-  gap: 0.6rem;
+  gap: 0.14rem;
   flex-wrap: wrap;
 }
 .hp-btn-primary {
   display: inline-flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.62rem 1.22rem;
+  gap: 0.1rem;
+  padding: 0.45rem 0.85rem;
   border: 1px solid transparent;
   border-radius: 9999px;
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);

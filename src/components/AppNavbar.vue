@@ -295,13 +295,13 @@ onUnmounted(() => {
 /* 桌面端永远不隐藏（即 nav-hidden 类对桌面端无视觉效果） */
 .nav-standard.nav-hidden { transform: translateY(0); }
 .nav-content {
-  max-width: 68rem; height: 100%; margin: 0 auto; padding: 0 1.5rem;
-  display: flex; align-items: center; justify-content: space-between; gap: 0.75rem;
+  max-width: var(--nav-content-max-width); height: 100%; margin: 0 auto; padding: 0 0.9rem;
+  display: flex; align-items: center; justify-content: space-between; gap: 0.2rem;
 }
-.nav-right { display: flex; align-items: center; gap: 0.4rem; }
+.nav-right { display: flex; align-items: center; gap: 0.12rem; }
 
 /* Logo */
-.nav-logo { display: flex; align-items: center; gap: 0.65rem; cursor: pointer; flex-shrink: 0; }
+.nav-logo { display: flex; align-items: center; gap: 0.2rem; cursor: pointer; flex-shrink: 0; }
 .logo-box {
   width: 1.85rem; height: 1.85rem; background: #0f172a; color: white;
   display: flex; align-items: center; justify-content: center;
@@ -310,7 +310,7 @@ onUnmounted(() => {
 .logo-text { font-weight: 800; font-size: 0.88rem; letter-spacing: 0.045em; color: #0f172a; }
 
 /* PC 链接 */
-.nav-links { display: flex; gap: 1.25rem; }
+.nav-links { display: flex; gap: 0.35rem; }
 .nav-links button {
   background: none; border: none; font-size: 0.8rem; font-weight: 700;
   color: #64748b; cursor: pointer; transition: color 0.2s;
@@ -319,11 +319,11 @@ onUnmounted(() => {
 .nav-links button:hover { color: #0f172a; }
 
 /* PC 操作 */
-.nav-actions { display: flex; gap: 0.35rem; align-items: center; margin-left: 0.1rem; }
+.nav-actions { display: flex; gap: 0.08rem; align-items: center; margin-left: 0.02rem; }
 .nav-action-button {
-  display: inline-flex; align-items: center; justify-content: center; gap: 0.4rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.1rem;
   min-height: 2rem;
-  padding: 0.36rem 0.58rem; border-radius: 0.62rem; border: none;
+  padding: 0.28rem 0.38rem; border-radius: 0.62rem; border: none;
   background: #0f172a; color: white; font-size: 0.7rem; font-weight: 750;
   line-height: 1;
   white-space: nowrap;
@@ -337,10 +337,10 @@ onUnmounted(() => {
 .nav-search-trigger {
   display: flex;
   align-items: center;
-  gap: 0.38rem;
-  width: 8.6rem;
+  gap: 0.12rem;
+  width: 6.4rem;
   height: 2rem;
-  padding: 0 0.55rem;
+  padding: 0 0.3rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.6rem;
   background: #f8fafc;
@@ -371,9 +371,9 @@ kbd {
   position: relative;
   display: flex;
   align-items: center;
-  gap: 0.45rem;
+  gap: 0.12rem;
   height: 2rem;
-  padding: 0 0.75rem 0 0.3rem;
+  padding: 0 0.45rem 0 0.2rem;
   border: none;
   border-radius: 9999px;
   background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 55%, #4f46e5 100%);

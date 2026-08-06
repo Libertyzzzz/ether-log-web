@@ -5,6 +5,22 @@ body {
   transition: background-color 0.3s, color 0.3s;
 }
 
+/* Global layout variables for header/hero spacing */
+:root {
+  --nav-top-offset: 0.75rem;
+  --hero-top-offset: 6.1rem;
+  --content-max-width: 68rem;
+  --nav-content-max-width: 68rem;
+}
+
+@media (max-width: 768px) {
+  :root {
+    --nav-top-offset: 0.5rem;
+    --hero-top-offset: 4.2rem;
+    --nav-content-max-width: 100%;
+  }
+}
+
 .app-container {
   position: relative;
   min-height: 100vh;
