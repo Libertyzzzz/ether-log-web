@@ -96,8 +96,11 @@ axios.interceptors.response.use(
   (response) => {
     const body = response.data
     const code = body?.code
-    if (code === 1003 || code === 1004) {
-      clearAuthState(code)
+    if (code === 1003 || code === 1004 || code === 401) {
+      clearAuthState(code === 401 ? undefined : code)
+      window.dispatchEvent(new CustomEvent('auth:need-login', {
+        detail: { message: body?.message || '需要登录才能执行此操作，请先登录' }
+      }))
       return Promise.reject(new Error(body?.message || '登录已过期'))
     }
     return response
@@ -105,14 +108,14 @@ axios.interceptors.response.use(
   (error) => {
     if (axios.isAxiosError(error)) {
       const status = error.response?.status
-      if (status === 401) {
+      const body = error.response?.data
+      const code = body?.code
+      if (status === 401 || code === 401) {
         clearAuthState(undefined)
         window.dispatchEvent(new CustomEvent('auth:need-login', {
-          detail: { message: '需要登录才能执行此操作，请先登录' }
+          detail: { message: body?.message || '需要登录才能执行此操作，请先登录' }
         }))
       } else if (status === 403) {
-        const body = error.response?.data
-        const code = body?.code
         if (code === 1003 || code === 1004) clearAuthState(code)
       }
     }
