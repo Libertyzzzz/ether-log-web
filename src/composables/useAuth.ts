@@ -62,6 +62,22 @@ async function executeRefreshOnce(): Promise<void> {
   if (expire && expire > Date.now()) {
     console.warn('[auth] token refresh failed, retry in', REFRESH_RETRY_INTERVAL_MS, 'ms')
     refreshTimer = setTimeout(executeRefreshOnce, REFRESH_RETRY_INTERVAL_MS)
+    return
+  }
+
+  // If we've reached here, token is expired or unrecoverable — notify backend to
+  // clear refresh cookie / server-side session, then dispatch expired event so
+  // the app can clear local state and prompt the user to login.
+  try {
+    await apiLogout()
+  } catch (e) {
+    console.warn('[auth] apiLogout during refresh-failure failed', e)
+  } finally {
+    try {
+      window.dispatchEvent(new CustomEvent('auth:expired', { detail: { message: '登录已过期' } }))
+    } catch (e) {
+      // ignore
+    }
   }
 }
 
@@ -137,7 +153,18 @@ function setupAxiosInterceptor() {
           await runRefreshOnce()
           return axios(cfg)
         } catch (e) {
-          // refresh failed, fallthrough to original error
+          // refresh failed — attempt server logout to clear refresh cookie,
+          // then bubble original error so higher-level handlers can react.
+          try {
+            await apiLogout()
+          } catch (e2) {
+            console.warn('[auth] apiLogout during interceptor retry failed', e2)
+          }
+          try {
+            window.dispatchEvent(new CustomEvent('auth:expired', { detail: { message: '登录已过期' } }))
+          } catch (e3) {
+            // ignore
+          }
           throw err
         }
       }
