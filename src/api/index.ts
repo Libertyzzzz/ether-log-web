@@ -140,7 +140,7 @@ axios.interceptors.response.use(
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list')
+  const response = await axios.get<ResultResponse<Category[]>>('/api/v1/categories')
   const data = Array.isArray(response.data) ? response.data : response.data?.data
   if (Array.isArray(data)) {
     return data.map((c: any) => ({
@@ -174,7 +174,7 @@ export async function updateCategory(id: number, payload: { name: string; sort?:
 
 export async function fetchTags(): Promise<Tag[]> {
   const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
-    '/api/tags/page?pageNum=1&pageSize=200',
+    '/api/v1/tags',
   )
   const payload = response.data?.data || response.data
   const records: any[] = Array.isArray(payload?.records) ? payload.records : []
@@ -207,7 +207,7 @@ export async function updateTag(id: number, payload: { name: string; color?: str
 
 export async function fetchSensitiveWords(params: SensitiveWordQueryDto = {}): Promise<PageResponse<SensitiveWordItem>> {
   const response = await axios.get<ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>>(
-    '/api/admin/sensitive-words',
+    '/api/v1/sensitive-words',
     { params, headers: getAuthHeaders() },
   )
   const body = response.data as ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>
@@ -248,7 +248,7 @@ export async function deleteSensitiveWord(id: number): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ records: ArticleListItem[]; total: number }> {
-  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
+  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/v1/articles/feed', {
     params: { pageNum, pageSize, status: 1 },
   })
   if (response.data.code === 200) {
@@ -292,11 +292,11 @@ function extractRecords(response: any): { records: any[]; total: number } {
 export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ articles: ArticleListItem[]; total: number }> {
   const [publishedRes, draftRes] = await Promise.all([
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
-      '/api/articles',
+      '/api/v1/articles/admin-published',
       { params: { pageNum, pageSize, status: 1 }, headers: getAuthHeaders() },
     ),
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
-      '/api/articles',
+      '/api/v1/articles/admin-drafts',
       { params: { pageNum, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
     ),
   ])
@@ -310,7 +310,7 @@ export async function fetchArticleDetail(articleId: number, useAuth = false, sta
   const headers = useAuth && hasAuthToken() ? getAuthHeaders() : undefined
   const params: Record<string, number> = {}
   if (status !== undefined) params.status = status
-  const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, { headers, params })
+  const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/v1/articles/detail/${articleId}`, { headers, params })
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -321,7 +321,7 @@ export async function fetchAdminArticleDetail(articleId: number, status?: number
   try {
     const params: Record<string, number> = {}
     if (status !== undefined) params.status = status
-    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/articles/${articleId}`, {
+    const response = await axios.get<ResultResponse<ArticleDetail>>(`/api/v1/articles/detail/${articleId}`, {
       headers: getAuthHeaders(),
       params,
     })
@@ -456,7 +456,7 @@ export async function updateUserProfile(payload: Record<string, any>): Promise<b
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchComments(articleId: number): Promise<BackendCommentVO[]> {
-  const url = articleId === 0 ? '/api/comment/list/guest-book' : `/api/comment/list/${articleId}`
+  const url = articleId === 0 ? '/api/v1/comments/guest-book' : `/api/v1/comments/article/${articleId}`
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(url)
   if (response.data.code === 200) {
     return response.data.data || []
@@ -466,7 +466,7 @@ export async function fetchComments(articleId: number): Promise<BackendCommentVO
 
 export async function fetchPendingComments(): Promise<BackendCommentVO[]> {
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(
-    '/api/comment/list/guest-book',
+    '/api/v1/comments/guest-book',
     {
       headers: getAuthHeaders(),
       params: { status: 0 },
@@ -510,7 +510,7 @@ export async function submitComment(body: CommentSubmitRequest): Promise<boolean
 // ═══════════════════════════════════════════════════════════════
 
 export async function checkGateStatus(): Promise<{ status: number } | null> {
-  const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
+  const response = await axios.get<ResultResponse<any>>('/api/v1/access-code/gate')
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -542,7 +542,7 @@ export async function uploadImage(formData: FormData): Promise<UploadImageData |
 
 export async function fetchImageList(params: ImageQueryDto = {}): Promise<PageResponse<ImageInfoVo>> {
   const response = await axios.get<ResultResponse<PageResponse<ImageInfoVo>>>(
-    '/api/image/list',
+    '/api/v1/images',
     { params, headers: getAuthHeaders() },
   )
   if (response.data.code === 200 && response.data.data) {
