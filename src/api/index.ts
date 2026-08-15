@@ -128,7 +128,7 @@ axios.interceptors.response.use(
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list')
+  const response = await axios.get<ResultResponse<Category[]>>('/api/v1/categories')
   const data = Array.isArray(response.data) ? response.data : response.data?.data
   if (Array.isArray(data)) {
     return data.map((c: any) => ({
@@ -162,7 +162,7 @@ export async function updateCategory(id: number, payload: { name: string; sort?:
 
 export async function fetchTags(): Promise<Tag[]> {
   const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
-    '/api/tags/page?pageNum=1&pageSize=200',
+    '/api/v1/tags',
   )
   const payload = response.data?.data || response.data
   const records: any[] = Array.isArray(payload?.records) ? payload.records : []
@@ -232,7 +232,7 @@ export async function deleteSensitiveWord(id: number): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ records: ArticleListItem[]; total: number }> {
-  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
+  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/v1/articles/feed', {
     params: { pageNum, pageSize, status: 1 },
   })
   if (response.data.code === 200) {
@@ -428,7 +428,7 @@ export async function logout(): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchComments(articleId: number): Promise<BackendCommentVO[]> {
-  const url = articleId === 0 ? '/api/comment/list/guest-book' : `/api/comment/list/${articleId}`
+  const url = articleId === 0 ? '/api/v1/comments/guest-book' : `/api/v1/comments/article/${articleId}`
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(url)
   if (response.data.code === 200) {
     return response.data.data || []
@@ -473,7 +473,7 @@ export async function submitComment(body: CommentSubmitRequest): Promise<boolean
 // ═══════════════════════════════════════════════════════════════
 
 export async function checkGateStatus(): Promise<{ status: number } | null> {
-  const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
+  const response = await axios.get<ResultResponse<any>>('/api/v1/access-code/gate')
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
