@@ -33,8 +33,22 @@ import type {
 const TOKEN_KEY = 'authToken'
 const TOKEN_EXPIRE_KEY = 'authTokenExpire'
 
+export function getStoredItem(key: string): string | null {
+  return localStorage.getItem(key) || sessionStorage.getItem(key)
+}
+
+export function setStoredItem(key: string, value: string): void {
+  localStorage.setItem(key, value)
+  sessionStorage.setItem(key, value)
+}
+
+export function removeStoredItem(key: string): void {
+  localStorage.removeItem(key)
+  sessionStorage.removeItem(key)
+}
+
 export function hasAuthToken(): boolean {
-  return !!sessionStorage.getItem(TOKEN_KEY)
+  return !!getStoredItem(TOKEN_KEY)
 }
 
 export function parseJwt<T = any>(token: string): T | null {
@@ -55,12 +69,12 @@ export function parseJwt<T = any>(token: string): T | null {
 }
 
 export function getTokenExpire(): number | null {
-  const stored = sessionStorage.getItem(TOKEN_EXPIRE_KEY)
+  const stored = getStoredItem(TOKEN_EXPIRE_KEY)
   if (stored) {
     const n = Number(stored)
     if (!Number.isNaN(n)) return n
   }
-  const token = sessionStorage.getItem(TOKEN_KEY)
+  const token = getStoredItem(TOKEN_KEY)
   if (!token) return null
   const payload = parseJwt<{ exp: number }>(token)
   if (payload && typeof payload.exp === 'number') {
@@ -70,19 +84,28 @@ export function getTokenExpire(): number | null {
 }
 
 export function setTokenExpire(expireMs: number) {
-  sessionStorage.setItem(TOKEN_EXPIRE_KEY, String(expireMs))
+  setStoredItem(TOKEN_EXPIRE_KEY, String(expireMs))
 }
 
 function clearAuthState(code?: number) {
-  sessionStorage.removeItem(TOKEN_KEY)
-  sessionStorage.removeItem(TOKEN_EXPIRE_KEY)
-  sessionStorage.removeItem('authUser')
+  removeStoredItem(TOKEN_KEY)
+  removeStoredItem(TOKEN_EXPIRE_KEY)
+  removeStoredItem('authUser')
   window.dispatchEvent(new CustomEvent('auth:expired', { detail: { code } }))
 }
 
 axios.interceptors.request.use(
   (config) => {
-    const token = sessionStorage.getItem(TOKEN_KEY)
+    // 关键修复：续约接口 /api/auth/refresh 依赖 Cookie (withCredentials)，绝不能携带过期的 Authorization 头！
+    // 否则后端的全局 JWT Filter 会优先校验过期的 Header 并抛出 401/403，导致续约接口被拦截强行登出。
+    if (config.url && config.url.includes('/api/auth/refresh')) {
+      if (config.headers) {
+        delete config.headers.Authorization
+      }
+      return config
+    }
+
+    const token = getStoredItem(TOKEN_KEY)
     if (token) {
       config.headers = config.headers || {}
       if (!config.headers.Authorization) config.headers.Authorization = token
@@ -96,10 +119,11 @@ axios.interceptors.response.use(
   (response) => {
     const body = response.data
     const code = body?.code
-    if (code === 1003 || code === 1004 || code === 401) {
-      clearAuthState(code === 401 ? undefined : code)
+    // 只有后端明确返回已失效业务状态码 1003 (TOKEN_INVALID) / 1004 (MAX_EXPIRED) 时才判定登录状态失效
+    if (code === 1003 || code === 1004) {
+      clearAuthState(code)
       window.dispatchEvent(new CustomEvent('auth:need-login', {
-        detail: { message: body?.message || '需要登录才能执行此操作，请先登录' }
+        detail: { message: body?.message || '登录状态已失效，请重新登录' }
       }))
       return Promise.reject(new Error(body?.message || '登录已过期'))
     }
@@ -110,13 +134,9 @@ axios.interceptors.response.use(
       const status = error.response?.status
       const body = error.response?.data
       const code = body?.code
-      if (status === 401 || code === 401) {
-        clearAuthState(undefined)
-        window.dispatchEvent(new CustomEvent('auth:need-login', {
-          detail: { message: body?.message || '需要登录才能执行此操作，请先登录' }
-        }))
-      } else if (status === 403) {
-        if (code === 1003 || code === 1004) clearAuthState(code)
+      // 401 状态交给 useAuth.ts 中的重试拦截器统一捕获并尝试 runRefreshOnce() 续约，此处不盲目清除状态
+      if (status === 403 && (code === 1003 || code === 1004)) {
+        clearAuthState(code)
       }
     }
     return Promise.reject(error)

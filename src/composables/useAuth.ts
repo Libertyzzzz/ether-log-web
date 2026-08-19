@@ -12,6 +12,9 @@ import {
   setTokenExpire,
   parseJwt,
   normalizeExpire,
+  getStoredItem,
+  setStoredItem,
+  removeStoredItem,
 } from '../api'
 
 const emptyLoginUser: Partial<LoginUser> = {
@@ -50,6 +53,8 @@ function scheduleRefresh() {
   refreshTimer = setTimeout(executeRefreshOnce, delay)
 }
 
+let _lastRefreshError: any = null
+
 async function executeRefreshOnce(): Promise<void> {
   if (!hasAuthToken()) return
   const success = await runRefresh()
@@ -59,15 +64,18 @@ async function executeRefreshOnce(): Promise<void> {
     return
   }
 
-  if (expire && expire > Date.now()) {
-    console.warn('[auth] token refresh failed, retry in', REFRESH_RETRY_INTERVAL_MS, 'ms')
+  // 关键防御：如果是网络开线/休眠刚唤醒时的临时网络异常（如 Network Error / 5xx / 离线），不删除登录态，调度重试
+  const isNetworkOrServerError =
+    !navigator.onLine ||
+    (axios.isAxiosError(_lastRefreshError) && (!_lastRefreshError.response || _lastRefreshError.response.status >= 500))
+
+  if (isNetworkOrServerError || (expire && expire > Date.now())) {
+    console.warn('[auth] token refresh temporary network failure, will retry in', REFRESH_RETRY_INTERVAL_MS, 'ms')
     refreshTimer = setTimeout(executeRefreshOnce, REFRESH_RETRY_INTERVAL_MS)
     return
   }
 
-  // If we've reached here, token is expired or unrecoverable — notify backend to
-  // clear refresh cookie / server-side session, then dispatch expired event so
-  // the app can clear local state and prompt the user to login.
+  // 只有当后端明确校验续约 Cookie 失败（如返回 401/403/1003/1004）时，才认为登录态彻底过期
   try {
     await apiLogout()
   } catch (e) {
@@ -83,8 +91,9 @@ async function executeRefreshOnce(): Promise<void> {
 
 async function runRefresh(): Promise<boolean> {
   try {
+    _lastRefreshError = null
     const { token, expire: apiExpire } = await apiRefreshToken()
-    sessionStorage.setItem('authToken', token)
+    setStoredItem('authToken', token)
 
     let newExpire: number | undefined
     if (typeof apiExpire === 'number') {
@@ -98,6 +107,7 @@ async function runRefresh(): Promise<boolean> {
     setTokenExpire(newExpire)
     return true
   } catch (error) {
+    _lastRefreshError = error
     console.error('[auth] refreshToken failed', error)
     return false
   }
@@ -123,7 +133,7 @@ function runRefreshIfNeeded(): Promise<boolean> | undefined {
   const expire = getTokenExpire()
   const now = Date.now()
   if (!expire) {
-    const storedUser = sessionStorage.getItem('authUser')
+    const storedUser = getStoredItem('authUser')
     if (storedUser) {
       // Attempt to restore session via HttpOnly refresh cookie when access token is absent.
       return runRefreshOnce()
@@ -214,7 +224,7 @@ export function useAuth() {
 
   function initFromLocalStorage() {
     if (!hasAuthToken()) return
-    const stored = sessionStorage.getItem('authUser')
+    const stored = getStoredItem('authUser')
     if (stored) {
       try {
         loginUser.value = JSON.parse(stored)
@@ -235,9 +245,9 @@ export function useAuth() {
     isLoggedIn.value = false
     loginUser.value = emptyLoginUser
     loginError.value = ''
-    sessionStorage.removeItem('authToken')
-    sessionStorage.removeItem('authTokenExpire')
-    sessionStorage.removeItem('authUser')
+    removeStoredItem('authToken')
+    removeStoredItem('authTokenExpire')
+    removeStoredItem('authUser')
     clearRefreshTimer()
     removeAuthEventListeners()
   }
@@ -252,9 +262,9 @@ export function useAuth() {
 
     try {
       const loginData = await apiLogin(email, password)
-      sessionStorage.setItem('authToken', loginData.token)
+      setStoredItem('authToken', loginData.token)
       if (typeof loginData.expire === 'number') setTokenExpire(loginData.expire)
-      sessionStorage.setItem('authUser', JSON.stringify(loginData.user))
+      setStoredItem('authUser', JSON.stringify(loginData.user))
       loginUser.value = loginData.user
       isLoggedIn.value = true
       scheduleRefresh()
@@ -307,7 +317,7 @@ export function useAuth() {
       const user = await apiFetchUserProfile(loginUser.value.id || 0)
       if (user) {
         loginUser.value = user
-        sessionStorage.setItem('authUser', JSON.stringify(user))
+        setStoredItem('authUser', JSON.stringify(user))
       }
     } catch {
       // no-op
