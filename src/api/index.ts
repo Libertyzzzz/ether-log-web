@@ -51,6 +51,11 @@ export function hasAuthToken(): boolean {
   return !!getStoredItem(TOKEN_KEY)
 }
 
+export function getAuthHeaders(): Record<string, string> {
+  const token = getStoredItem(TOKEN_KEY)
+  return token ? { Authorization: token } : {}
+}
+
 export function parseJwt<T = any>(token: string): T | null {
   try {
     const parts = token.split('.')
@@ -148,7 +153,7 @@ axios.interceptors.response.use(
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchCategories(): Promise<Category[]> {
-  const response = await axios.get<ResultResponse<Category[]>>('/api/v1/categories')
+  const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list')
   const data = Array.isArray(response.data) ? response.data : response.data?.data
   if (Array.isArray(data)) {
     return data.map((c: any) => ({
@@ -182,7 +187,7 @@ export async function updateCategory(id: number, payload: { name: string; sort?:
 
 export async function fetchTags(): Promise<Tag[]> {
   const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
-    '/api/v1/tags',
+    '/api/tags/page?pageNum=1&pageSize=200',
   )
   const payload = response.data?.data || response.data
   const records: any[] = Array.isArray(payload?.records) ? payload.records : []
@@ -252,7 +257,7 @@ export async function deleteSensitiveWord(id: number): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ records: ArticleListItem[]; total: number }> {
-  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/v1/articles/feed', {
+  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
     params: { pageNum, pageSize, status: 1 },
   })
   if (response.data.code === 200) {
@@ -297,11 +302,11 @@ export async function fetchAdminArticles(pageNum = 1, pageSize = 6): Promise<{ a
   const [publishedRes, draftRes] = await Promise.all([
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum, pageSize, status: 1 } },
+      { params: { pageNum, pageSize, status: 1 }, headers: getAuthHeaders() },
     ),
     axios.get<ResultResponse<PageResponse<ArticleListItem>> | PageResponse<ArticleListItem>>(
       '/api/articles',
-      { params: { pageNum, pageSize: 200, status: 0 } },
+      { params: { pageNum, pageSize: 200, status: 0 }, headers: getAuthHeaders() },
     ),
   ])
   const { records: publishedRecords, total } = extractRecords(publishedRes)
@@ -448,7 +453,7 @@ export async function logout(): Promise<void> {
 // ═══════════════════════════════════════════════════════════════
 
 export async function fetchComments(articleId: number): Promise<BackendCommentVO[]> {
-  const url = articleId === 0 ? '/api/v1/comments/guest-book' : `/api/v1/comments/article/${articleId}`
+  const url = articleId === 0 ? '/api/comment/list/guest-book' : `/api/comment/list/${articleId}`
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(url)
   if (response.data.code === 200) {
     return response.data.data || []
@@ -493,7 +498,7 @@ export async function submitComment(body: CommentSubmitRequest): Promise<boolean
 // ═══════════════════════════════════════════════════════════════
 
 export async function checkGateStatus(): Promise<{ status: number } | null> {
-  const response = await axios.get<ResultResponse<any>>('/api/v1/access-code/gate')
+  const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
