@@ -9,6 +9,7 @@ export function useArticles() {
   const router = useRouter()
   const route = useRoute()
   const articles = ref<ArticleListItem[]>([])
+  const allArticles = ref<ArticleListItem[]>([])
   const totalArticles = ref(0)
   const currentPage = ref(1)
   const articleError = ref('')
@@ -19,6 +20,16 @@ export function useArticles() {
   const isLoadingArticleDetail = ref(false)
 
   const PAGE_SIZE = 9
+  const SIDEBAR_PAGE_SIZE = 1000
+
+  async function fetchAllArticlesForSidebar(): Promise<void> {
+    try {
+      const result = await fetchPublicArticles(1, SIDEBAR_PAGE_SIZE)
+      allArticles.value = result.records
+    } catch {
+      // 拉取失败时保持原有值或空值，不影响主流程
+    }
+  }
 
   async function fetchArticles(): Promise<void> {
     articleError.value = ''
@@ -28,6 +39,10 @@ export function useArticles() {
       const result = await fetchPublicArticles(1, PAGE_SIZE)
       articles.value = result.records
       totalArticles.value = result.total
+      // 如果 allArticles 还没数据，顺便用当前结果填充，避免首屏空
+      if (!allArticles.value.length) {
+        allArticles.value = result.records
+      }
     } catch (error) {
       articleError.value =
         axios.isAxiosError(error) && error.response?.data?.message
@@ -133,6 +148,7 @@ export function useArticles() {
 
   return {
     articles,
+    allArticles,
     totalArticles,
     articleError,
     isLoadingArticles,
@@ -141,6 +157,7 @@ export function useArticles() {
     selectedArticlePreview,
     isLoadingArticleDetail,
     fetchArticles,
+    fetchAllArticlesForSidebar,
     loadMoreArticles,
     openArticleDetail,
     closeArticleDetail,

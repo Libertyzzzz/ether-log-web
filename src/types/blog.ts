@@ -17,6 +17,7 @@ export interface Category {
   id: number
   name: string
   sort?: number
+  articleCount?: number
 }
 
 export interface ArticleDirectory {
@@ -25,6 +26,8 @@ export interface ArticleDirectory {
   description: string
   articleIds: number[]
   sortOrder: number
+  /** 后端返回的真实文章总数，优先使用；展开列表仍从 articleIds 读取 */
+  count?: number
 }
 
 export interface ArticleListItem {

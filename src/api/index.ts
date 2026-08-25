@@ -160,6 +160,9 @@ export async function fetchCategories(): Promise<Category[]> {
       id: c.id,
       name: c.name || c.label || String(c.id),
       sort: typeof c.sort === 'number' ? c.sort : 0,
+      articleCount: typeof c.articleCount === 'number' ? c.articleCount
+        : typeof c.count === 'number' ? c.count
+        : typeof c.article_count === 'number' ? c.article_count : undefined,
     }))
   }
   return []

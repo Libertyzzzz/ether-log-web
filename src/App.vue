@@ -55,6 +55,7 @@ const router = useRouter()
 
 const {
   articles,
+  allArticles,
   totalArticles,
   articleError,
   isLoadingArticles,
@@ -63,6 +64,7 @@ const {
   selectedArticlePreview,
   isLoadingArticleDetail,
   fetchArticles,
+  fetchAllArticlesForSidebar,
   loadMoreArticles,
   openArticleDetail,
   closeArticleDetail,
@@ -162,7 +164,10 @@ function handleAdminPageChange(page: number) {
 }
 
 async function refreshArticleData() {
-  await fetchArticles()
+  await Promise.all([
+    fetchArticles(),
+    fetchAllArticlesForSidebar(),
+  ])
   try {
     await fetchAdminArticles()
   } catch { /* 未登录时后端 401，由拦截器处理 */ }
@@ -1121,7 +1126,7 @@ onUnmounted(() => {
       />
 
       <!-- Global sidebar (hover from left edge) - only on home, posts, about, and article detail -->
-      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about' || isArticleDetailOpen" :articles="articles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about' || isArticleDetailOpen" :articles="allArticles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
 
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView

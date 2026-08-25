@@ -26,7 +26,9 @@ const emit = defineEmits<{
 const isOpen = ref(false)
 const isMobile = ref(false)
 const shellRef = ref<HTMLElement | null>(null)
-const activeDirectoryId = ref(101)
+const activeDirectoryId = ref<number | null>(null)
+// 支持多个目录同时展开：Set 存放已展开的目录 id
+const expandedDirectoryIds = ref<Set<number>>(new Set())
 
 function checkMobile() {
   isMobile.value = typeof window !== 'undefined' && window.innerWidth <= 1024
@@ -46,27 +48,43 @@ const navItems = [
 ]
 
 const directories = computed<ArticleDirectory[]>(() => {
-  const mapped = props.categories.map((c) => ({
-    id: c.id,
-    name: c.name || String(c.id),
-    description: '',
-    articleIds: props.articles
-      .filter((a) => a.categoryName === (c.name || String(c.id)))
-      .map((a) => a.id),
-    sortOrder: c.sort || 0,
-  }))
-  return mapped
+  return props.categories.map((c) => {
+    const matchedArticles = props.articles.filter(
+      (a) => a.categoryName === (c.name || String(c.id)),
+    )
+    // 优先使用后端返回的 articleCount；如果后端没返回，则用全量文章列表统计
+    const count =
+      typeof c.articleCount === 'number' && c.articleCount >= 0
+        ? c.articleCount
+        : matchedArticles.length
+    return {
+      id: c.id,
+      name: c.name || String(c.id),
+      description: '',
+      // articleIds 始终使用全量文章匹配（用于展开列表）
+      articleIds: matchedArticles.map((a) => a.id),
+      sortOrder: c.sort || 0,
+      // 后端返回的真实文章总数（展示 & 排序用）
+      count,
+    }
+  })
 })
 
 const articleMap = computed(() => new Map(props.articles.map((article) => [article.id, article])))
 
+function dirArticleCount(d: ArticleDirectory): number {
+  return typeof d.count === 'number' ? d.count : d.articleIds.length
+}
+
 const sortedDirectories = computed(() =>
   [...directories.value]
-    .filter((d) => d.articleIds.length > 0)
+    .filter((d) => dirArticleCount(d) > 0)
     .sort((a, b) => {
-      if (b.articleIds.length !== a.articleIds.length) return b.articleIds.length - a.articleIds.length
+      const la = dirArticleCount(a)
+      const lb = dirArticleCount(b)
+      if (lb !== la) return lb - la
       return a.sortOrder - b.sortOrder
-    })
+    }),
 )
 
 const activeNavId = computed(() => (route.meta?.page as string) || 'home')
@@ -88,10 +106,29 @@ function getDirectoryArticles(directory: ArticleDirectory) {
     .filter((article): article is ArticleListItem => Boolean(article))
 }
 
+function isDirectoryExpanded(directoryId: number): boolean {
+  return expandedDirectoryIds.value.has(directoryId)
+}
+
 function selectDirectory(directoryId: number) {
-  activeDirectoryId.value = directoryId
-  const dir = directories.value.find((d) => d.id === directoryId)
-  if (dir) emit('filter-category', dir.name)
+  // 1. 切换展开状态（支持多开，互不影响）
+  if (expandedDirectoryIds.value.has(directoryId)) {
+    expandedDirectoryIds.value.delete(directoryId)
+  } else {
+    expandedDirectoryIds.value.add(directoryId)
+  }
+  // 2. 记录当前高亮选中的目录（用于筛选和 active 样式）
+  // 只有在展开时才触发筛选
+  if (expandedDirectoryIds.value.has(directoryId)) {
+    activeDirectoryId.value = directoryId
+    const dir = directories.value.find((d) => d.id === directoryId)
+    if (dir) emit('filter-category', dir.name)
+  } else {
+    // 如果闭合了当前高亮的目录，取消高亮
+    if (activeDirectoryId.value === directoryId) {
+      activeDirectoryId.value = null
+    }
+  }
 }
 
 function addDirectory() {
@@ -212,12 +249,12 @@ function toggleSidebar() {
                 <small>{{ directory.description }}</small>
               </span>
               <span
-                v-if="directory.articleIds.length > 0"
+                v-if="dirArticleCount(directory) > 0"
                 class="directory-count"
-              >{{ directory.articleIds.length }}</span>
+              >{{ dirArticleCount(directory) }}</span>
             </button>
 
-            <div v-if="activeDirectoryId === directory.id" class="directory-articles">
+            <div v-if="isDirectoryExpanded(directory.id)" class="directory-articles">
               <div
                 v-for="article in getDirectoryArticles(directory)"
                 :key="article.id"
