@@ -47,8 +47,8 @@ defineProps<{
 <style scoped>
 .gb-page { min-height: 100vh; background: linear-gradient(180deg, #f3f6ff 0%, #ffffff 40%); padding-top: 5.5rem; }
 
-.gb-shell { display: flex; justify-content: center; padding: 1.5rem 1rem; }
-.gb-container { width: 100%; max-width: 1050px; }
+.gb-shell { display: flex; justify-content: center; padding: 1.5rem 0; }
+.gb-container { width: 100%; max-width: var(--nav-content-max-width); margin: 0 auto; padding: 0 0.9rem; }
 
 .gb-hero-card { display:none }
 
@@ -88,7 +88,7 @@ defineProps<{
 
 @media (max-width: 768px) {
   .gb-page { padding-top: 4.5rem; }
-  .gb-shell { padding: 1rem 0.75rem; }
+  .gb-shell { padding: 1rem 0.9rem; }
   .gb-title { font-size: 1.4rem; }
   .gb-subtitle { font-size: 0.9rem; }
   .gb-stats { flex-wrap: wrap; gap: 0.75rem; }

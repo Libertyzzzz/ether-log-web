@@ -476,9 +476,9 @@ function handleExport() {
 <style scoped>
 .sw-page {
   width: 100%;
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   align-self: center;
-  padding: 5.5rem 1.5rem 1.5rem;
+  padding: 5.5rem 0.9rem 1.5rem;
 }
 
 /* 工具栏 */

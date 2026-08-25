@@ -313,9 +313,9 @@ onMounted(() => {
 
 /* ── 主体布局 ── */
 .article-layout-inner {
-  max-width: 60rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
   display: flex;
   align-items: flex-start;
 }

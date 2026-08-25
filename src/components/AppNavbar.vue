@@ -310,7 +310,7 @@ onUnmounted(() => {
 .logo-text { font-weight: 800; font-size: 0.88rem; letter-spacing: 0.045em; color: #0f172a; }
 
 /* PC 链接 */
-.nav-links { display: flex; gap: 0.35rem; }
+.nav-links { display: flex; gap: 2rem; }
 .nav-links button {
   background: none; border: none; font-size: 0.8rem; font-weight: 700;
   color: #64748b; cursor: pointer; transition: color 0.2s;
@@ -565,7 +565,7 @@ kbd {
     padding: 0 1rem;
   }
   .nav-links {
-    gap: 0.9rem;
+    gap: 1.5rem;
   }
   .nav-search-trigger {
     width: 2rem;

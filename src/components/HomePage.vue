@@ -642,8 +642,8 @@ function heroOpenDrawerOnly() {
   padding-top: 6.1rem;
   max-width: var(--content-max-width);
   margin: 0 auto;
-  padding-left: 1.5rem;
-  padding-right: 1.5rem;
+  padding-left: 0.9rem;
+  padding-right: 0.9rem;
 }
 
 .hp-hero-inner {
@@ -654,8 +654,8 @@ function heroOpenDrawerOnly() {
     radial-gradient(circle at 10% 80%, rgba(59, 130, 246, 0.18), transparent 16rem),
     linear-gradient(145deg, rgba(12, 18, 32, 0.96) 0%, rgba(24, 35, 55, 0.92) 46%, rgba(49, 46, 129, 0.82) 100%);
   border: 1px solid rgba(191, 219, 254, 0.22);
-  /* 左侧取消圆角 —— 和侧边栏 / 页面左区域直线对接，浑然一体；右侧保留圆润感 */
-  border-radius: 0 1.5rem 1.5rem 0;
+  /* 左右四角统一圆角，视觉更和谐 */
+  border-radius: 1.5rem;
   overflow: hidden;
   padding: 0.55rem 0.55rem;
   display: grid;
@@ -992,9 +992,9 @@ function heroOpenDrawerOnly() {
   padding: 1rem 0 0.5rem;
 }
 .hp-categories-wrapper {
-  max-width: 68rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -1104,9 +1104,9 @@ function heroOpenDrawerOnly() {
   background: transparent;
 }
 .hp-posts-inner {
-  max-width: 68rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
   display: grid;
   grid-template-columns: minmax(0, 1fr) 18rem;
   gap: 2rem;
@@ -1924,7 +1924,7 @@ function heroOpenDrawerOnly() {
   .home-page { padding-bottom: 4.75rem; }
 
   /* Hero 移动端：压缩间距与字号 */
-  .hp-hero { padding-left: 0.85rem; padding-right: 0.85rem; padding-top: 4.15rem; padding-bottom: 0.2rem; }
+  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 4.15rem; padding-bottom: 0.2rem; }
   .hp-hero-inner {
     grid-template-columns: 1fr;
     padding: 1rem 1rem 1rem;

@@ -689,10 +689,10 @@ function getArticleStatusClass(post: ArticleListItem) {
 
 <style scoped>
 .db-page { background:#f5f5f7; min-height:100vh; padding-top: 4.5rem; }
-.db-body { max-width:64rem; margin: 1.5rem auto 0; padding:0 1.5rem 5rem; display:flex; flex-direction:column; gap:1rem; }
+.db-body { max-width: var(--nav-content-max-width); margin: 1.5rem auto 0; padding:0 0.9rem 5rem; display:flex; flex-direction:column; gap:1rem; }
 
 /* ── Hero Banner ── */
-.db-hero { max-width:64rem; margin:0 auto; padding:0 1.5rem; }
+.db-hero { max-width: var(--nav-content-max-width); margin:1rem auto 0; padding:0 0.9rem; }
 .db-hero-bg-wrap {
   position:relative; overflow:hidden; border-radius:1.75rem;
   background:linear-gradient(160deg,#0a0e1a 0%,#0f172a 40%,#1e1b4b 100%);
@@ -1042,16 +1042,16 @@ function getArticleStatusClass(post: ArticleListItem) {
 /* 响应式 */
 @media (max-width:900px) {
   .db-page { padding-top: 4rem; }
-  .db-body { padding: 0 1rem 4rem; }
-  .db-hero { padding: 0 1rem; }
+  .db-body { padding: 0 0.9rem 4rem; }
+  .db-hero { padding: 0 0.9rem; }
   .db-hero-inner { padding: 1.25rem 1.25rem; }
   .db-stats-grid { grid-template-columns:repeat(2,1fr); }
   .db-main-grid { grid-template-columns:1fr; }
 }
 @media (max-width:600px) {
   .db-page { padding-top: 3.75rem; }
-  .db-body { padding: 0 0.75rem 4rem; }
-  .db-hero { padding: 0 0.75rem; }
+  .db-body { padding: 0 0.8rem 4rem; }
+  .db-hero { padding: 0 0.8rem; }
   .db-hero-inner { padding: 1rem 1rem; }
   .db-stats-grid { grid-template-columns:repeat(2,1fr); }
   .db-media-banner { flex-direction: column; gap: 0.75rem; align-items: flex-start; }

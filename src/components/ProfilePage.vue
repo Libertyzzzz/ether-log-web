@@ -230,13 +230,13 @@ const toggleEmailNotifications = (event: Event) => {
 <style scoped>
 /* ── 页面容器 ── */
 .pp-page { background:#f5f5f7; min-height:100vh; padding-top: 5.5rem; }
-.pp-body { max-width:64rem; margin:0 auto; padding:2rem 1.5rem 5rem; display:flex; flex-direction:column; gap:2rem; }
+.pp-body { max-width: var(--nav-content-max-width); margin:0 auto; padding:2rem 0.9rem 5rem; display:flex; flex-direction:column; gap:2rem; }
 
 /* ── Hero Banner：和 navbar 等宽，两侧留白对齐 ── */
 .pp-hero {
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
 }
 .pp-hero-bg-wrap {
   position: relative;
@@ -388,7 +388,7 @@ const toggleEmailNotifications = (event: Event) => {
 /* ── 响应式 ── */
 @media (max-width:900px) {
   .pp-page { padding-top: 5rem; }
-  .pp-body { padding: 1.5rem 1rem 4rem; }
+  .pp-body { padding: 1.5rem 0.9rem 4rem; }
   .pp-settings-grid { grid-template-columns: 1fr; }
   .pp-social-input-grid { grid-template-columns: 1fr; }
 }

@@ -745,10 +745,10 @@ onBeforeUnmount(() => {
 }
 .publish-breadcrumb {
   flex-shrink: 0;
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   width: 100%; /* 确保填满父容器宽度，配合 margin: auto 居中 */
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
   height: 3.25rem;       /* 稍微增加高度，让工具栏居中更从容 */
   display: flex;
   align-items: center;
@@ -760,6 +760,7 @@ onBeforeUnmount(() => {
   border-radius: 1rem;   /* 增加圆角，消除“贯穿感” */
   box-shadow: 0 8px 30px rgba(0, 0, 0, 0.05); /* 增加微妙的阴影 */
   pointer-events: auto;  /* 开启点击 */
+  box-sizing: border-box;
 }
 .breadcrumb-back {
   display: inline-flex;
@@ -1013,13 +1014,14 @@ onBeforeUnmount(() => {
 .publish-layout-inner {
   flex: 1;
   min-height: 0; /* 允许 Flex item 缩小 */
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   width: 100%; /* 确保填满父容器宽度，配合 margin: auto 居中 */
   margin: 0 auto;
-  padding: 0; /* 移除容器 padding，让子组件背景能贴边 */
+  padding: 0; /* 移除外层 padding，让三栏外边缘和面包屑卡片外边缘对齐 */
   display: flex;
   align-items: stretch; /* 确保左右两栏等高 */
   overflow: hidden; /* 隐藏内部滚动条，由子组件控制 */
+  box-sizing: border-box;
 }
 
 /* 左侧设置面板 */
@@ -1028,7 +1030,7 @@ onBeforeUnmount(() => {
   flex-shrink: 0;
   height: 100%; /* 填充父容器高度 */
   overflow-y: auto;
-  padding: 2rem 1.25rem 2rem 1.5rem; /* 左 padding 设为 1.5rem，对齐面包屑文字 */
+  padding: 2rem 1rem 2rem 0.9rem; /* 内部内容的间距 */
   display: flex;
   flex-direction: column;
   gap: 1.1rem;

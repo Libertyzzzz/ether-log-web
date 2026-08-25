@@ -428,13 +428,13 @@ onUnmounted(() => {
 <style scoped>
 .quant-page {
   min-height: 100vh;
-  padding: 6.5rem 1.5rem 3.5rem;
+  padding: 6.5rem 0 3.5rem;
   background:
     radial-gradient(circle at 12% 4%, rgba(37,99,235,0.16), transparent 30rem),
     radial-gradient(circle at 92% 2%, rgba(240,171,252,0.14), transparent 26rem),
     linear-gradient(180deg, #edf3ff 0%, #f8fbff 48%, #eef3fb 100%);
 }
-.quant-inner { max-width: 64rem; margin: 0 auto; display: grid; gap: 1.25rem; }
+.quant-inner { max-width: var(--nav-content-max-width); margin: 0 auto; padding: 0 0.9rem; display: grid; gap: 1.25rem; }
 .quant-hero {
   min-height: 13rem;
   padding: 2.4rem;
@@ -600,7 +600,7 @@ onUnmounted(() => {
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
 }
 @media (max-width: 640px) {
-  .quant-page { padding: 5.75rem 1rem 2.5rem; }
+  .quant-page { padding: 5.75rem 0 2.5rem; }
   .quant-hero { flex-direction: column; padding: 1.6rem; border-radius: 1.25rem; }
   .quant-overview, .config-grid { grid-template-columns: 1fr; }
   .config-actions, .chart-toolbar { flex-direction: column; align-items: stretch; }

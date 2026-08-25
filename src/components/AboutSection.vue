@@ -66,9 +66,9 @@ const stats = [
   background: transparent;
 }
 .about-inner {
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 0 1.5rem;
+  padding: 0 0.9rem;
 }
 .about-label {
   display: inline-flex;

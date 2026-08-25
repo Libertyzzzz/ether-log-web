@@ -1,4 +1,5 @@
 /* 使用 Scoped 样式确保布局不乱 */
+*, *::before, *::after { box-sizing: border-box; }
 body {
   background: var(--bg);
   color: var(--text-primary);
@@ -9,8 +10,8 @@ body {
 :root {
   --nav-top-offset: 0.75rem;
   --hero-top-offset: 6.1rem;
-  --content-max-width: 68rem;
-  --nav-content-max-width: 68rem;
+  --content-max-width: 69rem;
+  --nav-content-max-width: 69rem;
 }
 
 @media (max-width: 768px) {

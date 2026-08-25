@@ -507,9 +507,9 @@ onMounted(() => {
 
 <style scoped>
 .media-hub {
-  max-width: 64rem;
+  max-width: var(--nav-content-max-width);
   margin: 0 auto;
-  padding: 6rem 1.5rem 1.5rem;
+  padding: 6rem 0.9rem 1.5rem;
   box-sizing: border-box;
 }
 
