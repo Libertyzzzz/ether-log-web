@@ -268,6 +268,17 @@ const visibleArticles = computed(() => {
   return list
 })
 
+const totalArticlesInCategories = computed(() =>
+  props.categories.reduce((sum, c) => sum + (c.articleCount ?? 0), 0)
+)
+
+const maxCategorySort = computed<number | null>(() => {
+  const valid = props.categories
+    .map((c) => c.sort)
+    .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
+  return valid.length ? Math.max(...valid) : null
+})
+
 function getArticleStatusLabel(post: ArticleListItem) {
   if (post.status === 0) return '草稿'
   if (post.status === 2) return '私密'
@@ -522,17 +533,30 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-card-body">
             <div v-if="!categories.length" class="db-empty">暂无分类</div>
             <div v-else>
-              <div class="cat-list">
-                  <div v-for="cat in categories" :key="cat.id" class="cat-row">
+              <div class="cat-count-meta">
+                共 {{ categories.length }} 个分类 · {{ totalArticlesInCategories }} 篇文章
+                <template v-if="maxCategorySort != null"> · 最大排序 #{{ maxCategorySort }}</template>
+              </div>
+              <div class="cat-list cat-list--scrollable">
+                <div v-for="cat in categories" :key="cat.id" class="cat-row">
+                  <div class="cat-row-left">
+                    <span class="cat-row-index"></span>
                     <span class="cat-name">{{ cat.name }}</span>
-                    <div class="cat-actions">
-                    <button v-if="hasAuthToken()" class="db-action-btn edit" type="button" @click="openEditCategoryDialog(cat)">修改</button>
-                    <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteCategory(cat)">删除</button>
+                  </div>
+                  <div class="cat-row-right">
+                    <span class="cat-sort-badge">#{{ cat.sort ?? '-' }}</span>
+                    <span class="cat-count-badge">{{ cat.articleCount ?? 0 }} 篇</span>
+                    <div v-if="hasAuthToken()" class="cat-actions cat-actions--icons cat-actions--inline">
+                      <button class="db-icon-btn edit" type="button" title="修改" @click="openEditCategoryDialog(cat)">
+                        <Edit3 :size="12" />
+                      </button>
+                      <button class="db-icon-btn danger" type="button" title="删除" @click="confirmDeleteCategory(cat)">
+                        <Trash2 :size="12" />
+                      </button>
                     </div>
                   </div>
                 </div>
-
-              <!-- creation handled via AppConfirmDialog in header -->
+              </div>
             </div>
           </div>
 
@@ -593,20 +617,32 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-card-body">
             <div v-if="!tags.length" class="db-empty">暂无标签</div>
             <div v-else>
-              <div class="cat-list">
-                <div v-for="tag in tags" :key="tag.id" class="cat-row">
-                  <div style="display:flex;align-items:center;gap:0.6rem">
-                    <span class="tag-badge" :style="{background: tag.color || '#e6eef6'}"></span>
-                    <span class="cat-name">{{ tag.name }}</span>
-                  </div>
-                  <div class="cat-actions">
-                    <button v-if="hasAuthToken()" class="db-action-btn edit" type="button" @click="openEditTagDialog(tag)">修改</button>
-                    <button v-if="hasAuthToken()" class="db-action-btn view" type="button" @click="confirmDeleteTag(tag)">删除</button>
+              <div class="cat-count-meta">共 {{ tags.length }} 个标签</div>
+              <div class="tag-cloud-wrap">
+                <div class="tag-cloud">
+                  <div
+                    v-for="tag in tags"
+                    :key="tag.id"
+                    class="tag-chip"
+                    :style="{
+                      '--tag-bg': (tag.color || '#7c3aed') + '18',
+                      '--tag-fg': tag.color || '#7c3aed',
+                      '--tag-border': (tag.color || '#7c3aed') + '33',
+                    }"
+                  >
+                    <span class="tag-chip-dot" :style="{background: tag.color || '#7c3aed'}"></span>
+                    <span class="tag-chip-name">{{ tag.name }}</span>
+                    <div v-if="hasAuthToken()" class="tag-chip-actions">
+                      <button class="db-icon-btn tiny edit" type="button" title="修改" @click="openEditTagDialog(tag)">
+                        <Edit3 :size="10" />
+                      </button>
+                      <button class="db-icon-btn tiny danger" type="button" title="删除" @click="confirmDeleteTag(tag)">
+                        <Trash2 :size="10" />
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
-
-              <!-- creation handled via AppConfirmDialog in header -->
             </div>
           </div>
 
@@ -984,14 +1020,173 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-action-btn:disabled { opacity:0.4;cursor:not-allowed; }
 .db-empty { padding:2rem;text-align:center;color:#94a3b8;font-size:0.85rem; }
 
-/* Category/Tag management UI tweaks */
-.cat-row { display:flex; align-items:center; justify-content:space-between; padding:0.4rem 0.5rem; border-bottom:1px solid #f1f5f9; }
-.cat-actions { opacity: 0; transition: opacity 0.12s ease; }
-.cat-row:hover .cat-actions { opacity: 1; }
+/* 图标按钮 */
+.db-icon-btn {
+  display:inline-flex; align-items:center; justify-content:center;
+  width: 1.6rem; height: 1.6rem;
+  border:none; border-radius: 0.5rem;
+  cursor:pointer; transition: all 0.15s ease;
+  background: transparent; color: #94a3b8;
+}
+.db-icon-btn.tiny { width: 1.35rem; height: 1.35rem; border-radius: 0.4rem; }
+.db-icon-btn.edit:hover { background: rgba(79,70,229,0.1); color: #4f46e5; }
+.db-icon-btn.danger:hover { background: rgba(239,68,68,0.1); color: #dc2626; }
+
+/* 分类 / 标签计数 */
+.cat-count-meta {
+  display: inline-block;
+  font-size: 0.7rem; font-weight: 650; color: #94a3b8;
+  padding: 0.15rem 0.55rem; margin-bottom: 0.65rem;
+  background: #f8fafc; border-radius: 999px;
+  letter-spacing: 0.02em;
+}
+
+/* 分类列表 - 限高滚动 */
+.cat-list--scrollable {
+  max-height: 240px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -0.25rem;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.cat-list--scrollable::-webkit-scrollbar { width: 5px; }
+.cat-list--scrollable::-webkit-scrollbar-track { background: transparent; }
+.cat-list--scrollable::-webkit-scrollbar-thumb {
+  background: #e2e8f0; border-radius: 999px;
+}
+.cat-list--scrollable::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+.cat-row {
+  display:flex; align-items:center; justify-content:space-between;
+  padding: 0.38rem 0.45rem;
+  border-radius: 0.6rem;
+  transition: background 0.12s ease;
+  gap: 0.5rem;
+}
+.cat-row:hover { background: #f8fafc; }
+.cat-row + .cat-row { margin-top: 1px; }
+.cat-row-left { display:flex; align-items:center; gap: 0.5rem; min-width: 0; flex: 1; }
+.cat-row-index {
+  width: 3px; height: 14px; border-radius: 2px;
+  background: linear-gradient(180deg, #818cf8, #4f46e5);
+  flex-shrink: 0;
+}
+.cat-name {
+  font-size: 0.83rem; font-weight: 650; color: #1e293b;
+  overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+}
+.cat-row-right {
+  display:flex; align-items:center; gap: 0.3rem;
+  flex-shrink: 0;
+}
+.cat-sort-badge {
+  display: inline-flex; align-items: baseline; justify-content: center;
+  padding: 0.12rem 0.38rem;
+  border-radius: 0.35rem;
+  background: #f8fafc;
+  border: 1px solid #e2e8f0;
+  color: #94a3b8;
+  font-size: 0.65rem; font-weight: 750;
+  line-height: 1.3;
+  font-family: "SF Mono", Menlo, Consolas, monospace;
+  letter-spacing: 0;
+  transition: all 0.15s ease;
+  user-select: none;
+}
+.cat-sort-badge::first-letter {
+  font-size: 0.58rem;
+  color: #cbd5e1;
+  margin-right: 1px;
+}
+.cat-row:hover .cat-sort-badge {
+  background: #fff;
+  border-color: #cbd5e1;
+  color: #64748b;
+}
+.cat-count-badge {
+  display: inline-flex; align-items: center; justify-content: center;
+  padding: 0.14rem 0.5rem;
+  border-radius: 999px;
+  background: #f1f5f9;
+  color: #64748b;
+  font-size: 0.68rem; font-weight: 700;
+  line-height: 1.3;
+  letter-spacing: 0.01em;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+.cat-row:hover .cat-count-badge {
+  background: rgba(79,70,229,0.1);
+  color: #4f46e5;
+}
+.cat-actions--icons { display:flex; gap: 0.1rem; transition: opacity 0.12s ease; }
+.cat-actions--inline { opacity: 1; }
+
+/* 标签云流式布局 */
+.tag-cloud-wrap {
+  max-height: 260px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -0.25rem;
+  padding-right: 0.15rem;
+  scrollbar-width: thin;
+  scrollbar-color: #cbd5e1 transparent;
+}
+.tag-cloud-wrap::-webkit-scrollbar { width: 5px; }
+.tag-cloud-wrap::-webkit-scrollbar-track { background: transparent; }
+.tag-cloud-wrap::-webkit-scrollbar-thumb {
+  background: #e2e8f0; border-radius: 999px;
+}
+.tag-cloud-wrap::-webkit-scrollbar-thumb:hover { background: #cbd5e1; }
+
+.tag-cloud {
+  display: flex; flex-wrap: wrap; gap: 0.4rem 0.4rem;
+}
+.tag-chip {
+  position: relative;
+  display: inline-flex; align-items: center; gap: 0.35rem;
+  padding: 0.28rem 0.55rem 0.28rem 0.4rem;
+  border-radius: 999px;
+  background: var(--tag-bg, rgba(124,58,237,0.1));
+  border: 1px solid var(--tag-border, rgba(124,58,237,0.2));
+  color: var(--tag-fg, #7c3aed);
+  cursor: default;
+  transition: transform 0.12s ease, box-shadow 0.15s ease;
+}
+.tag-chip:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.06);
+}
+.tag-chip-dot {
+  width: 0.55rem; height: 0.55rem;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.35) inset;
+}
+.tag-chip-name {
+  font-size: 0.75rem; font-weight: 650;
+  line-height: 1.1;
+  max-width: 120px;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.tag-chip-actions {
+  display: flex; gap: 0.05rem; align-items: center;
+  margin-left: 0.15rem;
+  opacity: 0;
+  transform: translateX(-2px);
+  transition: opacity 0.12s ease, transform 0.12s ease;
+}
+.tag-chip:hover .tag-chip-actions {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* 旧标签遗留样式，保留避免其他地方引用 */
+.tag-badge { width:0.8rem; height:0.8rem; display:inline-block; border-radius:0.2rem; border:1px solid rgba(0,0,0,0.06) }
 .cat-create-row { display:flex; gap:0.5rem; align-items:center; }
 .cat-create-row input { padding:0.45rem 0.6rem; border-radius:0.6rem; border:1px solid #e6eef6; }
 .cat-create-row button { white-space:nowrap }
-.tag-badge { width:0.8rem; height:0.8rem; display:inline-block; border-radius:0.2rem; border:1px solid rgba(0,0,0,0.06) }
 
 /* 评论 */
 .db-comment-item { padding:1rem;border-radius:1rem;background:#f8fafc;margin-bottom:0.75rem;display:flex;flex-direction:column;gap:0.4rem; }
