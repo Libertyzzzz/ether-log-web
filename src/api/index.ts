@@ -28,6 +28,16 @@ import type {
   SensitiveWordQueryDto,
   Tag,
   UploadImageData,
+  SysRole,
+  SysPermission,
+  PermissionTreeQueryDto,
+  PermissionTreeVO,
+  UserPermissionInfo,
+  RoleUserItem,
+  SysUser,
+  SysUserCreateRequest,
+  SysUserUpdateRequest,
+  SysUserQueryDto,
 } from '../types/blog'
 
 const TOKEN_KEY = 'authToken'
@@ -120,6 +130,36 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
+function dispatchForbiddenEvent(message: string | undefined, url: string) {
+  window.dispatchEvent(new CustomEvent('api:forbidden', {
+    detail: {
+      message: message || '抱歉，你没有该操作的权限',
+      url: url || '',
+    }
+  }))
+}
+
+/**
+ * 判断一个错误是否为「权限不足 (403)」且已由全局拦截器处理过。
+ * 覆盖两种情况：
+ *   1. HTTP 200 + body.code = 403（拦截器 reject 时打了 _forbiddenHandled 标记）
+ *   2. HTTP status = 403（协议层）
+ * 上层 catch 如果返回 true，应跳过自己的 toast，避免重复提示。
+ */
+export function isForbiddenError(err: unknown): boolean {
+  if (!err) return false
+  if ((err as any)._forbiddenHandled === true) return true
+  if (axios.isAxiosError(err)) {
+    if (err.response?.status === 403) {
+      const bodyCode = (err.response?.data as any)?.code
+      // 1003/1004 是 token 过期，不属于权限不足提示的场景
+      if (bodyCode === 1003 || bodyCode === 1004) return false
+      return true
+    }
+  }
+  return false
+}
+
 axios.interceptors.response.use(
   (response) => {
     const body = response.data
@@ -132,6 +172,13 @@ axios.interceptors.response.use(
       }))
       return Promise.reject(new Error(body?.message || '登录已过期'))
     }
+    // 业务码 403：HTTP 200，但 body.code 表示权限不足（真正的角色无权限）
+    if (code === 403) {
+      dispatchForbiddenEvent(body?.message, response.config?.url || '')
+      const err = new Error(body?.message || '权限不足，拒绝访问') as Error & { _forbiddenHandled?: boolean }
+      err._forbiddenHandled = true
+      return Promise.reject(err)
+    }
     return response
   },
   (error) => {
@@ -140,17 +187,19 @@ axios.interceptors.response.use(
       const body = error.response?.data
       const code = body?.code
       // 401 状态交给 useAuth.ts 中的重试拦截器统一捕获并尝试 runRefreshOnce() 续约，此处不盲目清除状态
-      if (status === 403 && (code === 1003 || code === 1004)) {
-        clearAuthState(code)
+      if (status === 403) {
+        if (code === 1003 || code === 1004) {
+          clearAuthState(code)
+        } else {
+          // HTTP 403：协议层权限不足（已登录但角色无权限）
+          dispatchForbiddenEvent(body?.message, error.config?.url || '')
+          ;(error as any)._forbiddenHandled = true
+        }
       }
     }
     return Promise.reject(error)
   }
 )
-
-// ═══════════════════════════════════════════════════════════════
-// Categories
-// ═══════════════════════════════════════════════════════════════
 
 export async function fetchCategories(): Promise<Category[]> {
   const response = await axios.get<ResultResponse<Category[]>>('/api/categories/list')
@@ -184,10 +233,6 @@ export async function updateCategory(id: number, payload: { name: string; sort?:
   return { id: p?.id || id, name: payload.name, sort: payload.sort }
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Tags
-// ═══════════════════════════════════════════════════════════════
-
 export async function fetchTags(): Promise<Tag[]> {
   const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
     '/api/tags/page?pageNum=1&pageSize=200',
@@ -216,10 +261,6 @@ export async function updateTag(id: number, payload: { name: string; color?: str
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, color: payload.color }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Sensitive Words
-// ═══════════════════════════════════════════════════════════════
 
 export async function fetchSensitiveWords(params: SensitiveWordQueryDto = {}): Promise<PageResponse<SensitiveWordItem>> {
   const response = await axios.get<ResultResponse<PageResponse<SensitiveWordItem>> | PageResponse<SensitiveWordItem>>(
@@ -254,10 +295,6 @@ export async function deleteSensitiveWord(id: number): Promise<void> {
     throw new Error(response.data?.message || '删除敏感词失败')
   }
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Articles
-// ═══════════════════════════════════════════════════════════════
 
 export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ records: ArticleListItem[]; total: number }> {
   const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles', {
@@ -379,10 +416,6 @@ export async function searchArticles(keyword: string): Promise<any[]> {
   return []
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Auth
-// ═══════════════════════════════════════════════════════════════
-
 export function normalizeExpire(value: number | undefined | null): number | undefined {
   if (typeof value !== 'number' || Number.isNaN(value)) return undefined
   return value < 1_000_000_000_000 ? value * 1000 : value
@@ -432,8 +465,8 @@ export async function refreshToken(): Promise<RefreshTokenData> {
   return data
 }
 
-export async function fetchUserProfile(userId: number): Promise<LoginUser | null> {
-  const response = await axios.get<ResultResponse<LoginUser>>(`/api/user/${userId}`)
+export async function fetchUserProfile(): Promise<LoginUser | null> {
+  const response = await axios.get<ResultResponse<LoginUser>>('/api/user/info')
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -450,10 +483,6 @@ export async function logout(): Promise<void> {
     withCredentials: true,
   })
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Comments
-// ═══════════════════════════════════════════════════════════════
 
 export async function fetchComments(articleId: number): Promise<BackendCommentVO[]> {
   const url = articleId === 0 ? '/api/comment/list/guest-book' : `/api/comment/list/${articleId}`
@@ -496,12 +525,10 @@ export async function submitComment(body: CommentSubmitRequest): Promise<boolean
   return response.data.code === 200
 }
 
-// ═══════════════════════════════════════════════════════════════
-// Gate (Access Code)
-// ═══════════════════════════════════════════════════════════════
-
 export async function checkGateStatus(): Promise<{ status: number } | null> {
-  const response = await axios.get<ResultResponse<any>>('/api/access-code/1')
+  const response = await axios.get<ResultResponse<any>>('/api/access-code/gate', {
+    params: { id: 1 },
+  })
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -514,10 +541,6 @@ export async function verifyAccessCode(code: string): Promise<boolean> {
   })
   return response.data.code === 200 && response.data.data === true
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Upload
-// ═══════════════════════════════════════════════════════════════
 
 export async function uploadImage(formData: FormData): Promise<UploadImageData | null> {
   const response = await axios.post<ResultResponse<UploadImageData>>(
@@ -563,19 +586,11 @@ export async function deleteImages(ids: number[]): Promise<ImageDeleteResultVo> 
   return { successCount: 0, failCount: 0, errorMessages: [] }
 }
 
-// ══════════════════════════════════════════════════════════════
-// Anonymous
-// ═══════════════════════════════════════════════════════════════
-
 export async function fetchAnonymousUser(): Promise<{ anonymousId?: string; hasCommented?: boolean } | null> {
   const resp = await axios.get('/api/anonymous/user')
   const payload = resp.data && resp.data.data ? resp.data.data : resp.data
   return payload || null
 }
-
-// ═══════════════════════════════════════════════════════════════
-// Assessment
-// ═══════════════════════════════════════════════════════════════
 
 export async function fetchAssessmentShare(shareId: string): Promise<any> {
   const res = await axios.get(`/api/v2/assessment/share/${shareId}`)
@@ -589,10 +604,6 @@ export async function evaluateAssessment(payload: any, gender: string): Promise<
   const responseData = response.data
   return 'data' in responseData ? responseData.data : response.data
 }
-
-// ═══════════════════════════════════════════════════════════════
-// AI Assistant
-// ═══════════════════════════════════════════════════════════════
 
 export async function chatWithAI(payload: AIChatRequest): Promise<AIChatResponse> {
   const contextKey = payload.contextKey || 'generic'
@@ -725,4 +736,367 @@ export async function fetchAIAssistantConversationContext(conversationId: string
     throw new Error(body.message || '加载会话上下文失败')
   }
   return (body && typeof body === 'object' && 'data' in body ? body.data : body) as AgentMessageVo[]
+}
+
+/**
+ * 获取用户的权限信息 (登录后调用，基于当前 token)
+ */
+export async function fetchUserPermissions(): Promise<UserPermissionInfo> {
+  const response = await axios.get<ResultResponse<UserPermissionInfo>>('/api/admin/role/user/permissions')
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户权限失败')
+}
+
+export async function fetchRolesPage(
+  current = 1,
+  size = 10,
+  keyword?: string,
+): Promise<PageResponse<SysRole>> {
+  const response = await axios.get<ResultResponse<PageResponse<SysRole>>>('/api/admin/role/page', {
+    params: { current, size, keyword },
+  })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取角色列表失败')
+}
+
+export async function fetchRoleList(): Promise<SysRole[]> {
+  const response = await axios.get<ResultResponse<SysRole[]>>('/api/admin/role/list')
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取角色列表失败')
+}
+
+export async function fetchRoleById(id: number): Promise<SysRole> {
+  const response = await axios.get<ResultResponse<SysRole>>(`/api/admin/role/${id}`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取角色详情失败')
+}
+
+export async function createRole(role: Partial<SysRole>): Promise<SysRole> {
+  const response = await axios.post<ResultResponse<SysRole>>('/api/admin/role', role)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '创建角色失败')
+}
+
+export async function updateRole(role: Partial<SysRole>): Promise<SysRole> {
+  const response = await axios.put<ResultResponse<SysRole>>('/api/admin/role', role)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '更新角色失败')
+}
+
+export async function deleteRole(id: number): Promise<void> {
+  const response = await axios.delete<ResultResponse<void>>(`/api/admin/role/${id}`)
+  if (response.data.code !== 200) {
+    throw new Error(response.data.message || '删除角色失败')
+  }
+}
+
+export async function fetchUserRoles(userId: number): Promise<SysRole[]> {
+  const response = await axios.get<ResultResponse<SysRole[]>>(`/api/admin/role/user/${userId}`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户角色失败')
+}
+
+export async function assignRolesToUser(userId: number, roleIds: number[]): Promise<void> {
+  await updateUser(userId, { roleIds })
+}
+
+export async function fetchRolePermissionIds(roleId: number): Promise<number[]> {
+  const response = await axios.get<ResultResponse<number[]>>(`/api/admin/role/${roleId}/permissions`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取角色权限失败')
+}
+
+export async function assignPermissionsToRole(roleId: number, permissionIds: number[]): Promise<void> {
+  const response = await axios.post<ResultResponse<void>>(
+    `/api/admin/role/${roleId}/permissions`,
+    null,
+    { params: { permissionIds: permissionIds.join(',') } },
+  )
+  if (response.data.code !== 200) {
+    throw new Error(response.data.message || '分配权限失败')
+  }
+}
+
+export async function fetchRoleUsersList(): Promise<RoleUserItem[]> {
+  const response = await axios.get<ResultResponse<RoleUserItem[]>>('/api/admin/role/users')
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户列表失败')
+}
+
+export async function fetchPermissionPage(
+  current = 1,
+  size = 10,
+  keyword?: string,
+  permType?: number,
+): Promise<PageResponse<SysPermission>> {
+  const response = await axios.get<ResultResponse<PageResponse<SysPermission>>>('/api/admin/permission/page', {
+    params: { current, size, keyword, permType },
+  })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取权限列表失败')
+}
+
+export async function fetchPermissionList(): Promise<SysPermission[]> {
+  const response = await axios.get<ResultResponse<SysPermission[]>>('/api/admin/permission/list')
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取权限列表失败')
+}
+
+export async function fetchPermissionTree(query?: PermissionTreeQueryDto): Promise<PermissionTreeVO[]> {
+  const params: Record<string, unknown> = {}
+  if (query) {
+    if (query.parentId !== undefined && query.parentId !== null) params.parentId = query.parentId
+    if (query.permType !== undefined && query.permType !== null) params.permType = query.permType
+    if (query.onlyEnabled !== undefined) params.onlyEnabled = query.onlyEnabled
+  }
+  const response = await axios.get<ResultResponse<PermissionTreeVO[]>>('/api/admin/permission/tree', { params })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取权限树失败')
+}
+
+export async function fetchPermissionsByType(permType: number): Promise<SysPermission[]> {
+  const response = await axios.get<ResultResponse<SysPermission[]>>(`/api/admin/permission/type/${permType}`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取指定类型权限失败')
+}
+
+export async function fetchPermissionById(id: number): Promise<SysPermission> {
+  const response = await axios.get<ResultResponse<SysPermission>>(`/api/admin/permission/${id}`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取权限详情失败')
+}
+
+export async function createPermission(permission: Partial<SysPermission>): Promise<SysPermission> {
+  const response = await axios.post<ResultResponse<SysPermission>>('/api/admin/permission', permission)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '创建权限失败')
+}
+
+export async function updatePermission(permission: Partial<SysPermission>): Promise<SysPermission> {
+  const response = await axios.put<ResultResponse<SysPermission>>('/api/admin/permission', permission)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '更新权限失败')
+}
+
+export async function deletePermission(id: number): Promise<void> {
+  const response = await axios.delete<ResultResponse<void>>(`/api/admin/permission/${id}`)
+  if (response.data.code !== 200) {
+    throw new Error(response.data.message || '删除权限失败')
+  }
+}
+
+export async function fetchUsersPage(
+  params: SysUserQueryDto,
+): Promise<PageResponse<SysUser>> {
+  const response = await axios.get<ResultResponse<PageResponse<SysUser>>>('/api/admin/user/page', { params })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户列表失败')
+}
+
+export async function fetchUserList(keyword?: string): Promise<SysUser[]> {
+  const response = await axios.get<ResultResponse<SysUser[]>>('/api/admin/user/list', { params: { keyword } })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户列表失败')
+}
+
+export async function fetchUserById(id: number): Promise<SysUser> {
+  const response = await axios.get<ResultResponse<SysUser>>(`/api/admin/user/${id}`)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '获取用户详情失败')
+}
+
+export async function createUser(user: SysUserCreateRequest): Promise<SysUser> {
+  const response = await axios.post<ResultResponse<SysUser>>('/api/admin/user', user)
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '创建用户失败')
+}
+
+export async function updateUser(id: number, dto: SysUserUpdateRequest): Promise<SysUser> {
+  const response = await axios.put<ResultResponse<SysUser>>('/api/admin/user', dto, {
+    params: { id },
+  })
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  throw new Error(response.data.message || '更新用户失败')
+}
+
+export async function deleteUser(id: number): Promise<void> {
+  const response = await axios.delete<ResultResponse<void>>(`/api/admin/user/${id}`)
+  if (response.data.code !== 200) {
+    throw new Error(response.data.message || '删除用户失败')
+  }
+}
+
+export async function resetUserPassword(userId: number, newPassword?: string): Promise<void> {
+  await updateUser(userId, { password: newPassword || undefined })
+}
+
+export async function toggleUserStatus(userId: number, status: number): Promise<void> {
+  await updateUser(userId, { status })
+}
+
+import type {
+  ArticleQueryDto,
+  CategoryQueryDto,
+  TagQueryDto,
+  CommentQueryDto,
+} from '../types/blog'
+
+export async function fetchArticlesAdminPage(params: ArticleQueryDto): Promise<PageResponse<ArticleListItem>> {
+  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>(
+    '/api/articles',
+    { params },
+  )
+  const payload = (response.data as any)?.data ?? response.data
+  if (payload && typeof payload === 'object' && Array.isArray(payload.records)) {
+    return {
+      records: (payload.records || []).map(mapArticleRecord),
+      total: typeof payload.total === 'number' ? payload.total : payload.records.length,
+      size: typeof payload.size === 'number' ? payload.size : params.pageSize ?? 10,
+      current: typeof payload.current === 'number' ? payload.current : params.pageNum ?? 1,
+      pages: typeof payload.pages === 'number' ? payload.pages : 1,
+    }
+  }
+  return { records: [], total: 0, size: params.pageSize ?? 10, current: params.pageNum ?? 1, pages: 0 }
+}
+
+export async function batchUpdateArticleStatus(ids: number[], status: number): Promise<void> {
+  await Promise.all(ids.map((id) => axios.put(`/api/articles/${id}`, { status })))
+}
+
+export async function auditArticle(articleId: number, passed: boolean, remark?: string): Promise<void> {
+  const status = passed ? 1 : 2
+  const fields: Record<string, any> = { status }
+  if (remark) fields.rejectRemark = remark
+  await axios.put(`/api/articles/${articleId}`, fields)
+}
+
+export async function fetchCategoriesPage(params: CategoryQueryDto = {}): Promise<PageResponse<Category>> {
+  const pageNum = params.pageNum ?? 1
+  const pageSize = params.pageSize ?? 10
+  const all = await fetchCategories()
+  const filtered = params.keyword
+    ? all.filter((c) => c.name.includes(params.keyword as string))
+    : all
+  filtered.sort((a, b) => (a.sort ?? 0) - (b.sort ?? 0))
+  const total = filtered.length
+  const start = (pageNum - 1) * pageSize
+  const records = filtered.slice(start, start + pageSize)
+  return {
+    records,
+    total,
+    size: pageSize,
+    current: pageNum,
+    pages: Math.max(1, Math.ceil(total / pageSize)),
+  }
+}
+
+export async function fetchTagsPage(params: TagQueryDto = {}): Promise<PageResponse<Tag>> {
+  const pageNum = params.pageNum ?? 1
+  const pageSize = params.pageSize ?? 10
+  const response = await axios.get<ResultResponse<PageResponse<Tag>>>(
+    '/api/tags/page',
+    { params: { pageNum, pageSize, keyword: params.keyword } },
+  )
+  const payload = response.data?.data || response.data
+  const records: any[] = Array.isArray(payload?.records) ? payload.records : []
+  return {
+    records: records.map((t: any) => ({
+      id: t.id,
+      name: t.name || t.label || String(t.id),
+      color: t.color,
+      articleCount: typeof t.articleCount === 'number' ? t.articleCount : undefined,
+    })),
+    total: typeof payload?.total === 'number' ? payload.total : records.length,
+    size: typeof payload?.size === 'number' ? payload.size : pageSize,
+    current: typeof payload?.current === 'number' ? payload.current : pageNum,
+    pages: typeof payload?.pages === 'number' ? payload.pages : 1,
+  }
+}
+
+export async function fetchCommentsPage(params: CommentQueryDto): Promise<PageResponse<BackendCommentVO>> {
+  const pageNum = params.pageNum ?? 1
+  const pageSize = params.pageSize ?? 10
+  const status = params.status
+  try {
+    const guestBook = await axios.get<ResultResponse<BackendCommentVO[]>>(
+      '/api/comment/list/guest-book',
+      { params: status !== undefined ? { status } : undefined },
+    )
+    let records: BackendCommentVO[] = []
+    if (guestBook.data.code === 200) {
+      records = guestBook.data.data || []
+    }
+    if (params.keyword) {
+      const kw = String(params.keyword).toLowerCase()
+      records = records.filter((c: any) =>
+        (c.nickname && String(c.nickname).toLowerCase().includes(kw))
+        || (c.content && String(c.content).toLowerCase().includes(kw))
+        || (c.email && String(c.email).toLowerCase().includes(kw))
+      )
+    }
+    const total = records.length
+    const start = (pageNum - 1) * pageSize
+    return {
+      records: records.slice(start, start + pageSize),
+      total,
+      size: pageSize,
+      current: pageNum,
+      pages: Math.max(1, Math.ceil(total / pageSize)),
+    }
+  } catch (e) {
+    if (axios.isAxiosError(e) && (e.response?.status === 404 || !e.response)) {
+      return { records: [], total: 0, size: pageSize, current: pageNum, pages: 1 }
+    }
+    throw e
+  }
+}
+
+export async function batchReviewComments(ids: number[], status: number): Promise<void> {
+  await Promise.all(ids.map((id) => reviewComment(id, status)))
+}
+
+export async function batchDeleteComments(ids: number[]): Promise<void> {
+  await Promise.all(ids.map((id) => deleteComment(id)))
 }

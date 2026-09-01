@@ -5,7 +5,7 @@ import {
   X, ChevronLeft, ChevronRight, Search,
   HardDrive, FileWarning, CheckCircle, Clock
 } from 'lucide-vue-next'
-import { fetchImageList, fetchImageReference, deleteImages } from '../api'
+import { fetchImageList, fetchImageReference, deleteImages, isForbiddenError } from '../api'
 import type { ImageInfoVo, ImageQueryDto, ImageReferenceVo, ImageDeleteResultVo, PageResponse } from '../types/blog'
 import { toast } from '../utils/toast'
 
@@ -13,7 +13,6 @@ defineEmits<{
   back: []
 }>()
 
-// ── 类型定义 ──
 type MediaStatus = 'temporary' | 'permanent' | 'orphan'
 type FileType = 'jpg' | 'png' | 'webp' | 'gif'
 type UsageType = 'article' | 'avatar' | 'ad' | 'other'
@@ -35,7 +34,6 @@ interface MediaItem {
   uploadTime: string
 }
 
-// ── 转换后端数据 ──
 function mapImageVo(item: ImageInfoVo): MediaItem {
   const isTemp = item.isTemporary
   const status: MediaStatus = isTemp ? 'temporary' : (item.referenceCount === 0 ? 'orphan' : 'permanent')
@@ -111,7 +109,6 @@ async function loadData() {
   }
 }
 
-// ── 存储统计 ──
 const storageStats = computed(() => {
   const total = totalRecords.value
   const totalSize = allItems.value.reduce((s, i) => s + i.fileSize, 0)
@@ -127,7 +124,6 @@ function formatSize(bytes: number): string {
   return (bytes / 1073741824).toFixed(2) + ' GB'
 }
 
-// ── 排序（前端对当前页排序） ──
 const sortedItems = computed(() => {
   const items = [...allItems.value]
   switch (sortBy.value) {
@@ -142,7 +138,6 @@ const sortedItems = computed(() => {
 const totalPages = computed(() => Math.ceil(totalRecords.value / pageSize))
 const paginatedItems = computed(() => sortedItems.value)
 
-// ── 过滤条件变化时重新加载 ──
 watch([selectedStatus, selectedFormat, selectedUsage, searchQuery], () => {
   currentPage.value = 1
   loadData()
@@ -152,7 +147,6 @@ watch(currentPage, () => {
   loadData()
 })
 
-// ── 操作 ──
 async function openDetail(item: MediaItem) {
   detailItem.value = item
   detailReferences.value = []
@@ -189,8 +183,8 @@ async function deleteSelected() {
     if (result.errorMessages.length > 0) {
       toast(result.errorMessages.join('; '), 'error')
     }
-  } catch {
-    toast('删除失败，请稍后重试', 'error')
+  } catch (e) {
+    if (!isForbiddenError(e)) toast('删除失败，请稍后重试', 'error')
   } finally {
     selectedItems.value.clear()
   }
@@ -208,8 +202,8 @@ async function deleteFromDetail() {
     if (result.errorMessages.length > 0) {
       toast(result.errorMessages.join('; '), 'error')
     }
-  } catch {
-    toast('删除失败，请稍后重试', 'error')
+  } catch (e) {
+    if (!isForbiddenError(e)) toast('删除失败，请稍后重试', 'error')
   }
 }
 
@@ -255,7 +249,6 @@ function formatColor(f: FileType): string {
   return f === 'jpg' ? '#3b82f6' : f === 'png' ? '#8b5cf6' : f === 'webp' ? '#06b6d4' : '#f97316'
 }
 
-// ── 分页 ──
 function goToPage(p: number) {
   if (p >= 1 && p <= totalPages.value) currentPage.value = p
 }
@@ -271,7 +264,7 @@ onMounted(() => {
     <div class="mh-toolbar">
       <button class="mh-back-btn" type="button" @click="$emit('back')">
         <ArrowLeft :size="16" />
-        <span>返回控制面板</span>
+        <span>返回数据面板</span>
       </button>
       <h1 class="mh-title">媒体资源管理</h1>
     </div>

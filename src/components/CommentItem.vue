@@ -112,7 +112,7 @@ async function submitReply(): Promise<boolean> {
     <div class="comment-main">
       <div class="comment-header">
         <img
-          :src="comment.avatar || `https://api.dicebear.com/7.x/avataaars/svg?seed=${comment.author || comment.id}`"
+          :src="comment.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (comment.author || comment.id)"
           alt=""
           class="comment-avatar"
         />

@@ -1,12 +1,13 @@
 import { ref, computed } from 'vue'
 import axios from 'axios'
-import type { LoginUser } from '../types/blog'
+import type { LoginUser, UserPermissionInfo } from '../types/blog'
 import {
   hasAuthToken,
   login as apiLogin,
   refreshToken as apiRefreshToken,
   fetchUserProfile as apiFetchUserProfile,
   updateUserProfile as apiUpdateUserProfile,
+  fetchUserPermissions as apiFetchUserPermissions,
   logout as apiLogout,
   getTokenExpire,
   setTokenExpire,
@@ -23,7 +24,53 @@ const emptyLoginUser: Partial<LoginUser> = {
   email: '',
 }
 
+const PERMISSIONS_KEY = 'authUserPermissions'
+
 export { hasAuthToken } from '../api'
+
+export const isLoggedIn = ref(false)
+export const loginUser = ref<Partial<LoginUser>>(emptyLoginUser)
+export const userPermissions = ref<UserPermissionInfo | null>(null)
+export const isLoggingIn = ref(false)
+export const loginError = ref('')
+
+export const isSuperAdmin = computed(() => {
+  return !!(
+    userPermissions.value?.isSuperAdmin ||
+    userPermissions.value?.roleCodes?.includes('ROLE_SUPER_ADMIN')
+  )
+})
+
+export const userRoles = computed<string[]>(() => {
+  return userPermissions.value?.roleCodes || []
+})
+
+export const userPermissionCodes = computed<string[]>(() => {
+  return userPermissions.value?.permissionCodes || []
+})
+
+export function hasRole(role: string | string[]): boolean {
+  if (!isLoggedIn.value) return false
+  if (isSuperAdmin.value) return true
+  const targets = Array.isArray(role) ? role : [role]
+  const currentRoles = userPermissions.value?.roleCodes || []
+  return targets.some((r) => currentRoles.includes(r))
+}
+
+export function hasPermission(permission: string | string[]): boolean {
+  if (!isLoggedIn.value) return false
+  if (isSuperAdmin.value) return true
+  const targets = Array.isArray(permission) ? permission : [permission]
+  const currentPerms = userPermissions.value?.permissionCodes || []
+  return targets.some((p) => currentPerms.includes(p))
+}
+
+export function can(permOrRole: string): boolean {
+  if (permOrRole.startsWith('ROLE_')) {
+    return hasRole(permOrRole)
+  }
+  return hasPermission(permOrRole)
+}
 
 const MIN_REFRESH_INTERVAL_MS = 5 * 1000
 const MAX_REFRESH_INTERVAL_MS = 30 * 60 * 1000
@@ -64,7 +111,6 @@ async function executeRefreshOnce(): Promise<void> {
     return
   }
 
-  // 关键防御：如果是网络开线/休眠刚唤醒时的临时网络异常（如 Network Error / 5xx / 离线），不删除登录态，调度重试
   const isNetworkOrServerError =
     !navigator.onLine ||
     (axios.isAxiosError(_lastRefreshError) && (!_lastRefreshError.response || _lastRefreshError.response.status >= 500))
@@ -75,7 +121,6 @@ async function executeRefreshOnce(): Promise<void> {
     return
   }
 
-  // 只有当后端明确校验续约 Cookie 失败（如返回 401/403/1003/1004）时，才认为登录态彻底过期
   try {
     await apiLogout()
   } catch (e) {
@@ -113,7 +158,6 @@ async function runRefresh(): Promise<boolean> {
   }
 }
 
-// Single-flight wrapper for refresh to avoid concurrent refresh calls.
 let _refreshingPromise: Promise<boolean> | null = null
 let _axiosInterceptorInstalled = false
 
@@ -135,12 +179,10 @@ function runRefreshIfNeeded(): Promise<boolean> | undefined {
   if (!expire) {
     const storedUser = getStoredItem('authUser')
     if (storedUser) {
-      // Attempt to restore session via HttpOnly refresh cookie when access token is absent.
       return runRefreshOnce()
     }
     return undefined
   }
-  // If token will expire within the next 60 seconds, refresh
   if (expire - now < 60 * 1000) {
     return runRefreshOnce()
   }
@@ -156,26 +198,22 @@ function setupAxiosInterceptor() {
       const cfg = err?.config
       if (!cfg) throw err
       if ((cfg as any)._retry) throw err
+
       const status = err.response?.status
       if (status === 401 && hasAuthToken()) {
-        ;(cfg as any)._retry = true
         try {
-          await runRefreshOnce()
-          return axios(cfg)
+          (cfg as any)._retry = true
+          const refreshed = await runRefreshOnce()
+          if (refreshed) {
+            const token = getStoredItem('authToken')
+            if (token) {
+              cfg.headers = cfg.headers || {}
+              cfg.headers.Authorization = token
+            }
+            return axios(cfg)
+          }
         } catch (e) {
-          // refresh failed — attempt server logout to clear refresh cookie,
-          // then bubble original error so higher-level handlers can react.
-          try {
-            await apiLogout()
-          } catch (e2) {
-            console.warn('[auth] apiLogout during interceptor retry failed', e2)
-          }
-          try {
-            window.dispatchEvent(new CustomEvent('auth:expired', { detail: { message: '登录已过期' } }))
-          } catch (e3) {
-            // ignore
-          }
-          throw err
+          // ignore refresh retry error
         }
       }
       throw err
@@ -211,12 +249,19 @@ function removeAuthEventListeners() {
   window.removeEventListener('online', handleWindowOnline)
 }
 
-export function useAuth() {
-  const isLoggedIn = ref(false)
-  const loginUser = ref<Partial<LoginUser>>(emptyLoginUser)
-  const isLoggingIn = ref(false)
-  const loginError = ref('')
+async function loadUserPermissions(): Promise<void> {
+  try {
+    const info = await apiFetchUserPermissions()
+    if (info) {
+      userPermissions.value = info
+      setStoredItem(PERMISSIONS_KEY, JSON.stringify(info))
+    }
+  } catch (e) {
+    console.warn('[auth] loadUserPermissions failed', e)
+  }
+}
 
+export function useAuth() {
   const userName = computed(() => {
     const u = loginUser.value
     return u.nickname || u.username || u.email || 'User'
@@ -236,6 +281,20 @@ export function useAuth() {
     } else {
       isLoggedIn.value = true
     }
+
+    const storedPerms = getStoredItem(PERMISSIONS_KEY)
+    if (storedPerms) {
+      try {
+        userPermissions.value = JSON.parse(storedPerms)
+      } catch {
+        // ignore parse error
+      }
+    }
+
+    if (hasAuthToken()) {
+      loadUserPermissions()
+    }
+
     scheduleRefresh()
     addAuthEventListeners()
     setupAxiosInterceptor()
@@ -244,10 +303,12 @@ export function useAuth() {
   function clearLoginState() {
     isLoggedIn.value = false
     loginUser.value = emptyLoginUser
+    userPermissions.value = null
     loginError.value = ''
     removeStoredItem('authToken')
     removeStoredItem('authTokenExpire')
     removeStoredItem('authUser')
+    removeStoredItem(PERMISSIONS_KEY)
     clearRefreshTimer()
     removeAuthEventListeners()
   }
@@ -270,6 +331,10 @@ export function useAuth() {
       scheduleRefresh()
       addAuthEventListeners()
       setupAxiosInterceptor()
+
+      if (loginData.token) {
+        await loadUserPermissions()
+      }
 
       const lastLoginTime = new Date(Date.now() - new Date().getTimezoneOffset() * 60000)
         .toISOString()
@@ -302,7 +367,6 @@ export function useAuth() {
       console.warn('[auth] api logout failed', e)
     } finally {
       clearLoginState()
-      // Notify other parts of the app that logout occurred
       try {
         window.dispatchEvent(new CustomEvent('auth:logged-out', { detail: { message: '用户已退出登录' } }))
       } catch (e) {
@@ -314,7 +378,7 @@ export function useAuth() {
   async function fetchUserProfile(): Promise<void> {
     if (!hasAuthToken()) return
     try {
-      const user = await apiFetchUserProfile(loginUser.value.id || 0)
+      const user = await apiFetchUserProfile()
       if (user) {
         loginUser.value = user
         setStoredItem('authUser', JSON.stringify(user))
@@ -357,12 +421,26 @@ export function useAuth() {
     }
   }
 
+  async function refreshPermissions(): Promise<void> {
+    if (hasAuthToken()) {
+      await loadUserPermissions()
+    }
+  }
+
   return {
     isLoggedIn,
     loginUser,
+    userPermissions,
+    isSuperAdmin,
+    userRoles,
+    userPermissionCodes,
     isLoggingIn,
     loginError,
     userName,
+    hasPermission,
+    hasRole,
+    can,
+    refreshPermissions,
     initFromLocalStorage,
     clearLoginState,
     login,

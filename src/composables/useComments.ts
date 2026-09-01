@@ -13,6 +13,7 @@ import {
   reviewComment as apiReviewComment,
   deleteComment as apiDeleteComment,
   submitComment as apiSubmitComment,
+  isForbiddenError,
 } from '../api'
 
 const LS_KEY_ID = 'anonymousCommentId'
@@ -140,6 +141,7 @@ export function useComments() {
     try {
       return await apiDeleteComment(commentId)
     } catch (err) {
+      if (isForbiddenError(err)) return false
       error.value =
         axios.isAxiosError(err) && err.response?.data?.message
           ? err.response.data.message

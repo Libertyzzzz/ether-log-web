@@ -1,9 +1,8 @@
 import { computed, ref, nextTick } from 'vue'
 
-// 类型定义
 export interface ChatMessage {
   id: string
-  questionId?: string // [新增] 用于精准匹配交互组件
+  questionId?: string
   type: 'bot' | 'user'
   content: string
   timestamp: number
@@ -29,9 +28,7 @@ export interface QuestionConfig {
   }
 }
 
-// 问题流程配置
 const questionFlow: QuestionConfig[] = [
-  // 阶段1: 基础建模
   {
     id: 'welcome',
     text: '嗨！我是你的专属估值助手～\n\n我们将从基础建模、资产扫描、生活技能、社交博弈等 33 个维度进行全方位评估。\n\n准备好了吗？',
@@ -76,16 +73,14 @@ const questionFlow: QuestionConfig[] = [
       condition: (form: any) => form.height > 205,
       response: '等等...你是篮球运动员吗？🏀 还是模特？'
     },
-    nextQuestion: 'visual_sample' // <--- 引导到新的视觉采样问题
+    nextQuestion: 'visual_sample'
   },
-  // [新增] 视觉采样问题 - 激活对话模式下的图像上传组件
   {
-    id: 'visual_sample', // 唯一的问题 ID
-    text: '为了更精准地评估“审美溢价”，系统需要获取一张你的视觉样本。这能让算法捕捉到潜意识无法描述的特征。',
-    inputType: 'image', // <--- 关键：设置为 'image' 类型，触发组件显示
-    stage: 1, // 放在基础建模阶段
-    // next 属性可以指向下一个问题，或者在用户点击“确认采样”后由 handleChatAnswer 自动处理
-    nextQuestion: 'visualHeight' // <--- 采样完成后，继续询问视觉身高
+    id: 'visual_sample',
+    text: '为了更精准地评估"审美溢价"，系统需要获取一张你的视觉样本。这能让算法捕捉到潜意识无法描述的特征。',
+    inputType: 'image',
+    stage: 1,
+    nextQuestion: 'visualHeight'
   },
   {
     id: 'visualHeight',
@@ -134,8 +129,6 @@ const questionFlow: QuestionConfig[] = [
     stage: 1,
     nextQuestion: 'annualIncome'
   },
-  
-  // 阶段2: 资产扫描
   {
     id: 'annualIncome',
     text: '好哒，基础建模完成！✅\n\n现在进入"生存资源"扫描环节...\n\n你的年薪大概是多少呢？（单位：元）\n🔒 放心，数据会加密处理，只用于生成报告',
@@ -210,8 +203,6 @@ const questionFlow: QuestionConfig[] = [
     stage: 2,
     nextQuestion: 'workStability'
   },
-  
-  // 阶段3: 软性标签
   {
     id: 'workStability',
     text: '硬核指标收集完毕！现在进入更有趣的"软实力"评估～\n\n先来测测你的职业稳定性：',
@@ -320,8 +311,6 @@ const questionFlow: QuestionConfig[] = [
     stage: 3,
     nextQuestion: 'talkBreadth'
   },
-
-  // 阶段4: 社交博弈
   {
     id: 'talkBreadth',
     text: '最后进入"社交与情绪"博弈环节...\n\n你的知识面或接梗能力如何？',
@@ -447,12 +436,10 @@ export function useAssessmentChat() {
   const userInput = ref<string | number>('')
   const sliderValue = ref<number>(0)
 
-  // 获取当前问题配置
   const getCurrentQuestion = computed(() => {
     return questionFlow.find(q => q.id === currentQuestionId.value)
   })
 
-  // 计算当前阶段和进度
   const currentStage = computed(() => {
     const question = getCurrentQuestion.value
     return question?.stage || 0
@@ -470,7 +457,6 @@ export function useAssessmentChat() {
     return Math.min((currentQuestionNumber.value / totalQuestions) * 100, 100)
   })
 
-  // 滚动到底部
   const scrollToBottom = () => {
     nextTick(() => {
       if (chatContainerRef.value) {
@@ -482,7 +468,6 @@ export function useAssessmentChat() {
     })
   }
 
-  // 添加消息
   const addMessage = (type: 'bot' | 'user', content: string, options?: ChatMessage['options'], qId?: string) => {
     const message: ChatMessage = {
       id: Date.now().toString() + Math.random(),
@@ -496,38 +481,28 @@ export function useAssessmentChat() {
     scrollToBottom()
   }
 
-  // 显示问题
   const showQuestion = async (questionId: string, form: any) => {
     const question = questionFlow.find(q => q.id === questionId)
     if (!question) return
 
     isTyping.value = true
-    
-    // 模拟助手"正在输入"
     await new Promise(resolve => setTimeout(resolve, 600))
     isTyping.value = false
-    
-    // 添加助手消息
     addMessage('bot', question.text, question.options, questionId)
-
-    // [核心修复] 在消息真正添加到列表后再更新 ID，确保交互组件精准显示
     currentQuestionId.value = questionId
-    
-    // 检查彩蛋
+
     if (question.easterEgg && question.easterEgg.condition(form)) {
       await new Promise(resolve => setTimeout(resolve, 800))
       addMessage('bot', `🎉 ${question.easterEgg.response}`)
     }
   }
 
-  // 处理用户回答
   const handleAnswer = async (value: any, form: any, onComplete: () => Promise<void>) => {
     const question = getCurrentQuestion.value
     if (!question) return
 
     currentQuestionId.value = ''
-    
-    // 添加用户消息
+
     let userContent = ''
     if (question.inputType === 'select' && question.options) {
       const option = question.options.find(opt => opt.value === value)
@@ -536,22 +511,19 @@ export function useAssessmentChat() {
       userContent = String(value)
     }
     addMessage('user', userContent)
-    
-    // 更新表单数据
+
     if (question.field) {
       (form as any)[question.field] = value
     }
     userInput.value = ''
-    
-    // 获取下一个问题
+
     let nextId = ''
     if (typeof question.nextQuestion === 'function') {
       nextId = question.nextQuestion(value)
     } else {
       nextId = question.nextQuestion || ''
     }
-    
-    // 如果完成，提交评估
+
     if (nextId === 'complete') {
       await new Promise(resolve => setTimeout(resolve, 500))
       addMessage('bot', '完美！所有数据采集完毕 ✨\n\n正在启动估值引擎...')
@@ -559,26 +531,23 @@ export function useAssessmentChat() {
       await onComplete()
       return
     }
-    
-    // 显示下一个问题
+
     if (nextId) {
       await new Promise(resolve => setTimeout(resolve, 400))
       await showQuestion(nextId, form)
     }
   }
 
-  // 初始化聊天
   const initChat = async (form: any) => {
     chatMessages.value = []
     await showQuestion('welcome', form)
   }
 
-  // 监听当前问题，初始化滑块值
   const initSliderValue = (form: any) => {
     const question = getCurrentQuestion.value
     if (question?.inputType === 'slider' && question.range && question.field) {
       const fieldValue = (form as any)[question.field]
-      sliderValue.value = typeof fieldValue === 'number' ? fieldValue : 
+      sliderValue.value = typeof fieldValue === 'number' ? fieldValue :
         Math.round((question.range.min + question.range.max) / 2)
     }
   }

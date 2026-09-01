@@ -1,11 +1,51 @@
 <script setup lang="ts">
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
-import { User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Info } from 'lucide-vue-next'
+import { useRoute, useRouter } from 'vue-router'
+import {
+  User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Info, Settings,
+  Folder, Tag, MessageSquare, Users, Shield, Key, ChevronDown
+} from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
+import { hasPermission, hasRole, isSuperAdmin } from '../composables/useAuth'
 
 const route = useRoute()
+const router = useRouter()
+
+const canAccessQuantLab = computed(() => {
+  return isSuperAdmin.value || hasPermission('quant-lab') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])
+})
+
+const canAccessDashboard = computed(() => {
+  return (
+    isSuperAdmin.value ||
+    hasPermission('dashboard') ||
+    hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR'])
+  )
+})
+
+const canAccessDashboardArticle = computed(() => hasPermission('dashboard:article') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+const canAccessDashboardCategory = computed(() => hasPermission('dashboard:category') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+const canAccessDashboardTag = computed(() => hasPermission('dashboard:tag') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+const canAccessDashboardComment = computed(() => hasPermission('dashboard:comment') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+
+const canAccessProfile = computed(() => {
+  return isSuperAdmin.value || hasPermission('profile') || props.isLoggedIn
+})
+
+const canAccessSystem = computed(() => {
+  return (
+    isSuperAdmin.value ||
+    hasPermission('system') ||
+    hasPermission('system:role') ||
+    hasPermission('system:permission') ||
+    hasPermission('system:user') ||
+    hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'])
+  )
+})
+const canAccessSystemUser = computed(() => isSuperAdmin.value || hasPermission('system:user') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystemRole = computed(() => isSuperAdmin.value || hasPermission('system:role') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystemPermission = computed(() => isSuperAdmin.value || hasPermission('system:permission') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
 
 const props = defineProps<{
   isLoggedIn: boolean
@@ -19,6 +59,7 @@ const emit = defineEmits<{
   openProfile: []
   openDashboard: []
   openQuantLab: []
+  openSystem: []
   openLogin: []
   toggleStatus: []
   openSearch: []
@@ -29,12 +70,28 @@ const emit = defineEmits<{
 }>()
 
 const isMobile = ref(false)
+const showSystemDropdown = ref(false)
+const systemDropdownRef = ref<HTMLElement | null>(null)
+
+function toggleSystemDropdown(e?: Event) {
+  if (e) e.stopPropagation()
+  showSystemDropdown.value = !showSystemDropdown.value
+  if (showSystemDropdown.value) {
+    emit('closeUserMenu')
+  }
+}
+function closeSystemDropdown() { showSystemDropdown.value = false }
+
+function handleDocumentClick(e: MouseEvent) {
+  if (systemDropdownRef.value && !systemDropdownRef.value.contains(e.target as Node)) {
+    closeSystemDropdown()
+  }
+}
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768
+  if (isMobile.value) closeSystemDropdown()
 }
-
-// ── 滚动隐藏导航栏（Twitter/Medium 风格：向下滚隐藏，向上滚显示） ──
 
 const contentPageNames = new Set([
   'posts', 'about', 'guestbook', 'profile',
@@ -99,12 +156,11 @@ function resetNavState() {
   lastScrollY = getScrollY()
 }
 
-// ── 监听器注册 ──
-
 watch(
   () => route.fullPath,
   () => {
     setTimeout(resetNavState, 50)
+    closeSystemDropdown()
   }
 )
 
@@ -112,16 +168,23 @@ watch(isMobile, () => {
   setTimeout(resetNavState, 50)
 })
 
+watch(
+  () => props.showUserMenu,
+  (v) => { if (v) closeSystemDropdown() }
+)
+
 onMounted(() => {
   checkMobile()
   lastScrollY = getScrollY()
   window.addEventListener('resize', checkMobile)
   window.addEventListener('scroll', handleScroll, { passive: true })
+  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
   window.removeEventListener('scroll', handleScroll)
+  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
 
@@ -168,9 +231,42 @@ onUnmounted(() => {
         </button>
 
         <div class="nav-actions desktop-only">
-          <button v-if="isLoggedIn" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
-          <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
-          <button v-if="isLoggedIn" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">控制面板</button>
+          <div v-if="isLoggedIn && canAccessSystem" class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef">
+            <button
+              class="nav-action-button secondary has-dropdown"
+              :class="{ active: showSystemDropdown }"
+              type="button"
+              @click.prevent="toggleSystemDropdown"
+              @mouseenter="showSystemDropdown = true; $emit('closeUserMenu')"
+            >
+              <Settings :size="12" style="margin-right:4px" />
+              系统管理
+              <ChevronDown :size="12" class="nav-action-chevron" :class="{ 'is-open': showSystemDropdown }" />
+            </button>
+            <Transition name="dropdown-fade">
+              <div v-if="showSystemDropdown" class="nav-dropdown system-dropdown right-menu" @click.stop>
+                <div class="dropdown-submenu-title" style="padding: 0.5rem 0.85rem 0.3rem">系统管理</div>
+                <div v-if="canAccessSystemUser" style="padding:0 0.4rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-user' })">
+                    <Users :size="13" /> 用户管理
+                  </button>
+                </div>
+                <div v-if="canAccessSystemRole" style="padding:0 0.4rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-role' })">
+                    <Shield :size="13" /> 角色管理
+                  </button>
+                </div>
+                <div v-if="canAccessSystemPermission" style="padding:0 0.4rem 0.3rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-permission' })">
+                    <Key :size="13" /> 权限管理
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+          <button v-if="isLoggedIn && canAccessQuantLab" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
+          <button v-if="isLoggedIn && canAccessProfile" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
+          <button v-if="isLoggedIn && canAccessDashboard" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
         </div>
 
         <!-- 移动端：AI 助手图标 -->
@@ -225,11 +321,19 @@ onUnmounted(() => {
                 <!-- 仅在移动端显示这些链接，因为 PC 端它们已经直接摆在导航栏上了 -->
                 <template v-if="isMobile">
                   <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openAiAssistant')"><Sparkles :size="14" /> AI 助手</button>
-                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
-                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
-                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><LayoutDashboard :size="14" /> 控制面板</button>
+                  <button v-if="canAccessSystem" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openSystem')"><Settings :size="14" /> 系统管理</button>
+                  <button v-if="canAccessQuantLab" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
+                  <button v-if="canAccessProfile" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
+                  <button v-if="canAccessDashboard" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><LayoutDashboard :size="14" /> 数据面板</button>
                   <div class="dropdown-divider"></div>
                 </template>
+                <div v-if="!isMobile" class="dropdown-submenu-group">
+                  <div class="dropdown-submenu-title">数据面板</div>
+                  <button v-if="canAccessDashboardArticle" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-article' })"><FileText :size="12" /> 文章管理</button>
+                  <button v-if="canAccessDashboardCategory" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-category' })"><Folder :size="12" /> 分类管理</button>
+                  <button v-if="canAccessDashboardTag" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-tag' })"><Tag :size="12" /> 标签管理</button>
+                  <button v-if="canAccessDashboardComment" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-comment' })"><MessageSquare :size="12" /> 评论管理</button>
+                </div>
                 <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
               </template>
               <button v-else class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openLogin')">登录账户</button>
@@ -310,13 +414,16 @@ onUnmounted(() => {
 .logo-text { font-weight: 800; font-size: 0.88rem; letter-spacing: 0.045em; color: #0f172a; }
 
 /* PC 链接 */
-.nav-links { display: flex; gap: 2rem; }
+.nav-links { display: flex; gap: 1.75rem; align-items: center; }
 .nav-links button {
-  background: none; border: none; font-size: 0.8rem; font-weight: 700;
-  color: #64748b; cursor: pointer; transition: color 0.2s;
+  background: none; border: none; font-size: 0.82rem; font-weight: 700;
+  color: #64748b; cursor: pointer; transition: all 0.2s ease;
   letter-spacing: 0.08em;
+  padding: 0.35rem 0.65rem;
+  border-radius: 0.5rem;
+  white-space: nowrap;
 }
-.nav-links button:hover { color: #0f172a; }
+.nav-links button:hover { color: #0f172a; background: rgba(241, 245, 249, 0.7); }
 
 /* PC 操作 */
 .nav-actions { display: flex; gap: 0.08rem; align-items: center; margin-left: 0.02rem; }
@@ -332,6 +439,57 @@ onUnmounted(() => {
 .nav-action-button:hover { transform: translateY(-1px); }
 .nav-action-button.lab { background: #eff6ff; color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.18); }
 .nav-action-button.secondary { background: #f1f5f9; color: #475569; }
+.nav-action-button.has-dropdown {
+  padding-right: 0.55rem;
+}
+.nav-action-button.active {
+  background: #e2e8f0;
+  color: #0f172a;
+  box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.08);
+}
+.nav-action-chevron {
+  margin-left: 2px;
+  color: currentColor;
+  opacity: 0.65;
+  transition: transform 0.18s ease;
+}
+.nav-action-chevron.is-open { transform: rotate(180deg); opacity: 1; }
+.nav-action-wrapper { position: relative; }
+
+.nav-dropdown {
+  position: absolute;
+  top: calc(100% + 8px);
+  min-width: 12rem;
+  background: white;
+  border-radius: 0.85rem;
+  box-shadow: 0 10px 30px rgba(15,23,42,0.12), 0 2px 6px rgba(15,23,42,0.05);
+  border: 1px solid rgba(226, 232, 240, 0.9);
+  padding: 0.3rem 0;
+  z-index: 100;
+  animation: dropdownSlideDown 0.18s ease-out;
+}
+.nav-dropdown::before {
+  content: '';
+  position: absolute;
+  top: -5px; right: 1.1rem;
+  width: 10px; height: 10px;
+  background: white;
+  border-left: 1px solid rgba(226, 232, 240, 0.9);
+  border-top: 1px solid rgba(226, 232, 240, 0.9);
+  transform: rotate(45deg);
+}
+.nav-dropdown.right-menu { right: 0; }
+@keyframes dropdownSlideDown {
+  from { opacity: 0; transform: translateY(-6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.dropdown-submenu-title {
+  font-size: 0.62rem;
+  font-weight: 750;
+  letter-spacing: 0.04em;
+  color: #94a3b8;
+  text-transform: uppercase;
+}
 
 /* 搜索触发器样式 */
 .nav-search-trigger {
@@ -541,6 +699,23 @@ kbd {
 }
 .dropdown-item:hover { background: #f8fafc; color: #0f172a; }
 .dropdown-item.danger { color: #ef4444; }
+.dropdown-item.sub { padding-left: 0.85rem; font-size: 0.74rem; font-weight: 600; color: #64748b; }
+.dropdown-item.sub:hover { color: #4f46e5; }
+.dropdown-submenu-group {
+  padding: 0.35rem 0.25rem;
+  margin-bottom: 0.2rem;
+  border-radius: 0.5rem;
+  background: linear-gradient(180deg, #f8fafc 0%, rgba(248,250,252,0) 100%);
+  border: 1px solid #f1f5f9;
+}
+.dropdown-submenu-title {
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #94a3b8;
+  padding: 0.15rem 0.45rem 0.35rem;
+}
 
 /* 动画 */
 .dropdown-fade-enter-active, .dropdown-fade-leave-active { transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1); }

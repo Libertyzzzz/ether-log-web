@@ -1,20 +1,16 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ChevronLeft, ChevronRight, Search, ArrowRight, Image, ShieldAlert } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ArrowRight, Image, ShieldAlert } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import { hasAuthToken } from '../composables/useAuth'
+import { hasAuthToken, hasPermission, hasRole, isSuperAdmin } from '../composables/useAuth'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 import SkeletonLoader from './SkeletonLoader.vue'
 import { toast } from '../utils/toast'
 import type { ArticleListItem, CommentItem, Tag, Category } from '../types/blog'
 import {
   createTag as apiCreateTag,
-  deleteTag as apiDeleteTag,
-  updateTag as apiUpdateTag,
   createCategory as apiCreateCategory,
-  deleteCategory as apiDeleteCategory,
-  updateCategory as apiUpdateCategory,
-  updateArticleField,
+  isForbiddenError,
 } from '../api'
 
 const props = defineProps<{
@@ -49,13 +45,9 @@ const router = useRouter()
 const newCategoryName = ref('')
 const newCategorySort = ref<number | null>(null)
 const showCreateCategoryDialog = ref(false)
-const deletingCategory = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
-const editingCategory = ref<{ show: boolean; id?: number; name?: string; sort?: number }>({ show: false })
 const newTagName = ref('')
 const newTagColor = ref('#7c3aed')
-const deletingTag = ref<{ show: boolean; id?: number; name?: string }>({ show: false })
 const showCreateTagDialog = ref(false)
-const editingTag = ref<{ show: boolean; id?: number; name?: string; color?: string }>({ show: false })
 
 // dialog-driven create flows (open on header button)
 function openCreateTagDialog() {
@@ -75,25 +67,7 @@ async function createTagAdmin() {
     toast('标签已创建', 'success')
     emit('refreshTags')
   } catch (e) {
-    toast('创建标签失败', 'error')
-  }
-}
-
-function confirmDeleteTag(tag: { id: number; name: string }) {
-  deletingTag.value = { show: true, id: tag.id, name: tag.name }
-}
-
-async function performDeleteTag() {
-  const id = deletingTag.value.id
-  if (!id) { deletingTag.value.show = false; return }
-  try {
-    await apiDeleteTag(id)
-    toast('标签已删除', 'success')
-    emit('refreshTags')
-  } catch (e) {
-    toast('删除标签失败', 'error')
-  } finally {
-    deletingTag.value.show = false
+    if (!isForbiddenError(e)) toast('创建标签失败', 'error')
   }
 }
 
@@ -112,102 +86,12 @@ async function createCategoryAdmin() {
     toast('分类已创建', 'success')
     emit('refreshCategories')
   } catch (e) {
-    toast('创建分类失败', 'error')
+    if (!isForbiddenError(e)) toast('创建分类失败', 'error')
   }
 }
 
 function openCreateCategoryDialog() {
   showCreateCategoryDialog.value = true
-}
-
-function confirmDeleteCategory(cat: { id: number; name: string }) {
-  deletingCategory.value = { show: true, id: cat.id, name: cat.name }
-}
-
-async function performDeleteCategoryAdmin() {
-  const id = deletingCategory.value.id
-  const name = deletingCategory.value.name
-  if (!id) {
-    deletingCategory.value.show = false
-    return
-  }
-  try {
-    // ensure general category
-    let general = props.categories.find((c) => c.name === '通用目录')
-    if (!general) {
-      general = await apiCreateCategory({ name: '通用目录', sort: 0 })
-    }
-
-    // reassign articles locally and backend
-    const toMove = props.articles.filter((a: ArticleListItem) => a.categoryName === name)
-    for (const a of toMove) {
-      try {
-        await updateArticleField(a.id, { categoryId: general!.id })
-      } catch (e) {
-        // ignore move error
-      }
-    }
-
-    // delete category
-    try {
-      await apiDeleteCategory(id)
-    } catch (e) {
-      // ignore delete error
-    }
-
-    toast('分类已删除并将文章移至通用目录', 'success')
-    emit('refreshCategories')
-  } catch (e) {
-    toast('删除分类失败', 'error')
-  } finally {
-    deletingCategory.value.show = false
-  }
-}
-
-// ── Edit Category ──
-function openEditCategoryDialog(cat: { id: number; name: string; sort?: number }) {
-  editingCategory.value = { show: true, id: cat.id, name: cat.name, sort: cat.sort }
-}
-
-async function performEditCategory() {
-  const { id, name, sort } = editingCategory.value
-  if (!id || !name?.trim()) {
-    editingCategory.value.show = false
-    return
-  }
-  try {
-    const payload: any = { name: name.trim() }
-    if (sort !== undefined && sort !== null) payload.sort = Number(sort)
-    await apiUpdateCategory(id, payload)
-    toast('分类已更新', 'success')
-    emit('refreshCategories')
-  } catch (e) {
-    toast('更新分类失败', 'error')
-  } finally {
-    editingCategory.value.show = false
-  }
-}
-
-// ── Edit Tag ──
-function openEditTagDialog(tag: { id: number; name: string; color?: string }) {
-  editingTag.value = { show: true, id: tag.id, name: tag.name, color: tag.color }
-}
-
-async function performEditTag() {
-  const { id, name, color } = editingTag.value
-  if (!id || !name?.trim()) {
-    editingTag.value.show = false
-    return
-  }
-  try {
-    await apiUpdateTag(id, { name: name.trim(), color })
-    toast('标签已更新', 'success')
-    emit('refreshTags')
-  } catch (e) {
-    toast('更新标签失败', 'error')
-  } finally {
-    editingTag.value.show = false
-  }
 }
 
 // fetch categories when dashboard mounts
@@ -234,50 +118,31 @@ function scrollToSection(id: string) {
   el.scrollIntoView({ behavior: 'smooth', block: 'start' });
 }
 
-const draftArticles = computed(() => props.articles.filter((article) => article.status === 0))
+const draftArticles = computed(() => props.articles.filter((article) => article.status === 0).slice(0, 5))
 const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
 
-const articleSearch = ref('')
-const articleStatusFilter = ref<number | null>(null)
-const articleCategoryFilter = ref<string>('')
-
-const articleCategories = computed(() => {
-  const names = new Set<string>()
-  for (const a of props.articles) {
-    if (a.categoryName && a.status !== 0) names.add(a.categoryName)
-  }
-  return [...names].sort()
-})
-
 const visibleArticles = computed(() => {
-  let list = props.articles.filter((article) => article.status !== 0)
-  if (articleSearch.value.trim()) {
-    const q = articleSearch.value.trim().toLowerCase()
-    list = list.filter((a) => a.title.toLowerCase().includes(q))
-  }
-  if (articleStatusFilter.value !== null) {
-    if (articleStatusFilter.value === 3) {
-      list = list.filter((a) => a.isTop)
-    } else {
-      list = list.filter((a) => (a.status ?? 1) === articleStatusFilter.value)
-    }
-  }
-  if (articleCategoryFilter.value) {
-    list = list.filter((a) => a.categoryName === articleCategoryFilter.value)
-  }
+  let list = props.articles.filter((article) => article.status !== 0).slice(0, 8)
   return list
 })
+
+const sortedCategories = computed(() =>
+  [...props.categories]
+    .sort((a, b) => (b.articleCount ?? 0) - (a.articleCount ?? 0))
+    .slice(0, 8)
+)
+
+const hotTags = computed(() =>
+  [...props.tags]
+    .sort((a, b) => (b.articleCount ?? 0) - (a.articleCount ?? 0))
+    .slice(0, 15)
+)
+
+const recentPendingComments = computed(() => props.pendingComments.slice(0, 5))
 
 const totalArticlesInCategories = computed(() =>
   props.categories.reduce((sum, c) => sum + (c.articleCount ?? 0), 0)
 )
-
-const maxCategorySort = computed<number | null>(() => {
-  const valid = props.categories
-    .map((c) => c.sort)
-    .filter((v): v is number => typeof v === 'number' && !Number.isNaN(v))
-  return valid.length ? Math.max(...valid) : null
-})
 
 function getArticleStatusLabel(post: ArticleListItem) {
   if (post.status === 0) return '草稿'
@@ -291,6 +156,15 @@ function getArticleStatusClass(post: ArticleListItem) {
   if (post.status === 2) return 'private'
   return post.isTop ? 'top' : 'pub'
 }
+
+const canAddArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:add', 'content:article:add']))
+const canEditArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:edit', 'content:article:edit']))
+const canDeleteArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:delete', 'content:article:delete']))
+const canManageCategories = computed(() => isSuperAdmin.value || hasPermission('dashboard:category') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_EDITOR']))
+const canManageTags = computed(() => isSuperAdmin.value || hasPermission('dashboard:tag') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_EDITOR']))
+const canManageComments = computed(() => isSuperAdmin.value || hasPermission('dashboard:comment') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
+const canManageMedia = computed(() => isSuperAdmin.value || hasPermission('dashboard:media') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
+const canManageSensitiveWords = computed(() => isSuperAdmin.value || hasPermission('dashboard:sensitive') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 </script>
 
 <template>
@@ -309,11 +183,11 @@ function getArticleStatusClass(post: ArticleListItem) {
               <LayoutDashboard :size="24" />
             </div>
             <div class="db-hero-info">
-              <h1 class="db-hero-title">控制面板</h1>
+              <h1 class="db-hero-title">数据面板</h1>
               <p class="db-hero-sub">管理你的文章、评论与内容数据</p>
             </div>
           </div>
-          <button class="db-btn-new" type="button" @click="$emit('newArticle')">
+          <button v-if="canAddArticle" class="db-btn-new" type="button" @click="$emit('newArticle')">
             <Plus :size="15" />
             发布文章
           </button>
@@ -354,9 +228,9 @@ function getArticleStatusClass(post: ArticleListItem) {
         </div>
       </div>
 
-      <!-- ── 媒体库入口横幅 ── -->
-      <div class="db-management-stack">
-        <div class="db-media-banner" @click="router.push('/dashboard/media')">
+      <!-- ── 媒体库与敏感词入口横幅 ── -->
+      <div v-if="canManageMedia || canManageSensitiveWords || canAccessSystem" class="db-management-stack">
+        <div v-if="canManageMedia" class="db-media-banner" @click="router.push('/dashboard/media')">
           <div class="db-media-banner-left">
             <div class="db-media-banner-icon">
               <Image :size="22" />
@@ -372,7 +246,7 @@ function getArticleStatusClass(post: ArticleListItem) {
           </div>
         </div>
 
-        <div class="db-media-banner db-media-banner--secondary" @click="router.push('/dashboard/sensitive-words')">
+        <div v-if="canManageSensitiveWords" class="db-media-banner db-media-banner--secondary" @click="router.push('/dashboard/sensitive-words')">
           <div class="db-media-banner-left">
             <div class="db-media-banner-icon" style="background:rgba(248,113,113,0.15);color:#fda4af">
               <ShieldAlert :size="22" />
@@ -397,36 +271,19 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-card-header">
             <div class="db-card-title-row">
               <FileText :size="15" class="db-card-icon" />
-              <h2 class="db-card-title">我的文章</h2>
+              <h2 class="db-card-title">最近文章</h2>
             </div>
-            <button class="db-btn-sm" type="button" @click="$emit('newArticle')">
-              <Plus :size="13" /> 发布文章
-            </button>
+            <div class="db-card-header-actions">
+              <button class="db-btn-sm ghost" type="button" @click="router.push('/dashboard/article')">
+                <ArrowUpRight :size="13" /> 全部文章
+              </button>
+              <button v-if="canAddArticle" class="db-btn-sm" type="button" @click="$emit('newArticle')">
+                <Plus :size="13" /> 发布文章
+              </button>
+            </div>
           </div>
 
-          <div class="db-filter-bar">
-            <div class="db-search-wrap">
-              <Search :size="13" class="db-search-icon" />
-              <input
-                v-model="articleSearch"
-                type="text"
-                class="db-search-input"
-                placeholder="搜索文章标题..."
-              />
-            </div>
-            <select v-model="articleStatusFilter" class="db-filter-select">
-              <option :value="null">全部状态</option>
-              <option :value="1">公开</option>
-              <option :value="2">私密</option>
-              <option :value="3">置顶</option>
-            </select>
-            <select v-model="articleCategoryFilter" class="db-filter-select">
-              <option value="">全部分类</option>
-              <option v-for="c in articleCategories" :key="c" :value="c">{{ c }}</option>
-            </select>
-          </div>
-
-          <div class="db-table-head">
+          <div class="db-table-head db-table-head--lite">
             <span>标题</span>
             <span>分类</span>
             <span>状态</span>
@@ -435,8 +292,7 @@ function getArticleStatusClass(post: ArticleListItem) {
 
           <SkeletonLoader v-if="isLoadingArticles" variant="table" :rows="5" />
           <div v-else-if="!visibleArticles.length" class="db-empty">
-            <template v-if="articleSearch || articleStatusFilter !== null || articleCategoryFilter">没有匹配的文章</template>
-            <template v-else>暂无已发布文章，点击新建开始写作</template>
+            暂无已发布文章，点击新建开始写作
           </div>
 
           <div v-for="(post, i) in visibleArticles" :key="post.id" class="db-table-row">
@@ -449,34 +305,13 @@ function getArticleStatusClass(post: ArticleListItem) {
               {{ getArticleStatusLabel(post) }}
             </span>
             <div class="db-row-actions">
-              <button type="button" class="db-action-btn edit" @click="$emit('editArticle', post)">
-                <Edit3 :size="11" /> {{ post.status === 0 ? '继续写' : '编辑' }}
+              <button v-if="canEditArticle" type="button" class="db-action-btn edit" @click="$emit('editArticle', post)">
+                <Edit3 :size="11" /> 编辑
               </button>
               <button v-if="post.status !== 0" type="button" class="db-action-btn view" @click="$emit('openArticle', post)">
                 <ArrowUpRight :size="11" /> 查看
               </button>
-              <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', post.id)">
-                <Trash2 :size="11" />
-              </button>
             </div>
-          </div>
-
-          <div v-if="totalPages > 1" class="db-pagination">
-            <button
-              class="db-page-btn"
-              :disabled="page <= 1"
-              @click="$emit('page-change', page - 1)"
-            >
-              <ChevronLeft :size="14" />
-            </button>
-            <span class="db-page-info">{{ page }} / {{ totalPages }}</span>
-            <button
-              class="db-page-btn"
-              :disabled="page >= totalPages"
-              @click="$emit('page-change', page + 1)"
-            >
-              <ChevronRight :size="14" />
-            </button>
           </div>
         </div>
 
@@ -485,9 +320,14 @@ function getArticleStatusClass(post: ArticleListItem) {
           <div class="db-card-header">
             <div class="db-card-title-row">
               <Edit3 :size="15" class="db-card-icon" />
-              <h2 class="db-card-title">草稿箱</h2>
+              <h2 class="db-card-title">最近草稿</h2>
             </div>
-            <span class="draft-count-badge">{{ draftArticles.length }}</span>
+            <div class="db-card-header-actions">
+              <span class="draft-count-badge">{{ draftArticles.length }}</span>
+              <button class="db-btn-sm ghost" type="button" @click="router.push('/dashboard/article')">
+                <ArrowUpRight :size="13" /> 全部
+              </button>
+            </div>
           </div>
           <div v-if="isLoadingArticles" class="draft-empty">
             <span class="draft-empty-icon">⏳</span>
@@ -507,38 +347,39 @@ function getArticleStatusClass(post: ArticleListItem) {
                 </div>
               </div>
               <div class="draft-actions">
-                <button type="button" class="db-action-btn edit" @click="$emit('editArticle', draft)">
+                <button v-if="canEditArticle" type="button" class="db-action-btn edit" @click="$emit('editArticle', draft)">
                   <Edit3 :size="11" /> 继续写
-                </button>
-                <button type="button" class="db-action-btn danger" @click="$emit('deleteArticle', draft.id)">
-                  <Trash2 :size="11" />
                 </button>
               </div>
             </article>
           </div>
         </div>
 
-        <!-- 分类管理 -->
-        <div class="db-card">
+        <!-- 分类概览 -->
+        <div v-if="canManageCategories" class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <Folder :size="15" class="db-card-icon" />
-              <h2 class="db-card-title">分类管理</h2>
+              <h2 class="db-card-title">分类概览</h2>
             </div>
-            <button class="db-btn-sm" type="button" @click="openCreateCategoryDialog" v-if="hasAuthToken()">
-              <Plus :size="13" /> 新增
-            </button>
+            <div class="db-card-header-actions">
+              <button class="db-btn-sm ghost" type="button" @click="router.push('/dashboard/category')">
+                <ArrowUpRight :size="13" /> 全部管理
+              </button>
+              <button class="db-btn-sm" type="button" @click="openCreateCategoryDialog" v-if="hasAuthToken()">
+                <Plus :size="13" /> 新增
+              </button>
+            </div>
           </div>
 
           <div class="db-card-body">
-            <div v-if="!categories.length" class="db-empty">暂无分类</div>
+            <div v-if="!sortedCategories.length" class="db-empty">暂无分类</div>
             <div v-else>
               <div class="cat-count-meta">
                 共 {{ categories.length }} 个分类 · {{ totalArticlesInCategories }} 篇文章
-                <template v-if="maxCategorySort != null"> · 最大排序 #{{ maxCategorySort }}</template>
               </div>
-              <div class="cat-list cat-list--scrollable">
-                <div v-for="cat in categories" :key="cat.id" class="cat-row">
+              <div class="cat-list">
+                <div v-for="cat in sortedCategories" :key="cat.id" class="cat-row">
                   <div class="cat-row-left">
                     <span class="cat-row-index"></span>
                     <span class="cat-name">{{ cat.name }}</span>
@@ -546,30 +387,11 @@ function getArticleStatusClass(post: ArticleListItem) {
                   <div class="cat-row-right">
                     <span class="cat-sort-badge">#{{ cat.sort ?? '-' }}</span>
                     <span class="cat-count-badge">{{ cat.articleCount ?? 0 }} 篇</span>
-                    <div v-if="hasAuthToken()" class="cat-actions cat-actions--icons cat-actions--inline">
-                      <button class="db-icon-btn edit" type="button" title="修改" @click="openEditCategoryDialog(cat)">
-                        <Edit3 :size="12" />
-                      </button>
-                      <button class="db-icon-btn danger" type="button" title="删除" @click="confirmDeleteCategory(cat)">
-                        <Trash2 :size="12" />
-                      </button>
-                    </div>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <AppConfirmDialog
-            :show="deletingCategory.show"
-            title="确认删除分类"
-            :message="`删除分类 “${deletingCategory.name || ''}” 将把其文章移至通用目录，确定吗？`"
-            confirmText="删除"
-            cancelText="取消"
-            tone="danger"
-            @confirm="performDeleteCategoryAdmin"
-            @cancel="deletingCategory.show = false"
-          />
 
           <!-- 创建分类弹窗（复用 AppConfirmDialog） -->
           <AppConfirmDialog
@@ -585,43 +407,33 @@ function getArticleStatusClass(post: ArticleListItem) {
               <input v-model.number="newCategorySort" placeholder="排序 (sort)" type="number" />
             </div>
           </AppConfirmDialog>
-
-          <!-- 修改分类弹窗 -->
-          <AppConfirmDialog
-            :show="editingCategory.show"
-            title="修改分类"
-            confirmText="保存"
-            cancelText="取消"
-            @confirm="performEditCategory"
-            @cancel="editingCategory.show = false"
-          >
-            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
-              <input v-model="editingCategory.name" placeholder="分类名称" aria-label="分类名称" />
-              <input v-model.number="editingCategory.sort" placeholder="排序 (sort)" type="number" />
-            </div>
-          </AppConfirmDialog>
         </div>
 
-        <!-- 标签管理 -->
-        <div class="db-card">
+        <!-- 标签概览 -->
+        <div v-if="canManageTags" class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <BookOpen :size="15" class="db-card-icon" />
-              <h2 class="db-card-title">标签管理</h2>
+              <h2 class="db-card-title">热门标签</h2>
             </div>
-            <button class="db-btn-sm" type="button" @click="openCreateTagDialog" v-if="hasAuthToken()">
-              <Plus :size="13" /> 新增
-            </button>
+            <div class="db-card-header-actions">
+              <button class="db-btn-sm ghost" type="button" @click="router.push('/dashboard/tag')">
+                <ArrowUpRight :size="13" /> 全部管理
+              </button>
+              <button class="db-btn-sm" type="button" @click="openCreateTagDialog" v-if="hasAuthToken()">
+                <Plus :size="13" /> 新增
+              </button>
+            </div>
           </div>
 
           <div class="db-card-body">
-            <div v-if="!tags.length" class="db-empty">暂无标签</div>
+            <div v-if="!hotTags.length" class="db-empty">暂无标签</div>
             <div v-else>
               <div class="cat-count-meta">共 {{ tags.length }} 个标签</div>
               <div class="tag-cloud-wrap">
                 <div class="tag-cloud">
                   <div
-                    v-for="tag in tags"
+                    v-for="tag in hotTags"
                     :key="tag.id"
                     class="tag-chip"
                     :style="{
@@ -632,30 +444,12 @@ function getArticleStatusClass(post: ArticleListItem) {
                   >
                     <span class="tag-chip-dot" :style="{background: tag.color || '#7c3aed'}"></span>
                     <span class="tag-chip-name">{{ tag.name }}</span>
-                    <div v-if="hasAuthToken()" class="tag-chip-actions">
-                      <button class="db-icon-btn tiny edit" type="button" title="修改" @click="openEditTagDialog(tag)">
-                        <Edit3 :size="10" />
-                      </button>
-                      <button class="db-icon-btn tiny danger" type="button" title="删除" @click="confirmDeleteTag(tag)">
-                        <Trash2 :size="10" />
-                      </button>
-                    </div>
+                    <span v-if="tag.articleCount" class="tag-chip-count">×{{ tag.articleCount }}</span>
                   </div>
                 </div>
               </div>
             </div>
           </div>
-
-          <AppConfirmDialog
-            :show="deletingTag.show"
-            title="确认删除标签"
-            :message="`删除标签 “${deletingTag.name || ''}” 将会移除该标签，确定吗？`"
-            confirmText="删除"
-            cancelText="取消"
-            tone="danger"
-            @confirm="performDeleteTag"
-            @cancel="deletingTag.show = false"
-          />
 
           <!-- 创建标签弹窗（复用 AppConfirmDialog） -->
           <AppConfirmDialog
@@ -671,36 +465,26 @@ function getArticleStatusClass(post: ArticleListItem) {
               <label style="display:flex;gap:0.6rem;align-items:center"><span style="font-size:0.85rem;color:#64748b">颜色</span><input type="color" v-model="newTagColor" style="width:2.2rem;height:2.2rem;border:0;padding:0;background:transparent"/></label>
             </div>
           </AppConfirmDialog>
-
-          <!-- 修改标签弹窗 -->
-          <AppConfirmDialog
-            :show="editingTag.show"
-            title="修改标签"
-            confirmText="保存"
-            cancelText="取消"
-            @confirm="performEditTag"
-            @cancel="editingTag.show = false"
-          >
-            <div style="display:flex;flex-direction:column;gap:0.6rem;margin-top:0.4rem;">
-              <input v-model="editingTag.name" placeholder="标签名称" aria-label="标签名称" />
-              <label style="display:flex;gap:0.6rem;align-items:center"><span style="font-size:0.85rem;color:#64748b">颜色</span><input type="color" v-model="editingTag.color" style="width:2.2rem;height:2.2rem;border:0;padding:0;background:transparent"/></label>
-            </div>
-          </AppConfirmDialog>
         </div>
 
         <!-- 待审核评论 -->
-        <div id="db-comments" class="db-card">
+        <div v-if="canManageComments" id="db-comments" class="db-card">
           <div class="db-card-header">
             <div class="db-card-title-row">
               <MessageSquare :size="15" class="db-card-icon" />
               <h2 class="db-card-title">待审核评论</h2>
             </div>
+            <div class="db-card-header-actions">
+              <button class="db-btn-sm ghost" type="button" @click="router.push('/dashboard/comment')">
+                <ArrowUpRight :size="13" /> 评论管理
+              </button>
+            </div>
           </div>
 
           <div v-if="isLoadingPending" class="db-empty">加载中...</div>
-          <div v-else-if="!pendingComments.length" class="db-empty">暂无待审核的评论</div>
+          <div v-else-if="!recentPendingComments.length" class="db-empty">暂无待审核的评论</div>
 
-          <div v-for="comment in pendingComments" :key="comment.id" class="db-comment-item">
+          <div v-for="comment in recentPendingComments" :key="comment.id" class="db-comment-item">
             <p class="db-comment-text">{{ comment.content }}</p>
             <p class="db-comment-meta">
               {{ comment.author }}
@@ -816,6 +600,13 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-media-banner-action { font-size: 0.8rem; font-weight: 700; color: #6366f1; }
 .db-media-banner-arrow { color: #6366f1; transition: transform 0.2s; }
 .db-media-banner:hover .db-media-banner-arrow { transform: translateX(3px); }
+.db-media-banner--secondary { border-color: rgba(248,113,113,0.12); }
+.db-media-banner--secondary .db-media-banner-action { color: #f43f5e; }
+.db-media-banner--secondary .db-media-banner-arrow { color: #f43f5e; }
+.db-media-banner--secondary:hover {
+  border-color: rgba(248,113,113,0.25);
+  box-shadow: 0 8px 20px rgba(244,63,94,0.08);
+}
 
 /* ── 主内容双栏 ── */
 .db-main-grid { display:grid; grid-template-columns:1.4fr 1fr; gap:1.25rem; }
@@ -828,12 +619,17 @@ function getArticleStatusClass(post: ArticleListItem) {
 .db-card-title-row { display:flex;align-items:center;gap:0.5rem; }
 .db-card-icon { color:#4f46e5; }
 .db-card-title { margin:0;font-size:0.95rem;font-weight:800;color:#0f172a; }
+.db-card-header-actions { display:flex; align-items:center; gap:0.4rem; flex-wrap:wrap; }
 .db-btn-sm {
   display:inline-flex;align-items:center;gap:0.3rem;
   padding:0.3rem 0.75rem;border:none;border-radius:9999px;
   background:#4f46e5;color:white;font-size:0.72rem;font-weight:800;cursor:pointer;transition:background 0.2s;
 }
 .db-btn-sm:hover { background:#4338ca; }
+.db-btn-sm.ghost {
+  background:#f1f5f9; color:#475569; border:1px solid #e2e8f0;
+}
+.db-btn-sm.ghost:hover { background:#e2e8f0; color:#0f172a; }
 
 /* 筛选栏 */
 .db-filter-bar {
@@ -1170,16 +966,12 @@ function getArticleStatusClass(post: ArticleListItem) {
   max-width: 120px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-.tag-chip-actions {
-  display: flex; gap: 0.05rem; align-items: center;
-  margin-left: 0.15rem;
-  opacity: 0;
-  transform: translateX(-2px);
-  transition: opacity 0.12s ease, transform 0.12s ease;
-}
-.tag-chip:hover .tag-chip-actions {
-  opacity: 1;
-  transform: translateX(0);
+.tag-chip-count {
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--tag-fg);
+  opacity: 0.75;
+  margin-left: 0.1rem;
 }
 
 /* 旧标签遗留样式，保留避免其他地方引用 */

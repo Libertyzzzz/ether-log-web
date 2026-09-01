@@ -123,7 +123,6 @@ function formatDate(dateStr: string) {
   return dateStr.slice(0, 10)
 }
 
-// ── Hero 右侧 AI 助手卡片 ──
 const ai = useAIAssistant()
 const heroInput = ref('')
 

@@ -10,7 +10,6 @@ import type { SensitiveWordItem, SensitiveWordCreateRequest, SensitiveWordQueryD
 import { toast } from '../utils/toast'
 import AppConfirmDialog from './AppConfirmDialog.vue'
 
-// ── 状态 ──
 const allItems = ref<SensitiveWordItem[]>([])
 const loading = ref(false)
 const searchQuery = ref('')
@@ -41,7 +40,6 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 const importInput = ref<HTMLInputElement | null>(null)
 const isImporting = ref(false)
 
-// ── 加载数据 ──
 async function loadData() {
   loading.value = true
   const params: SensitiveWordQueryDto = {
@@ -88,7 +86,6 @@ watch(selectedCategory, () => {
   loadData()
 })
 
-// ── 分页 ──
 const totalPages = computed(() => Math.max(1, Math.ceil(totalRecords.value / pageSize)))
 
 function goToPage(p: number) {
@@ -134,7 +131,6 @@ onBeforeUnmount(() => {
   if (searchTimer) clearTimeout(searchTimer)
 })
 
-// ── 操作 ──
 async function addWord() {
   const word = newWord.value.trim()
   if (!word) {
@@ -222,7 +218,6 @@ async function saveEdit() {
   }
 }
 
-// ── 导入导出 ──
 function triggerImport() {
   importInput.value?.click()
 }
@@ -462,7 +457,7 @@ function handleExport() {
     <AppConfirmDialog
       :show="deletingItem.show"
       title="确认删除敏感词"
-      :message="`确定要删除敏感词 “${deletingItem.item?.word || ''}” 吗？此操作不可撤销。`"
+      :message="'确定要删除敏感词「' + (deletingItem.item?.word || '') + '」吗？此操作不可撤销。'"
       confirmText="删除"
       cancelText="取消"
       tone="danger"

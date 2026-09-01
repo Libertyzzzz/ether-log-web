@@ -11,11 +11,8 @@ import QRCode from 'qrcode'
 import { uploadImage, fetchAssessmentShare, evaluateAssessment } from '../api'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
 
-
-// 分享模块
 const route = useRoute()
 
-// [新增] 使用聊天 composab
 const {
   chatMessages,
   currentQuestionId: chatCurrentQuestionId,
@@ -34,7 +31,6 @@ const {
   initSliderValue
 } = useAssessmentChat()
 
-// [新增] 视觉采样相关状态
 const valuationImage = ref<string | null>(null)
 const valuationImageServerName = ref<string | null>(null)
 const valuationImageInput = ref<HTMLInputElement | null>(null)
@@ -44,15 +40,12 @@ const handleImageUpload = async (event: Event) => {
   const target = event.target as HTMLInputElement
   const file = target.files?.[0]
   if (file) {
-    // [优化] 如果之前已经有了预览图且是本地 Blob URL，先释放它以节省内存
-    if (valuationImage.value && valuationImage.value.startsWith('blob:')) {
+        if (valuationImage.value && valuationImage.value.startsWith('blob:')) {
       URL.revokeObjectURL(valuationImage.value)
     }
 
-    // 1. 本地即时预览 (Blob URL)
     valuationImage.value = URL.createObjectURL(file)
 
-    // 2. 实际上传到后端接口
     isUploadingValuationImage.value = true
     try {
       const formData = new FormData()
@@ -67,8 +60,7 @@ const handleImageUpload = async (event: Event) => {
       }
     } catch (error) {
       console.error('采样图片上传异常:', error)
-      toast('图片上传失败，请稍后重试', 'error') // [优化] 增加基础用户反馈
-    } finally {
+      toast('图片上传失败，请稍后重试', 'error')     } finally {
       isUploadingValuationImage.value = false
     }
   }
@@ -79,7 +71,7 @@ const triggerImageUpload = () => {
 }
 
 const posterRef = ref<HTMLElement | null>(null)
-const isGenerating = ref(false) // [新增] 生成状态
+const isGenerating = ref(false)
 const isShareMenuOpen = ref(false)
 const isWechatShareOpen = ref(false)
 const wechatQrCanvasRef = ref<HTMLCanvasElement | null>(null)
@@ -89,14 +81,11 @@ const userLocation = ref<{ latitude: number; longitude: number } | null>(null)
 const isLocationPromptOpen = ref(false)
 let locationPromptResolver: ((allowed: boolean) => void) | null = null
 let activeShareId = ''
-// 在其他 ref 之后添加
-// const qrCodeRef = ref<HTMLElement | null>(null)
 
 const isSharedReport = ref(false)
 
 type AssessmentStep = 'intro' | 'chat' | 'input' | 'loading' | 'result'
 
-// [新增] 用于控制 Hero 区域在聊天模式下不显示
 const shouldShowHero = computed(() => {
   return (step.value === 'input' || step.value === 'loading') 
 })
@@ -132,7 +121,6 @@ const handleAssessmentBack = () => {
 // const adjustColor = (color, amount) => {
 //   return color;
 // };
-
 
 function requestLocationConsent() {
   if (locationPromptResolver) {
@@ -324,7 +312,6 @@ const currentShareUrl = computed(() => {
   return `${window.location.origin}/assessment`
 })
 
-// ─── 海报雷达图 SVG 辅助函数 ───
 const hexAngle = (i: number) => (Math.PI / 180) * (i * 60 - 90)
 
 const hexPoints = (cx: number, cy: number, r: number): string =>
@@ -420,11 +407,7 @@ const savePoster = async () => {
   }
 }
 
-
-
 type GenderModel = 'MALE' | 'FEMALE'
-
-
 
 interface AssessmentForm {
   gender: GenderModel
@@ -567,7 +550,6 @@ const rangeFields = [
   { key: 'empathyLevel', label: '同理心', hint: '1 到 5， 共情力递增', min: 1, max: 5 }
 ] as const
 
-// [新增] 双模式支持
 type InputMode = 'chat' | 'form'
 const inputMode = ref<InputMode>('chat')
 
@@ -586,7 +568,6 @@ const selectMode = async (mode: InputMode) => {
   }
 }
 
-// [新增] 包装 composable 中的函数
 // [修复] 补全语法并移除冗余函数
 const handleChatAnswer = async (value: any) => {
   const currentQ = getCurrentQuestion.value
@@ -796,13 +777,11 @@ const resultChips = computed(() => {
     { label: '推荐动作', value: '笑一下再看' }
   ]
 
-  // 如果后端返回了颜值评分，则展示在结果标签中
   if (result.value?.beautyScore !== undefined) {
     chips.splice(1, 0, { label: '颜值评估', value: `${result.value.beautyScore} pts` })
   }
   return chips
 })
-
 
 function buildAssessmentPayload() {
   const payload = {   
@@ -886,8 +865,7 @@ function normalizeResult(payload: any): AssessmentResult {
     lieFactor: typeof source.lieFactor === 'number' ? source.lieFactor : undefined,
     beautyScore: typeof source.beautyScore === 'number' ? source.beautyScore : undefined,
     visualImageUrl: source.visualImageUrl || source.imageUrl || source.photoUrl || source.image || undefined,
-    shareId: source.shareId, // [新增] 映射后端返回的 ID
-    inputSnapshot: inputSnapshot
+    shareId: source.shareId,     inputSnapshot: inputSnapshot
       ? {
           annualIncome: normalizedAnnualIncome,
           age: typeof inputSnapshot.age === 'number' ? inputSnapshot.age : undefined,
@@ -906,8 +884,6 @@ function normalizeResult(payload: any): AssessmentResult {
     advice: Array.isArray(source.advice) ? source.advice : []
   }
 }
-
-
 
 function startLoadingMessages() {
   let index = 0
@@ -1870,8 +1846,6 @@ onUnmounted(() => {
             <span class="poster-brand-name">Aether Valuation</span>
             <span class="poster-brand-ver">人间估值</span>
           </div>
-
-
 
           <!-- ③ HERO 区 -->
           <div class="poster-hero">
@@ -3776,7 +3750,6 @@ onUnmounted(() => {
   background: #f1f5f9;
 }
 
-
 /* ── 弹窗遮罩 ── */
 .wechat-share-layer {
   position: fixed;
@@ -3959,7 +3932,6 @@ onUnmounted(() => {
   min-height: 50px;
   margin-top: 0;
 }
-
 
 .gold-theme {
   background: linear-gradient(135deg, #FFD700 0%, #FFA500 100%) !important;

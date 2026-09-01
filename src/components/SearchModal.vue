@@ -21,7 +21,6 @@ const results = ref<ArticleListItem[]>([])
 const isLoading = ref(false)
 let searchTimer: number | null = null
 
-// ─── 核心扩展点：本地搜索逻辑 ───
 const performSearch = async (query: string) => {
   if (!query.trim()) {
     results.value = []

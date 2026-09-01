@@ -15,6 +15,13 @@ import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
 import MediaHubPage from './components/MediaHubPage.vue'
 import SensitiveWordPage from './components/SensitiveWordPage.vue'
+import ArticlePage from './components/dashboard/ArticlePage.vue'
+import CategoryPage from './components/dashboard/CategoryPage.vue'
+import TagPage from './components/dashboard/TagPage.vue'
+import CommentPage from './components/dashboard/CommentPage.vue'
+import UserPage from './components/system/UserPage.vue'
+import RolePage from './components/system/RolePage.vue'
+import PermissionPage from './components/system/PermissionPage.vue'
 import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import LoginModal from './components/LoginModal.vue'
@@ -48,6 +55,7 @@ import {
   updateArticle,
   deleteArticle as apiDeleteArticle,
   uploadImage as apiUploadImage,
+  isForbiddenError,
 } from './api'
 
 const route = useRoute()
@@ -95,6 +103,7 @@ const {
 const {
   pendingComments,
   isLoadingPending,
+  error: commentError,
   fetchPendingComments,
   reviewComment,
   deleteComment: deleteCommentApi,
@@ -103,7 +112,6 @@ const {
 const { isDark, toggleDark } = useDarkMode()
 const { open: openAIAssistant } = useAIAssistant()
 
-// ── Route watching for article detail ──
 watch(
   () => route.name,
   async (newRouteName) => {
@@ -116,7 +124,6 @@ watch(
   { immediate: true }
 )
 
-// ── Categories & Tags (real data from backend) ──
 const categories = ref<Category[]>([])
 const tags = ref<Tag[]>([])
 
@@ -173,10 +180,8 @@ async function refreshArticleData() {
   } catch { /* 未登录时后端 401，由拦截器处理 */ }
 }
 
-// ── Login form state ──
 const loginForm = reactive({ email: '', password: '' })
 
-// ── Filter / UI state ──
 const activeCategoryId = ref<number | null>(null)
 const showFeaturedOnly = ref(false)
 
@@ -205,7 +210,6 @@ function handleFilterCategory(label: string) {
   navigateToSection('posts')
 }
 
-// ── Derived view state ──
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
 const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const currentPage = computed(() => (route.meta.page as string) || 'home')
@@ -225,7 +229,6 @@ const nextArticle = computed(() =>
 )
 const dashboardArticles = computed(() => (adminArticles.value.length ? adminArticles.value : articles.value))
 
-// ── Pending comments (real data from backend) ──
 const commentCount = computed(() => pendingComments.value.length)
 
 async function handleApproveComment(commentId: number) {
@@ -248,13 +251,14 @@ async function handleDeleteComment(commentId: number) {
   const success = await deleteCommentApi(commentId)
   if (!success) {
     pendingComments.value = originalList
-    showAppToast('删除失败，请稍后重试', 'error')
+    if (commentError.value) {
+      showAppToast(commentError.value, 'error')
+    }
     return
   }
   showAppToast('评论已删除', 'success')
 }
 
-// ── Publish modal state ──
 const showPublishModal = ref(false)
 const publishError = ref('')
 const isPublishing = ref(false)
@@ -659,9 +663,9 @@ async function publishArticle() {
   } catch (error) {
     if (axios.isAxiosError(error) && error.response?.status === 403) {
       publishError.value = editingArticleId.value
-        ? '编辑接口被权限拦截，请确认 token 和后端认证配置。'
-        : '发布接口被权限拦截，请确认 token 和后端认证配置。'
-      showAppToast(publishError.value, 'error')
+        ? '没有编辑文章的权限'
+        : '没有发布文章的权限'
+      // 403 的 toast 已由全局 api:forbidden 事件统一弹出，此处避免重复
       return
     }
     publishError.value =
@@ -703,7 +707,9 @@ async function confirmDeleteArticle() {
     showAppToast('文章删除成功！', 'success')
     await refreshArticleData()
   } catch (error) {
-    showAppToast('删除失败，请稍后重试。', 'error')
+    if (!isForbiddenError(error)) {
+      showAppToast('删除失败，请稍后重试。', 'error')
+    }
     publishError.value =
       axios.isAxiosError(error) && error.response?.data?.message
         ? error.response.data.message
@@ -713,7 +719,6 @@ async function confirmDeleteArticle() {
   }
 }
 
-// ── Image upload (markdown editor / cover / avatar) ──
 const isUploadingImage = ref(false)
 const pendingMarkdownImage = ref<{ id: number; src: string; alt: string } | null>(null)
 const contentTextarea = ref<HTMLTextAreaElement | null>(null)
@@ -795,11 +800,16 @@ async function uploadImage(event: Event, type: 'markdown' | 'cover' | 'avatar') 
       await updateUserProfile({ avatar: imageUrl })
     }
   } catch (error) {
-    if (axios.isAxiosError(error) && (error.response?.status === 401 || error.response?.status === 403)) {
-      publishError.value = '图片上传被后端权限拦截，请重新登录后再试。'
+    if (axios.isAxiosError(error) && error.response?.status === 401) {
+      publishError.value = '登录已失效，请重新登录后上传'
       clearLoginState()
       openLoginModal()
-      showAppToast(publishError.value, 'error')
+      showAppToast(publishError.value, 'info')
+      return
+    }
+    if (axios.isAxiosError(error) && error.response?.status === 403) {
+      publishError.value = '没有图片上传的权限，请联系管理员授权'
+      // 403 toast 已由全局 api:forbidden 统一弹出，此处避免重复
       return
     }
     publishError.value =
@@ -816,7 +826,6 @@ const isDeletingArticle = ref(false)
 const showDeleteConfirm = ref(false)
 const pendingDeleteArticleId = ref<number | null>(null)
 
-// ── Login / logout actions ──
 const showLoginModal = ref(false)
 
 function openLoginModal() {
@@ -853,7 +862,6 @@ function handleLogout() {
   showAppToast('已退出登录。', 'info')
 }
 
-// ── Access gate ──
 const accessCodeInput = ref('')
 const accessCodeError = ref('')
 const isVerifyingAccessCode = ref(false)
@@ -880,7 +888,6 @@ async function verifyMainAccess() {
   }
 }
 
-// ── Search modal ──
 const showSearchModal = ref(false)
 
 function handleSearchSelect(article: ArticleListItem) {
@@ -888,7 +895,6 @@ function handleSearchSelect(article: ArticleListItem) {
   openArticleDetail(article)
 }
 
-// ── User menu / navigation ──
 const showUserMenu = ref(false)
 
 function handleStatusClick() {
@@ -946,6 +952,13 @@ function openDashboard() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function openSystem() {
+  closeUserMenu()
+  router.push({ name: 'system-role' })
+  closeArticleDetail()
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
 function openQuantLab() {
   closeUserMenu()
   router.push({ name: 'quant-lab' })
@@ -958,7 +971,6 @@ function openAssessment() {
   closeArticleDetail()
 }
 
-// ── Donate modal ──
 const isDonateOpen = ref(false)
 const donateQrCanvasRef = ref<HTMLCanvasElement | null>(null)
 const ALIPAY_URL = 'https://qr.alipay.com/fkx15570bli95fl5zczgq60'
@@ -990,7 +1002,6 @@ async function openDonate() {
   }
 }
 
-// ── Global toast ──
 const showToast = ref(false)
 const toastMessage = ref('')
 const toastType = ref<'success' | 'error' | 'info'>('info')
@@ -1006,7 +1017,6 @@ function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'inf
   }, 3000) as unknown as number
 }
 
-// ── Keyboard shortcuts ──
 function handleKeyDown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault()
@@ -1034,14 +1044,12 @@ function handleBeforeUnload(event: BeforeUnloadEvent) {
   event.returnValue = ''
 }
 
-// ── Lifecycle ──
 onMounted(async () => {
   document.title = 'NEXTIFY'
   window.addEventListener('keydown', handleKeyDown)
   window.addEventListener('beforeunload', handleBeforeUnload)
 
   // 尽早注册 auth:expired 监听，避免早于拦截器 dispatch 的时序问题
-  // 后端返回 401 时，axios 拦截器触发此事件 → 清本地登录态 + 弹登录窗
   // code=1004 (MAX_EXPIRED) —— token 超过最大有效期，强制提醒重新登录
   // code=1003 (TOKEN_INVALID) —— token 无效
   window.addEventListener('auth:expired', (evt: Event) => {
@@ -1063,6 +1071,16 @@ onMounted(async () => {
     const detail = (evt as CustomEvent).detail
     showAppToast(detail?.message || '需要登录才能执行此操作', 'info')
     showLoginModal.value = true
+  })
+
+  // 监听接口权限不足 (403) 事件
+  window.addEventListener('api:forbidden', (evt: Event) => {
+    const detail = (evt as CustomEvent).detail
+    const rawMessage = detail?.message || '抱歉，你没有该操作的权限'
+    const friendlyMessage = rawMessage.length > 60
+      ? '抱歉，你没有该操作的权限，请联系管理员授权'
+      : rawMessage
+    showAppToast(`🚫 ${friendlyMessage}`, 'error')
   })
 
   await checkGateStatus()
@@ -1115,6 +1133,7 @@ onUnmounted(() => {
         @navigate="navigateToSection"
         @open-profile="openProfile"
         @open-dashboard="openDashboard"
+        @open-system="openSystem"
         @open-quant-lab="openQuantLab"
         @open-login="openLoginModal"
         @toggle-status="handleStatusClick"
@@ -1207,6 +1226,41 @@ onUnmounted(() => {
 
           <SensitiveWordPage
             v-if="currentPage === 'dashboard-sensitive-words'"
+            @back="router.push('/dashboard')"
+          />
+
+          <ArticlePage
+            v-if="currentPage === 'dashboard-article'"
+            @back="router.push('/dashboard')"
+          />
+
+          <CategoryPage
+            v-if="currentPage === 'dashboard-category'"
+            @back="router.push('/dashboard')"
+          />
+
+          <TagPage
+            v-if="currentPage === 'dashboard-tag'"
+            @back="router.push('/dashboard')"
+          />
+
+          <CommentPage
+            v-if="currentPage === 'dashboard-comment'"
+            @back="router.push('/dashboard')"
+          />
+
+          <UserPage
+            v-if="currentPage === 'system-user'"
+            @back="router.push('/dashboard')"
+          />
+
+          <RolePage
+            v-if="currentPage === 'system-role'"
+            @back="router.push('/dashboard')"
+          />
+
+          <PermissionPage
+            v-if="currentPage === 'system-permission'"
             @back="router.push('/dashboard')"
           />
 

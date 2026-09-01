@@ -27,7 +27,7 @@ defineEmits<{
       <div class="login-panel compact">
         <div class="login-intro">
           <span class="section-label">登录</span>
-          <h2>进入控制面板</h2>
+          <h2>进入数据面板</h2>
           <p>登录后即可访问文章管理、草稿与个人后台功能。</p>
         </div>
 

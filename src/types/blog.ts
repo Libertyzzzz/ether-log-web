@@ -72,6 +72,7 @@ export interface ArticlePublishRequest {
 
 export interface LoginUser {
   id: number
+  userId: number
   username: string
   nickname: string | null
   avatar: string | null
@@ -215,10 +216,6 @@ export interface ImageDeleteResultVo {
   errorMessages: string[]
 }
 
-// ═══════════════════════════════════════════════════════════════
-// AI Assistant
-// ═══════════════════════════════════════════════════════════════
-
 export type AIChatRole = 'user' | 'assistant'
 export type AIChatAction =
   | 'chat'
@@ -288,4 +285,172 @@ export interface AIChatResponse {
   content: string
   candidates?: string[]
   action?: AIChatAction
+}
+
+export interface SysRole {
+  id: number
+  roleCode: string
+  roleName: string
+  description?: string
+  sort?: number
+  dataScope?: number
+  status: number
+  isSystem?: number
+  createTime?: string
+  updateTime?: string
+}
+
+export interface SysPermission {
+  id: number
+  parentId: number
+  permCode: string
+  permName: string
+  permType: 1 | 2 | 3 // 1: 菜单, 2: 按钮, 3: API接口
+  path?: string
+  component?: string
+  icon?: string
+  sort?: number
+  visible?: number
+  status?: number
+  children?: SysPermission[]
+  createTime?: string
+  updateTime?: string
+}
+
+/**
+ * 权限树查询入参
+ *  - parentId: 起始节点 parentId，0/null 从根节点开始
+ *  - permType: 权限类型过滤 1=菜单 2=按钮 3=API接口, null=不过滤
+ *  - onlyEnabled: 是否只查启用状态 (默认 true)
+ */
+export interface PermissionTreeQueryDto {
+  parentId?: number | null
+  permType?: 1 | 2 | 3 | null
+  onlyEnabled?: boolean
+}
+
+/**
+ * 权限树出参 VO
+ *  - 与数据库实体解耦
+ *  - children 非空时才存在
+ */
+export interface PermissionTreeVO {
+  id: number
+  parentId: number
+  permCode: string
+  permName: string
+  permType: 1 | 2 | 3
+  path?: string
+  component?: string
+  icon?: string
+  sort?: number
+  visible?: number
+  status?: number
+  children?: PermissionTreeVO[]
+}
+
+export interface UserPermissionInfo {
+  userId: number
+  roleCodes: string[]
+  permissionCodes: string[]
+  dataScope?: number
+  isSuperAdmin?: boolean
+  expireAt?: number
+}
+
+export interface SysLoginLog {
+  id: number
+  userId?: number
+  username: string
+  loginType: number // 1=密码 2=扫码 3=第三方
+  status: number // 1=成功 0=失败
+  ip?: string
+  userAgent?: string
+  message?: string
+  loginTime?: string
+}
+
+export interface RoleUserItem {
+  id: number
+  username: string
+  nickname?: string
+  avatar?: string
+}
+
+export interface SysUser {
+  id: number
+  userId: number
+  username: string
+  nickname?: string
+  avatar?: string
+  email?: string
+  phone?: string
+  gender?: number
+  status: number
+  isSystem?: number
+  createTime?: string
+  updateTime?: string
+  lastLoginTime?: string
+  roles?: SysRole[]
+  roleIds?: number[]
+}
+
+export interface SysUserCreateRequest {
+  username: string
+  password?: string
+  nickname?: string
+  email?: string
+  phone?: string
+  gender?: number
+  status?: number
+  roleIds?: number[]
+}
+
+export interface SysUserUpdateRequest {
+  nickname?: string
+  email?: string
+  phone?: string
+  gender?: number
+  status?: number
+  avatar?: string
+  motto?: string
+  password?: string
+  roleIds?: number[]
+}
+
+export interface SysUserQueryDto {
+  pageNum: number
+  pageSize: number
+  keyword?: string
+  status?: number
+  roleId?: number
+}
+
+export interface ArticleQueryDto {
+  pageNum: number
+  pageSize: number
+  keyword?: string
+  categoryId?: number
+  status?: number
+  isTop?: number
+}
+
+export interface CategoryQueryDto {
+  pageNum?: number
+  pageSize?: number
+  keyword?: string
+}
+
+export interface TagQueryDto {
+  pageNum?: number
+  pageSize?: number
+  keyword?: string
+}
+
+export interface CommentQueryDto {
+  pageNum: number
+  pageSize: number
+  keyword?: string
+  status?: number
+  articleId?: number
 }

@@ -288,7 +288,6 @@ function toggleTableOps() {
   showTableOps.value = !showTableOps.value
 }
 
-// ── 表格插入对话框 ──
 const showTableDialog = ref(false)
 const tableRows = ref(3)
 const tableCols = ref(3)
@@ -334,7 +333,6 @@ function deleteTable() {
   editor.value.chain().focus().deleteTable().run()
 }
 
-// ── TOC 目录导航 ──
 type TocItem = { id: string; text: string; level: number; pos: number }
 
 const tocCollapsed = ref(isMobile.value)
@@ -608,7 +606,7 @@ onBeforeUnmount(() => {
                 :style="tagChipStyle(t)"
                 @click="toggleTag(t.id)"
               >{{ t.name }}</span>
-              <span v-if="!tags.length" class="tag-empty">暂无标签，可在控制面板中添加</span>
+              <span v-if="!tags.length" class="tag-empty">暂无标签，可在数据面板中添加</span>
             </div>
             <span class="tag-hint">点击选择或取消选择</span>
           </label>
