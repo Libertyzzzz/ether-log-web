@@ -2,12 +2,11 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   KeyRound, Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight,
-  ArrowLeft, X, Check, FolderOpen, FileText, CircleDot, GripVertical
+  ArrowLeft, FolderOpen, FileText, CircleDot, GripVertical
 } from 'lucide-vue-next'
 import {
   fetchPermissionPage,
   fetchPermissionList,
-  fetchPermissionTree,
   createPermission,
   updatePermission,
   deletePermission,
@@ -53,7 +52,6 @@ let searchTimer: ReturnType<typeof setTimeout> | null = null
 
 const menuCount = computed(() => allPermissions.value.filter((p) => p.permType === 1).length)
 const btnCount = computed(() => allPermissions.value.filter((p) => p.permType === 2).length)
-const apiCount = computed(() => allPermissions.value.filter((p) => p.permType === 3).length)
 const enabledCount = computed(() => allPermissions.value.filter((p) => (p.status ?? 1) === 1).length)
 
 const filteredPermissions = computed(() => pageRecords.value)

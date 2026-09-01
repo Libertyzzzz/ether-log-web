@@ -2,7 +2,7 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   FileText, Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight,
-  ArrowLeft, Eye, Pin, EyeOff, CheckCircle, XCircle, Clock, Filter,
+  ArrowLeft, Eye, Pin, CheckCircle, XCircle, Clock,
   Layout, Tag as TagIcon, ArrowUpRight
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
@@ -12,7 +12,6 @@ import {
   deleteArticle,
   updateArticleField,
   auditArticle,
-  batchUpdateArticleStatus,
   isForbiddenError,
 } from '../../api'
 import type { ArticleListItem, Category } from '../../types/blog'
@@ -37,8 +36,6 @@ const topFilter = ref<number | ''>('')
 
 const categories = ref<Category[]>([])
 
-const showAddModal = ref(false)
-const showEditModal = ref(false)
 const deletingItem = ref<{ show: boolean; item: ArticleListItem | null }>({ show: false, item: null })
 const auditingItem = ref<{ show: boolean; item: ArticleListItem | null; passed: boolean }>({ show: false, item: null, passed: true })
 
@@ -391,7 +388,7 @@ const totalViews = computed(() => allItems.value.reduce((s, a) => s + (a.viewCou
         : `确认拒绝文章《${auditingItem.item?.title || ''}》？作者会收到通知。`"
       :confirm-text="auditingItem.passed ? '确认通过' : '确认拒绝'"
       cancel-text="取消"
-      :tone="auditingItem.passed ? 'primary' : 'danger'"
+      :tone="auditingItem.passed ? 'default' : 'danger'"
       @confirm="handleAudit"
       @cancel="auditingItem.show = false"
     />

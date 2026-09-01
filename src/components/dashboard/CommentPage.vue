@@ -1,8 +1,8 @@
 <script setup lang="ts">
 import { computed, onMounted, ref, watch } from 'vue'
 import {
-  MessageSquare, Search, Trash2, Eye, ChevronLeft, ChevronRight,
-  ArrowLeft, User, CheckCircle, XCircle, Clock, Flag, Filter,
+  MessageSquare, Search, Trash2, ChevronLeft, ChevronRight,
+  ArrowLeft, User, CheckCircle, XCircle, Clock,
   FileText, ThumbsUp, Reply
 } from 'lucide-vue-next'
 import {
@@ -292,8 +292,8 @@ const totalLikes = computed(() => allItems.value.reduce((s, c) => s + (c.likeCou
         <div v-for="item in allItems" :key="item.id" class="sys-table-row comment-table-row" style="grid-template-columns: 40px 130px minmax(0,2fr) 110px 80px 90px 140px;">
           <span><input type="checkbox" :checked="selectedIds.has(item.id)" @change="toggleSelect(item.id)" /></span>
           <div class="sys-comment-user">
-            <div v-if="item.avatar" class="sys-comment-avatar">
-              <img :src="item.avatar" alt="" />
+            <div v-if="item.avatarUrl" class="sys-comment-avatar">
+              <img :src="item.avatarUrl" alt="" />
             </div>
             <div v-else class="sys-comment-avatar placeholder">
               <User :size="14" />
@@ -311,7 +311,7 @@ const totalLikes = computed(() => allItems.value.reduce((s, c) => s + (c.likeCou
               <span>{{ item.parentComment.content }}</span>
             </div>
           </div>
-          <span class="sys-row-text sys-comment-article" :title="item.articleTitle">
+          <span class="sys-row-text sys-comment-article" :title="item.articleTitle ?? undefined">
             <FileText :size="11" />
             {{ item.articleTitle ? (item.articleTitle.length > 8 ? item.articleTitle.slice(0, 8) + '...' : item.articleTitle) : '-' }}
           </span>
@@ -377,7 +377,7 @@ const totalLikes = computed(() => allItems.value.reduce((s, c) => s + (c.likeCou
         : `确认删除选中的 ${selectedIds.size} 条评论？此操作不可恢复。`"
       :confirm-text="batchAction.type === 'approve' ? '确认通过' : batchAction.type === 'reject' ? '确认拒绝' : '确认删除'"
       cancel-text="取消"
-      :tone="batchAction.type === 'approve' ? 'primary' : 'danger'"
+      :tone="batchAction.type === 'approve' ? 'default' : 'danger'"
       @confirm="handleBatchAction"
       @cancel="batchAction.show = false"
     />

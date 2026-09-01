@@ -2,8 +2,8 @@
 import { computed, onMounted, ref, watch } from 'vue'
 import {
   Users, Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight,
-  UserX, UserCheck, KeyRound, Shield, ArrowLeft, Filter,
-  X, Mail, Phone, UserCircle, Calendar, Lock
+  UserX, UserCheck, KeyRound, Shield, ArrowLeft,
+  Mail, Phone, UserCircle, Calendar, Lock
 } from 'lucide-vue-next'
 import {
   fetchUsersPage,

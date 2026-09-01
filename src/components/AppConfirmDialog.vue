@@ -8,7 +8,7 @@ defineProps<{
   errorMessage?: string
   confirmText?: string
   cancelText?: string
-  tone?: 'danger' | 'default'
+  tone?: 'danger' | 'default' | 'primary'
 }>()
 
 defineEmits<{
@@ -95,6 +95,10 @@ defineEmits<{
   margin-bottom: 1rem;
 }
 .confirm-icon.default {
+  background: #eff6ff;
+  color: #2563eb;
+}
+.confirm-icon.primary {
   background: #eff6ff;
   color: #2563eb;
 }

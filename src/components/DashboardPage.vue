@@ -119,7 +119,6 @@ function scrollToSection(id: string) {
 }
 
 const draftArticles = computed(() => props.articles.filter((article) => article.status === 0).slice(0, 5))
-const totalPages = computed(() => Math.max(1, Math.ceil(props.total / props.pageSize)))
 
 const visibleArticles = computed(() => {
   let list = props.articles.filter((article) => article.status !== 0).slice(0, 8)
@@ -159,12 +158,12 @@ function getArticleStatusClass(post: ArticleListItem) {
 
 const canAddArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:add', 'content:article:add']))
 const canEditArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:edit', 'content:article:edit']))
-const canDeleteArticle = computed(() => isSuperAdmin.value || hasPermission(['dashboard:article:delete', 'content:article:delete']))
 const canManageCategories = computed(() => isSuperAdmin.value || hasPermission('dashboard:category') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_EDITOR']))
 const canManageTags = computed(() => isSuperAdmin.value || hasPermission('dashboard:tag') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN', 'ROLE_EDITOR']))
 const canManageComments = computed(() => isSuperAdmin.value || hasPermission('dashboard:comment') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 const canManageMedia = computed(() => isSuperAdmin.value || hasPermission('dashboard:media') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 const canManageSensitiveWords = computed(() => isSuperAdmin.value || hasPermission('dashboard:sensitive') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
+const canAccessSystem = computed(() => isSuperAdmin.value || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 </script>
 
 <template>

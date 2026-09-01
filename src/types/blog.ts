@@ -137,6 +137,9 @@ export interface BackendCommentVO {
   createTime: string
   children: BackendCommentVO[] | null
   parentNickname: string | null
+  likeCount?: number
+  avatar?: string | null
+  parentComment?: BackendCommentVO | null
 }
 
 export interface CommentSubmitRequest {
@@ -155,6 +158,7 @@ export interface Tag {
   name: string
   color?: string
   createTime?: string
+  articleCount?: number
 }
 
 export interface ImageInfoVo {
