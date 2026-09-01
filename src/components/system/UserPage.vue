@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   Users, Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight,
   UserX, UserCheck, KeyRound, Shield, ArrowLeft,
-  Mail, Phone, UserCircle, Calendar, Lock
+  Phone, UserCircle, Calendar, Lock
 } from 'lucide-vue-next'
 import {
   fetchUsersPage,
@@ -34,7 +34,7 @@ const statusFilter = ref<number | ''>('')
 const roleFilter = ref<number | ''>('')
 
 const roleList = ref<SysRole[]>([])
-const userRoleMap = ref<Record<number, string[]>>({})
+const userRoleMap = ref<Record<string, string[]>>({})
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
@@ -55,13 +55,13 @@ const formData = ref({
 })
 
 const resetPwdData = ref({
-  userId: 0,
+  userId: '' as number | string,
   username: '',
   newPassword: '',
 })
 
 const assignRoleData = ref({
-  userId: 0,
+  userId: '' as number | string,
   username: '',
   selectedRoleIds: [] as number[],
 })
@@ -269,7 +269,7 @@ async function confirmDelete() {
 
 function openResetPwd(item: SysUser) {
   resetPwdData.value = {
-    userId: item.id,
+    userId: String(item.userId),
     username: item.username,
     newPassword: '',
   }
@@ -355,7 +355,7 @@ function getUserId(item: SysUser) {
 
 function getUserRoleNames(item: SysUser) {
   const userId = getUserId(item)
-  const roles = userRoleMap.value[userId] || []
+  const roles = userRoleMap.value[userId] ?? []
   return roles.length ? roles : ['未分配']
 }
 
