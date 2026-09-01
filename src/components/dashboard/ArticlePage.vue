@@ -3,7 +3,7 @@ import { computed, onMounted, ref, watch } from 'vue'
 import {
   FileText, Plus, Search, Trash2, Pencil, ChevronLeft, ChevronRight,
   ArrowLeft, Eye, Pin, CheckCircle, XCircle, Clock,
-  Layout, Tag as TagIcon, ArrowUpRight
+  Layout, Tag as TagIcon
 } from 'lucide-vue-next'
 import { useRouter } from 'vue-router'
 import {

@@ -115,14 +115,14 @@ function toggleSelectAll() {
   }
 }
 
-function statusLabel(s: number | undefined) {
+function statusLabel(s: number | null | undefined) {
   if (s === 0) return '待审核'
   if (s === 1) return '已通过'
   if (s === 2) return '已拒绝'
   return '未知'
 }
 
-function statusClass(s: number | undefined) {
+function statusClass(s: number | null | undefined) {
   if (s === 0) return 'status-pending'
   if (s === 1) return 'status-approved'
   if (s === 2) return 'status-rejected'
