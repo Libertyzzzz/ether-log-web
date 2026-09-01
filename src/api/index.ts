@@ -811,7 +811,11 @@ export async function fetchUserRoles(userId: number | string): Promise<SysRole[]
 }
 
 export async function assignRolesToUser(userId: number | string, roleIds: number[]): Promise<void> {
-  await updateUser(Number(userId), { roleIds })
+  const parsedUserId = Number(userId)
+  if (!Number.isFinite(parsedUserId)) {
+    throw new Error('无效用户ID')
+  }
+  await updateUser(parsedUserId, { roleIds })
 }
 
 export async function fetchRolePermissionIds(roleId: number): Promise<number[]> {
@@ -968,8 +972,12 @@ export async function deleteUser(id: number): Promise<void> {
   }
 }
 
-export async function resetUserPassword(userId: number, newPassword?: string): Promise<void> {
-  await updateUser(userId, { password: newPassword || undefined })
+export async function resetUserPassword(userId: number | string, newPassword?: string): Promise<void> {
+  const parsedUserId = Number(userId)
+  if (!Number.isFinite(parsedUserId)) {
+    throw new Error('无效用户ID')
+  }
+  await updateUser(parsedUserId, { password: newPassword || undefined })
 }
 
 export async function toggleUserStatus(userId: number, status: number): Promise<void> {
