@@ -34,6 +34,7 @@ const statusFilter = ref<number | ''>('')
 const roleFilter = ref<number | ''>('')
 
 const roleList = ref<SysRole[]>([])
+const userRoleMap = ref<Record<number, string[]>>({})
 
 const showAddModal = ref(false)
 const showEditModal = ref(false)
@@ -75,6 +76,28 @@ async function loadRoles() {
   }
 }
 
+async function loadRolesForUsers(records: SysUser[]) {
+  if (!records.length) {
+    userRoleMap.value = {}
+    return
+  }
+
+  const entries = await Promise.all(records.map(async (item) => {
+    const userId = String(item.userId)
+    try {
+      const roles = await fetchUserRoles(userId)
+      return [userId, roles.map((role) => role.roleName).filter(Boolean)] as const
+    } catch {
+      const fallbackRoles = Array.isArray(item.roles)
+        ? item.roles.map((role) => role.roleName).filter(Boolean)
+        : []
+      return [userId, fallbackRoles] as const
+    }
+  }))
+
+  userRoleMap.value = Object.fromEntries(entries)
+}
+
 async function loadData() {
   loading.value = true
   const params: SysUserQueryDto = {
@@ -89,10 +112,12 @@ async function loadData() {
     const result = await fetchUsersPage(params)
     allItems.value = result.records
     totalRecords.value = result.total
+    await loadRolesForUsers(result.records)
   } catch (e) {
     if (!isForbiddenError(e)) {
       allItems.value = []
       totalRecords.value = 0
+      userRoleMap.value = {}
     }
   } finally {
     loading.value = false
@@ -273,13 +298,14 @@ async function handleResetPwd() {
 }
 
 async function openAssignRole(item: SysUser) {
+  const targetUserId = getUserId(item)
   assignRoleData.value = {
-    userId: item.id,
+    userId: targetUserId,
     username: item.username,
     selectedRoleIds: [],
   }
   try {
-    const roles = await fetchUserRoles(item.userId)
+    const roles = await fetchUserRoles(targetUserId)
     assignRoleData.value.selectedRoleIds = roles.map((r) => r.id)
   } catch {
     assignRoleData.value.selectedRoleIds = item.roleIds || []
@@ -321,6 +347,16 @@ function getGenderLabel(g: number | undefined) {
   if (g === 1) return '男'
   if (g === 2) return '女'
   return '未知'
+}
+
+function getUserId(item: SysUser) {
+  return String(item.userId)
+}
+
+function getUserRoleNames(item: SysUser) {
+  const userId = getUserId(item)
+  const roles = userRoleMap.value[userId] || []
+  return roles.length ? roles : ['未分配']
 }
 
 function getStatusLabel(s: number) {
@@ -418,12 +454,13 @@ function getStatusLabel(s: number) {
         </div>
 
         <div class="sys-table-head">
-          <span style="width:180px">用户信息</span>
-          <span>邮箱 / 电话</span>
-          <span style="width:100px">性别</span>
-          <span style="width:100px">状态</span>
-          <span style="width:140px">创建时间</span>
-          <span style="width:260px">操作</span>
+          <span>用户信息</span>
+          <span>电话</span>
+          <span>性别</span>
+          <span>状态</span>
+          <span>用户角色</span>
+          <span>创建时间</span>
+          <span>操作</span>
         </div>
 
         <div v-if="loading" class="sys-empty">加载中...</div>
@@ -440,18 +477,33 @@ function getStatusLabel(s: number) {
             </div>
           </div>
           <div class="sys-user-contact">
-            <span v-if="item.email" class="sys-contact-item">
-              <Mail :size="11" /> {{ item.email }}
-            </span>
             <span v-if="item.phone" class="sys-contact-item">
               <Phone :size="11" /> {{ item.phone }}
             </span>
-            <span v-if="!item.email && !item.phone" class="sys-contact-empty">—</span>
+            <span v-else class="sys-contact-empty">—</span>
           </div>
           <span class="sys-row-text">{{ getGenderLabel(item.gender) }}</span>
           <span class="sys-row-status" :class="item.status === 1 ? 'active' : 'disabled'">
             {{ getStatusLabel(item.status) }}
           </span>
+          <div class="sys-row-role">
+            <template v-if="getUserRoleNames(item).length && getUserRoleNames(item)[0] !== '未分配'">
+              <span
+                v-for="(roleName, index) in getUserRoleNames(item).slice(0, 2)"
+                :key="`${item.id}-${roleName}-${index}`"
+                class="sys-role-tag"
+              >
+                {{ roleName }}
+              </span>
+              <span
+                v-if="getUserRoleNames(item).length > 2"
+                class="sys-role-tag sys-role-tag-more"
+              >
+                +{{ getUserRoleNames(item).length - 2 }}
+              </span>
+            </template>
+            <span v-else class="sys-role-empty">未分配</span>
+          </div>
           <div class="sys-row-text sys-time-cell">
             <Calendar :size="11" />
             {{ item.createTime?.slice(0, 10) || '—' }}
@@ -869,7 +921,7 @@ function getStatusLabel(s: number) {
 /* ── Table ── */
 .sys-table-head {
   display: grid;
-  grid-template-columns: 180px 1fr 100px 100px 140px 260px;
+  grid-template-columns: minmax(200px, 1.9fr) minmax(120px, 0.9fr) 90px 90px minmax(150px, 1.1fr) 140px minmax(200px, 1.3fr);
   align-items: center;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid #e2e8f0;
@@ -881,7 +933,7 @@ function getStatusLabel(s: number) {
 }
 .sys-table-row {
   display: grid;
-  grid-template-columns: 180px 1fr 100px 100px 140px 260px;
+  grid-template-columns: minmax(200px, 1.9fr) minmax(120px, 0.9fr) 90px 90px minmax(150px, 1.1fr) 140px minmax(200px, 1.3fr);
   align-items: center;
   padding: 0.85rem;
   border-bottom: 1px solid #f1f5f9;
@@ -918,6 +970,34 @@ function getStatusLabel(s: number) {
 .sys-contact-empty { color: #cbd5e1; font-size: 0.82rem; }
 
 .sys-row-text { font-size: 0.8rem; color: #475569; }
+.sys-row-role {
+  display: flex;
+  align-items: center;
+  gap: 0.42rem;
+  flex-wrap: wrap;
+  min-height: 2.1rem;
+}
+.sys-role-tag {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.22rem 0.6rem;
+  border-radius: 999px;
+  background: rgba(99, 102, 241, 0.08);
+  color: #4f46e5;
+  border: 1px solid rgba(99, 102, 241, 0.14);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+.sys-role-tag-more {
+  background: rgba(148, 163, 184, 0.12);
+  color: #475569;
+  border-color: rgba(148, 163, 184, 0.18);
+}
+.sys-role-empty {
+  color: #94a3b8;
+  font-size: 0.72rem;
+}
 .sys-time-cell { display: inline-flex; align-items: center; gap: 0.3rem; color: #64748b; }
 .sys-row-status {
   display: inline-flex;
@@ -933,8 +1013,10 @@ function getStatusLabel(s: number) {
 .sys-row-actions {
   display: flex;
   align-items: center;
+  justify-content: flex-start;
   gap: 0.35rem;
   flex-wrap: wrap;
+  min-width: 0;
 }
 .sys-action-btn {
   display: inline-flex; align-items: center; gap: 0.25rem;
@@ -945,6 +1027,7 @@ function getStatusLabel(s: number) {
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
+  white-space: nowrap;
 }
 .sys-action-btn.edit { background: rgba(99,102,241,0.08); color: #6366f1; }
 .sys-action-btn.edit:hover { background: rgba(99,102,241,0.15); }
@@ -1170,11 +1253,11 @@ function getStatusLabel(s: number) {
   .sys-stats-grid { grid-template-columns: repeat(2, 1fr); }
   .sys-table-head,
   .sys-table-row {
-    grid-template-columns: 150px 1fr 80px 80px 260px;
+    grid-template-columns: minmax(180px, 1.5fr) minmax(110px, 0.9fr) 80px 80px minmax(120px, 1fr) 200px;
   }
-  .sys-table-head > span:nth-child(5),
-  .sys-table-row > div:nth-child(5),
-  .sys-table-row > span:nth-child(5) { display: none; }
+  .sys-table-head > span:nth-child(7),
+  .sys-table-row > div:nth-child(7),
+  .sys-table-row > span:nth-child(7) { min-width: 0; }
 }
 @media (max-width: 640px) {
   .sys-stats-grid { grid-template-columns: 1fr 1fr; }

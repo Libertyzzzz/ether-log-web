@@ -802,16 +802,16 @@ export async function deleteRole(id: number): Promise<void> {
   }
 }
 
-export async function fetchUserRoles(userId: number): Promise<SysRole[]> {
-  const response = await axios.get<ResultResponse<SysRole[]>>(`/api/admin/role/user/${userId}`)
+export async function fetchUserRoles(userId: number | string): Promise<SysRole[]> {
+  const response = await axios.get<ResultResponse<SysRole[]>>(`/api/admin/role/user/${encodeURIComponent(String(userId))}`)
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
   throw new Error(response.data.message || '获取用户角色失败')
 }
 
-export async function assignRolesToUser(userId: number, roleIds: number[]): Promise<void> {
-  await updateUser(userId, { roleIds })
+export async function assignRolesToUser(userId: number | string, roleIds: number[]): Promise<void> {
+  await updateUser(Number(userId), { roleIds })
 }
 
 export async function fetchRolePermissionIds(roleId: number): Promise<number[]> {
