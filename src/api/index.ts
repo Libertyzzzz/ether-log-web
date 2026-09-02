@@ -811,11 +811,9 @@ export async function fetchUserRoles(userId: number | string): Promise<SysRole[]
 }
 
 export async function assignRolesToUser(userId: number | string, roleIds: number[]): Promise<void> {
-  const parsedUserId = Number(userId)
-  if (!Number.isFinite(parsedUserId)) {
-    throw new Error('无效用户ID')
-  }
-  await updateUser(parsedUserId, { roleIds })
+  const uid = String(userId)
+  if (!uid) throw new Error('无效用户ID')
+  await updateUser(uid, { roleIds })
 }
 
 export async function fetchRolePermissionIds(roleId: number): Promise<number[]> {
