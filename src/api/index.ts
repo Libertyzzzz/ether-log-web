@@ -955,10 +955,8 @@ export async function createUser(user: SysUserCreateRequest): Promise<SysUser> {
   throw new Error(response.data.message || '创建用户失败')
 }
 
-export async function updateUser(id: number, dto: SysUserUpdateRequest): Promise<SysUser> {
-  const response = await axios.put<ResultResponse<SysUser>>('/api/admin/user', dto, {
-    params: { id },
-  })
+export async function updateUser(userId: number | string, dto: SysUserUpdateRequest): Promise<SysUser> {
+  const response = await axios.put<ResultResponse<SysUser>>(`/api/admin/user/${encodeURIComponent(String(userId))}`, dto)
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }

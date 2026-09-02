@@ -44,6 +44,7 @@ const deletingItem = ref<{ show: boolean; item: SysUser | null }>({ show: false,
 
 const formData = ref({
   id: 0,
+  userId: '' as string,
   username: '',
   password: '',
   nickname: '',
@@ -167,6 +168,7 @@ onMounted(() => {
 function openAddModal() {
   formData.value = {
     id: 0,
+    userId: '',
     username: '',
     password: '',
     nickname: '',
@@ -214,15 +216,16 @@ async function handleCreate() {
 
 function openEditModal(item: SysUser) {
   formData.value = {
-    id: item.id,
+    id: item.id ?? item.userId,
+    userId: String(item.userId),
     username: item.username,
     password: '',
     nickname: item.nickname || '',
     email: item.email || '',
     phone: item.phone || '',
-    gender: item.gender || 0,
-    status: item.status,
-    roleIds: item.roleIds || [],
+    gender: item.gender ?? 0,
+    status: typeof item.status === 'number' ? item.status : 1,
+    roleIds: Array.isArray(item.roleIds) ? [...item.roleIds] : [],
   }
   showEditModal.value = true
 }
@@ -231,22 +234,31 @@ function closeEditModal() {
   showEditModal.value = false
 }
 
+const editSubmitting = ref(false)
+
 async function handleUpdate() {
-  if (!formData.value.id) return
+  if (!formData.value.userId) {
+    toast('用户信息缺失，请关闭后重试', 'error')
+    return
+  }
+  if (editSubmitting.value) return
+  editSubmitting.value = true
   try {
-    await updateUser(formData.value.id, {
+    await updateUser(formData.value.userId, {
       nickname: formData.value.nickname.trim() || undefined,
       email: formData.value.email.trim() || undefined,
       phone: formData.value.phone.trim() || undefined,
       gender: formData.value.gender,
       status: formData.value.status,
-      roleIds: formData.value.roleIds,
     })
     toast('用户信息已更新', 'success')
     closeEditModal()
     loadData()
-  } catch (e) {
-    if (!isForbiddenError(e)) toast('更新用户失败', 'error')
+  } catch (e: any) {
+    const msg = e?.response?.data?.message || e?.message || '更新用户失败'
+    if (!isForbiddenError(e)) toast(msg, 'error')
+  } finally {
+    editSubmitting.value = false
   }
 }
 
@@ -362,6 +374,17 @@ function getUserRoleNames(item: SysUser) {
 function getStatusLabel(s: number) {
   return s === 1 ? '正常' : '禁用'
 }
+
+function getStatusText(value: number | '') {
+  if (value === '') return '全部状态'
+  return value === 1 ? '正常' : '禁用'
+}
+
+function getRoleText(value: number | '') {
+  if (value === '') return '全部角色'
+  const match = roleList.value.find((item) => item.id === Number(value))
+  return match ? match.roleName : '全部角色'
+}
 </script>
 
 <template>
@@ -439,17 +462,30 @@ function getStatusLabel(s: number) {
                 type="text"
                 class="sys-search-input"
                 placeholder="搜索用户名/昵称..."
+                title="搜索用户名或昵称"
               />
             </div>
-            <select v-model="statusFilter" class="sys-filter-select">
-              <option :value="''">全部状态</option>
-              <option :value="1">正常</option>
-              <option :value="0">禁用</option>
-            </select>
-            <select v-model="roleFilter" class="sys-filter-select">
-              <option :value="''">全部角色</option>
-              <option v-for="r in roleList" :key="r.id" :value="r.id">{{ r.roleName }}</option>
-            </select>
+            <div class="sys-filter-field">
+              <select
+                v-model="statusFilter"
+                class="sys-filter-select"
+                :title="getStatusText(statusFilter)"
+              >
+                <option :value="''">全部状态</option>
+                <option :value="1">正常</option>
+                <option :value="0">禁用</option>
+              </select>
+            </div>
+            <div class="sys-filter-field">
+              <select
+                v-model="roleFilter"
+                class="sys-filter-select"
+                :title="getRoleText(roleFilter)"
+              >
+                <option :value="''">全部角色</option>
+                <option v-for="r in roleList" :key="r.id" :value="r.id">{{ r.roleName }}</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -467,46 +503,48 @@ function getStatusLabel(s: number) {
         <div v-else-if="!allItems.length" class="sys-empty">暂无用户数据</div>
 
         <div v-for="item in allItems" :key="item.id" class="sys-table-row">
-          <div class="sys-user-info">
-            <div class="sys-user-avatar">
-              <UserCircle :size="32" />
+          <div class="sys-row-main">
+            <div class="sys-user-info">
+              <div class="sys-user-avatar">
+                <UserCircle :size="32" />
+              </div>
+              <div class="sys-user-meta">
+                <strong class="sys-user-name">{{ item.nickname || item.username }}</strong>
+                <span class="sys-user-sub">@{{ item.username }}</span>
+              </div>
             </div>
-            <div class="sys-user-meta">
-              <strong class="sys-user-name">{{ item.nickname || item.username }}</strong>
-              <span class="sys-user-sub">@{{ item.username }}</span>
+            <div class="sys-user-contact">
+              <span v-if="item.phone" class="sys-contact-item">
+                <Phone :size="11" /> {{ item.phone }}
+              </span>
+              <span v-else class="sys-contact-empty">—</span>
             </div>
-          </div>
-          <div class="sys-user-contact">
-            <span v-if="item.phone" class="sys-contact-item">
-              <Phone :size="11" /> {{ item.phone }}
+            <span class="sys-row-text">{{ getGenderLabel(item.gender) }}</span>
+            <span class="sys-row-status" :class="item.status === 1 ? 'active' : 'disabled'">
+              {{ getStatusLabel(item.status) }}
             </span>
-            <span v-else class="sys-contact-empty">—</span>
-          </div>
-          <span class="sys-row-text">{{ getGenderLabel(item.gender) }}</span>
-          <span class="sys-row-status" :class="item.status === 1 ? 'active' : 'disabled'">
-            {{ getStatusLabel(item.status) }}
-          </span>
-          <div class="sys-row-role">
-            <template v-if="getUserRoleNames(item).length && getUserRoleNames(item)[0] !== '未分配'">
-              <span
-                v-for="(roleName, index) in getUserRoleNames(item).slice(0, 2)"
-                :key="`${item.id}-${roleName}-${index}`"
-                class="sys-role-tag"
-              >
-                {{ roleName }}
-              </span>
-              <span
-                v-if="getUserRoleNames(item).length > 2"
-                class="sys-role-tag sys-role-tag-more"
-              >
-                +{{ getUserRoleNames(item).length - 2 }}
-              </span>
-            </template>
-            <span v-else class="sys-role-empty">未分配</span>
-          </div>
-          <div class="sys-row-text sys-time-cell">
-            <Calendar :size="11" />
-            {{ item.createTime?.slice(0, 10) || '—' }}
+            <div class="sys-row-role">
+              <template v-if="getUserRoleNames(item).length && getUserRoleNames(item)[0] !== '未分配'">
+                <span
+                  v-for="(roleName, index) in getUserRoleNames(item).slice(0, 2)"
+                  :key="`${item.id}-${roleName}-${index}`"
+                  class="sys-role-tag"
+                >
+                  {{ roleName }}
+                </span>
+                <span
+                  v-if="getUserRoleNames(item).length > 2"
+                  class="sys-role-tag sys-role-tag-more"
+                >
+                  +{{ getUserRoleNames(item).length - 2 }}
+                </span>
+              </template>
+              <span v-else class="sys-role-empty">未分配</span>
+            </div>
+            <div class="sys-row-text sys-time-cell">
+              <Calendar :size="11" />
+              {{ item.createTime?.slice(0, 10) || '—' }}
+            </div>
           </div>
           <div class="sys-row-actions">
             <button type="button" class="sys-action-btn edit" @click="openEditModal(item)">
@@ -657,22 +695,6 @@ function getStatusLabel(s: number) {
             <option :value="0">禁用</option>
           </select>
         </label>
-        <div class="sys-form-item">
-          <span class="sys-form-label">分配角色</span>
-          <div v-if="!roleList.length" class="sys-roles-empty">暂无可用角色</div>
-          <div v-else class="sys-role-chips">
-            <button
-              v-for="role in roleList"
-              :key="role.id"
-              type="button"
-              class="sys-role-chip"
-              :class="{ checked: formData.roleIds.includes(role.id) }"
-              @click="toggleRoleSelect(role.id)"
-            >
-              {{ role.roleName }}
-            </button>
-          </div>
-        </div>
       </div>
     </AppConfirmDialog>
 
@@ -860,23 +882,35 @@ function getStatusLabel(s: number) {
   align-items: center;
   justify-content: space-between;
   margin-bottom: 1rem;
-  flex-wrap: wrap;
-  gap: 0.75rem;
+  flex-wrap: nowrap;
+  gap: 1rem;
 }
-.sys-card-title-row { display: flex; align-items: center; gap: 0.5rem; }
+.sys-card-title-row { display: flex; align-items: center; gap: 0.5rem; flex-shrink: 0; }
 .sys-card-icon { color: #4f46e5; }
-.sys-card-title { margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a; }
+.sys-card-title { margin: 0; font-size: 0.95rem; font-weight: 800; color: #0f172a; white-space: nowrap; }
 
 .sys-filter-bar {
   display: flex;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  flex-direction: row;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 0.45rem;
+  flex: 1 1 auto;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
+.sys-filter-field {
+  flex: 0 0 auto;
+  min-width: 7.5rem;
+  max-width: 9.5rem;
 }
 .sys-search-wrap {
   position: relative;
   display: flex;
   align-items: center;
-  min-width: 180px;
+  flex: 0 1 18rem;
+  min-width: 10rem;
+  max-width: 20rem;
 }
 .sys-search-icon {
   position: absolute;
@@ -901,7 +935,10 @@ function getStatusLabel(s: number) {
   background: #fff;
 }
 .sys-filter-select {
-  padding: 0.45rem 1.65rem 0.45rem 0.65rem;
+  width: 100%;
+  min-width: 0;
+  max-width: 100%;
+  padding: 0.45rem 1.85rem 0.45rem 0.7rem;
   border: 1px solid #e2e8f0;
   border-radius: 0.6rem;
   font-size: 0.78rem;
@@ -911,6 +948,9 @@ function getStatusLabel(s: number) {
   cursor: pointer;
   appearance: none;
   transition: border-color 0.15s;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .sys-filter-select:focus {
   border-color: #818cf8;
@@ -921,7 +961,7 @@ function getStatusLabel(s: number) {
 /* ── Table ── */
 .sys-table-head {
   display: grid;
-  grid-template-columns: minmax(200px, 1.9fr) minmax(120px, 0.9fr) 90px 90px minmax(150px, 1.1fr) 140px minmax(200px, 1.3fr);
+  grid-template-columns: minmax(200px, 1.7fr) minmax(170px, 1.25fr) 90px 90px minmax(150px, 1.1fr) 170px minmax(200px, 1.3fr);
   align-items: center;
   padding: 0.6rem 0.85rem;
   border-bottom: 1px solid #e2e8f0;
@@ -931,11 +971,12 @@ function getStatusLabel(s: number) {
   letter-spacing: 0.02em;
   text-transform: uppercase;
 }
+.sys-table-head > span:nth-child(2) { padding-left: 0.9rem; }
 .sys-table-row {
   display: grid;
-  grid-template-columns: minmax(200px, 1.9fr) minmax(120px, 0.9fr) 90px 90px minmax(150px, 1.1fr) 140px minmax(200px, 1.3fr);
+  grid-template-columns: minmax(200px, 1.7fr) minmax(170px, 1.25fr) 90px 90px minmax(150px, 1.1fr) 170px minmax(200px, 1.3fr);
   align-items: center;
-  padding: 0.85rem;
+  padding: 1.05rem 0.95rem;
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.15s;
 }
@@ -943,6 +984,9 @@ function getStatusLabel(s: number) {
   background: rgba(99,102,241,0.03);
 }
 .sys-table-row:last-child { border-bottom: none; }
+.sys-row-main {
+  display: contents;
+}
 
 .sys-user-info { display: flex; align-items: center; gap: 0.65rem; min-width: 0; }
 .sys-user-avatar {
@@ -953,15 +997,25 @@ function getStatusLabel(s: number) {
   display: flex; align-items: center; justify-content: center;
   flex-shrink: 0;
 }
-.sys-user-meta { display: flex; flex-direction: column; gap: 0.1rem; min-width: 0; }
+.sys-user-meta {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.1rem;
+  min-width: 0;
+  flex-wrap: nowrap;
+}
 .sys-user-name {
-  font-size: 0.82rem; font-weight: 750; color: #0f172a;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  font-size: 0.92rem; font-weight: 780; color: #0f172a;
+  line-height: 1.15;
+  white-space: nowrap;
 }
 .sys-user-sub {
-  font-size: 0.7rem; color: #94a3b8; font-weight: 500;
+  font-size: 0.76rem; color: #94a3b8; font-weight: 500;
+  line-height: 1.2;
+  white-space: nowrap;
 }
-.sys-user-contact { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; }
+.sys-user-contact { display: flex; flex-direction: column; gap: 0.25rem; min-width: 0; padding-left: 0.9rem; }
 .sys-contact-item {
   display: inline-flex; align-items: center; gap: 0.25rem;
   font-size: 0.75rem; color: #64748b;
@@ -969,11 +1023,11 @@ function getStatusLabel(s: number) {
 }
 .sys-contact-empty { color: #cbd5e1; font-size: 0.82rem; }
 
-.sys-row-text { font-size: 0.8rem; color: #475569; }
+.sys-row-text { font-size: 0.86rem; font-weight: 500; color: #334155; }
 .sys-row-role {
   display: flex;
   align-items: center;
-  gap: 0.42rem;
+  gap: 0.45rem;
   flex-wrap: wrap;
   min-height: 2.1rem;
 }
@@ -981,13 +1035,13 @@ function getStatusLabel(s: number) {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.22rem 0.6rem;
-  border-radius: 999px;
+  padding: 0.28rem 0.75rem;
+  border-radius: 0.55rem;
   background: rgba(99, 102, 241, 0.08);
   color: #4f46e5;
-  border: 1px solid rgba(99, 102, 241, 0.14);
-  font-size: 0.7rem;
-  font-weight: 700;
+  border: 1px solid rgba(99, 102, 241, 0.18);
+  font-size: 0.75rem;
+  font-weight: 750;
 }
 .sys-role-tag-more {
   background: rgba(148, 163, 184, 0.12);
@@ -996,46 +1050,60 @@ function getStatusLabel(s: number) {
 }
 .sys-role-empty {
   color: #94a3b8;
-  font-size: 0.72rem;
+  font-size: 0.8rem;
 }
-.sys-time-cell { display: inline-flex; align-items: center; gap: 0.3rem; color: #64748b; }
+.sys-time-cell { display: inline-flex; align-items: center; gap: 0.32rem; color: #64748b; font-size: 0.8rem; }
 .sys-row-status {
   display: inline-flex;
-  padding: 0.2rem 0.6rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-weight: 700;
+  align-items: center;
+  justify-content: center;
+  padding: 0.3rem 0.85rem;
+  border-radius: 0.65rem;
+  font-size: 0.72rem;
+  font-weight: 750;
   width: fit-content;
+  letter-spacing: 0.01em;
 }
 .sys-row-status.active { background: rgba(16,185,129,0.1); color: #10b981; }
 .sys-row-status.disabled { background: rgba(248,113,113,0.1); color: #f87171; }
 
 .sys-row-actions {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: flex-start;
-  gap: 0.35rem;
-  flex-wrap: wrap;
+  gap: 0.3rem 0.4rem;
   min-width: 0;
+  padding-top: 0;
+  border-top: none;
 }
 .sys-action-btn {
-  display: inline-flex; align-items: center; gap: 0.25rem;
-  padding: 0.3rem 0.55rem;
+  display: inline-flex; align-items: center; justify-content: center; gap: 0.2rem;
+  padding: 0.36rem 0.55rem;
   border: none;
-  border-radius: 0.5rem;
-  font-size: 0.7rem;
+  border-radius: 0.45rem;
+  font-size: 0.68rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.15s;
   white-space: nowrap;
+  line-height: 1.1;
+  width: fit-content;
 }
+.sys-action-btn svg { width: 11px; height: 11px; }
 .sys-action-btn.edit { background: rgba(99,102,241,0.08); color: #6366f1; }
 .sys-action-btn.edit:hover { background: rgba(99,102,241,0.15); }
 .sys-action-btn.role { background: rgba(139,92,246,0.08); color: #8b5cf6; }
 .sys-action-btn.role:hover { background: rgba(139,92,246,0.15); }
 .sys-action-btn.pwd { background: rgba(245,158,11,0.08); color: #f59e0b; }
 .sys-action-btn.pwd:hover { background: rgba(245,158,11,0.15); }
-.sys-action-btn.danger { background: rgba(248,113,113,0.08); color: #f87171; padding: 0.3rem 0.45rem; }
+.sys-action-btn.danger {
+  background: rgba(248,113,113,0.08);
+  color: #f87171;
+  padding: 0.36rem 0.45rem;
+  min-width: 1.9rem;
+}
+.sys-action-btn.danger svg { width: 12px; height: 12px; }
 .sys-action-btn.danger:hover { background: rgba(248,113,113,0.15); }
 
 .sys-empty {
@@ -1265,12 +1333,95 @@ function getStatusLabel(s: number) {
   .sys-hero-title { font-size: 1rem; }
   .sys-btn-new { padding: 0.5rem 1rem; font-size: 0.75rem; }
   .sys-card { padding: 1rem; }
-  .sys-table-head,
-  .sys-table-row {
-    grid-template-columns: 1fr;
-    gap: 0.5rem;
+  .sys-filter-bar {
+    display: flex;
+    flex-direction: row;
+    width: 100%;
+    gap: 0.4rem;
+  }
+  .sys-filter-field,
+  .sys-search-wrap {
+    flex: 1 1 0;
+    min-width: 0;
   }
   .sys-table-head { display: none; }
-  .sys-row-actions { flex-wrap: wrap; }
+  .sys-table-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.7rem;
+    padding: 1rem 0.9rem;
+  }
+  .sys-row-main {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    overflow: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+  }
+  .sys-user-info {
+    width: auto;
+    flex: 1 1 34%;
+    display: flex;
+    align-items: center;
+    gap: 0.55rem;
+    min-width: 0;
+  }
+  .sys-user-meta {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.35rem;
+    flex-wrap: nowrap;
+    min-width: 0;
+    overflow: hidden;
+  }
+  .sys-user-name,
+  .sys-user-sub {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sys-user-contact,
+  .sys-row-role,
+  .sys-time-cell,
+  .sys-row-status,
+  .sys-row-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sys-row-role {
+    flex: 1 1 auto;
+    min-width: 0;
+  }
+  .sys-user-contact,
+  .sys-time-cell,
+  .sys-row-status,
+  .sys-row-text {
+    max-width: 26vw;
+  }
+  .sys-user-contact {
+    flex-shrink: 1;
+  }
+  .sys-row-actions {
+    flex-wrap: wrap;
+    justify-content: flex-start;
+  }
+  .sys-action-btn {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+    min-width: 0;
+  }
+  .sys-form-row {
+    grid-template-columns: 1fr;
+  }
 }
 </style>

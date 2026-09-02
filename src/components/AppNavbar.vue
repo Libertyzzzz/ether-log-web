@@ -72,6 +72,14 @@ const emit = defineEmits<{
 const isMobile = ref(false)
 const showSystemDropdown = ref(false)
 const systemDropdownRef = ref<HTMLElement | null>(null)
+let systemCloseTimer: ReturnType<typeof setTimeout> | null = null
+
+function clearSystemCloseTimer() {
+  if (systemCloseTimer) {
+    clearTimeout(systemCloseTimer)
+    systemCloseTimer = null
+  }
+}
 
 function toggleSystemDropdown(e?: Event) {
   if (e) e.stopPropagation()
@@ -80,7 +88,23 @@ function toggleSystemDropdown(e?: Event) {
     emit('closeUserMenu')
   }
 }
-function closeSystemDropdown() { showSystemDropdown.value = false }
+function openSystemDropdown(e?: Event) {
+  if (e) e.stopPropagation()
+  if (!isMobile.value) {
+    clearSystemCloseTimer()
+    showSystemDropdown.value = true
+    emit('closeUserMenu')
+  }
+}
+function closeSystemDropdown() { clearSystemCloseTimer(); showSystemDropdown.value = false }
+function handleSystemMouseLeave() {
+  if (!isMobile.value) {
+    clearSystemCloseTimer()
+    systemCloseTimer = setTimeout(() => {
+      closeSystemDropdown()
+    }, 160)
+  }
+}
 
 function handleDocumentClick(e: MouseEvent) {
   if (systemDropdownRef.value && !systemDropdownRef.value.contains(e.target as Node)) {
@@ -231,20 +255,31 @@ onUnmounted(() => {
         </button>
 
         <div class="nav-actions desktop-only">
-          <div v-if="isLoggedIn && canAccessSystem" class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef">
+          <div
+            v-if="isLoggedIn && canAccessSystem"
+            class="nav-action-wrapper system-dropdown-wrap"
+            ref="systemDropdownRef"
+            @mouseenter="openSystemDropdown"
+            @mouseleave="handleSystemMouseLeave"
+          >
             <button
               class="nav-action-button secondary has-dropdown"
               :class="{ active: showSystemDropdown }"
               type="button"
               @click.prevent="toggleSystemDropdown"
-              @mouseenter="showSystemDropdown = true; $emit('closeUserMenu')"
             >
               <Settings :size="12" style="margin-right:4px" />
               系统管理
               <ChevronDown :size="12" class="nav-action-chevron" :class="{ 'is-open': showSystemDropdown }" />
             </button>
             <Transition name="dropdown-fade">
-              <div v-if="showSystemDropdown" class="nav-dropdown system-dropdown right-menu" @click.stop>
+              <div
+                v-if="showSystemDropdown"
+                class="nav-dropdown system-dropdown right-menu"
+                @click.stop
+                @mouseenter="clearSystemCloseTimer"
+                @mouseleave="handleSystemMouseLeave"
+              >
                 <div class="dropdown-submenu-title" style="padding: 0.5rem 0.85rem 0.3rem">系统管理</div>
                 <div v-if="canAccessSystemUser" style="padding:0 0.4rem">
                   <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-user' })">
@@ -289,6 +324,42 @@ onUnmounted(() => {
           <Search :size="18" />
         </button>
 
+        <div v-if="isLoggedIn && canAccessSystem" class="nav-mobile-tools mobile-only">
+          <div class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef" @mouseleave="handleSystemMouseLeave">
+            <button
+              class="nav-mobile-slot system has-dropdown"
+              :class="{ active: showSystemDropdown }"
+              type="button"
+              @click.prevent="toggleSystemDropdown"
+            >
+              <span class="nav-mobile-slot-label">系统管理</span>
+              <ChevronDown :size="12" class="nav-mobile-slot-chevron" :class="{ 'is-open': showSystemDropdown }" />
+            </button>
+            <Transition name="dropdown-fade">
+              <div v-if="showSystemDropdown" class="nav-dropdown system-dropdown right-menu mobile-system-dropdown" @click.stop>
+                <div class="dropdown-submenu-title" style="padding: 0.5rem 0.85rem 0.3rem">系统管理</div>
+                <div v-if="canAccessSystemUser" style="padding:0 0.4rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-user' })">
+                    <Users :size="13" /> 用户管理
+                  </button>
+                </div>
+                <div v-if="canAccessSystemRole" style="padding:0 0.4rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-role' })">
+                    <Shield :size="13" /> 角色管理
+                  </button>
+                </div>
+                <div v-if="canAccessSystemPermission" style="padding:0 0.4rem 0.3rem">
+                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-permission' })">
+                    <Key :size="13" /> 权限管理
+                  </button>
+                </div>
+              </div>
+            </Transition>
+          </div>
+          <button v-if="canAccessProfile" class="nav-mobile-slot" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
+          <button v-if="canAccessDashboard" class="nav-mobile-slot" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
+        </div>
+
         <div class="status-badge-wrapper">
           <!-- PC 端：带文字的 status badge -->
           <div class="status-badge clickable desktop-only" :class="{ active: showUserMenu }" @click="$emit('toggleStatus')">
@@ -316,16 +387,14 @@ onUnmounted(() => {
                 </div>
               </div>
               <div class="dropdown-divider" v-if="isLoggedIn"></div>
-              
+
               <template v-if="isLoggedIn">
-                <!-- 仅在移动端显示这些链接，因为 PC 端它们已经直接摆在导航栏上了 -->
                 <template v-if="isMobile">
                   <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openAiAssistant')"><Sparkles :size="14" /> AI 助手</button>
-                  <button v-if="canAccessSystem" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openSystem')"><Settings :size="14" /> 系统管理</button>
                   <button v-if="canAccessQuantLab" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
+                  <div class="dropdown-divider"></div>
                   <button v-if="canAccessProfile" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
                   <button v-if="canAccessDashboard" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><LayoutDashboard :size="14" /> 数据面板</button>
-                  <div class="dropdown-divider"></div>
                 </template>
                 <div v-if="!isMobile" class="dropdown-submenu-group">
                   <div class="dropdown-submenu-title">数据面板</div>
@@ -403,6 +472,7 @@ onUnmounted(() => {
   display: flex; align-items: center; justify-content: space-between; gap: 0.2rem;
 }
 .nav-right { display: flex; align-items: center; gap: 0.12rem; }
+.nav-action-wrapper { position: relative; }
 
 /* Logo */
 .nav-logo { display: flex; align-items: center; gap: 0.2rem; cursor: pointer; flex-shrink: 0; }
@@ -454,8 +524,6 @@ onUnmounted(() => {
   transition: transform 0.18s ease;
 }
 .nav-action-chevron.is-open { transform: rotate(180deg); opacity: 1; }
-.nav-action-wrapper { position: relative; }
-
 .nav-dropdown {
   position: absolute;
   top: calc(100% + 8px);
@@ -614,6 +682,64 @@ kbd {
 .status-badge:hover { border-color: #cbd5e1; background: #f1f5f9; }
 .status-badge.active { background: #0f172a; color: white; border-color: #0f172a; }
 .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
+
+/* ── 移动端快捷入口 */
+.nav-mobile-tools {
+  display: flex;
+  align-items: center;
+  gap: 0.28rem;
+  overflow: visible;
+  position: relative;
+}
+.nav-mobile-slot {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2rem;
+  padding: 0.28rem 0.55rem;
+  border: 1px solid rgba(148, 163, 184, 0.3);
+  border-radius: 9999px;
+  background: rgba(255, 255, 255, 0.72);
+  color: #334155;
+  font-size: 0.62rem;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.nav-mobile-slot:hover {
+  border-color: rgba(99, 102, 241, 0.3);
+  background: rgba(99, 102, 241, 0.05);
+  color: #4f46e5;
+}
+.nav-mobile-slot.has-dropdown {
+  gap: 0.22rem;
+}
+.nav-mobile-slot-label {
+  display: inline-flex;
+  align-items: center;
+}
+.nav-mobile-slot-chevron {
+  transition: transform 0.2s ease;
+  opacity: 0.8;
+}
+.nav-mobile-slot-chevron.is-open {
+  transform: rotate(180deg);
+  opacity: 1;
+}
+.nav-mobile-slot.system {
+  background: rgba(255, 255, 255, 0.72);
+  border-color: rgba(148, 163, 184, 0.3);
+  color: #334155;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,0.4);
+}
+.nav-mobile-slot.system.active {
+  background: rgba(255, 255, 255, 0.9);
+  border-color: rgba(148, 163, 184, 0.42);
+  color: #1f2937;
+}
 
 /* ── 移动端：图标按钮（搜索/用户） */
 .nav-icon-btn {
@@ -786,6 +912,25 @@ kbd {
   }
 
   .nav-right { gap: 0.35rem; }
+  .nav-mobile-tools {
+    max-width: calc(100vw - 8.5rem);
+    justify-content: flex-end;
+    overflow: visible;
+    z-index: 30;
+  }
+  .nav-action-wrapper.system-dropdown-wrap {
+    position: relative;
+    z-index: 40;
+  }
+  .nav-dropdown.system-dropdown.mobile-system-dropdown {
+    right: 0;
+    left: auto;
+    min-width: 10.5rem;
+  }
+  .nav-mobile-slot {
+    padding: 0.24rem 0.42rem;
+    font-size: 0.56rem;
+  }
   .nav-icon-btn,
   .status-dot-btn {
     width: 2.15rem;

@@ -950,8 +950,53 @@ textarea:focus {
 @media (max-width: 640px) {
   .role-table-head { display: none; }
   .role-table-row {
-    grid-template-columns: 1fr !important;
-    gap: 0.5rem;
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.8rem;
+    overflow: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+  }
+  .sys-role-info {
+    width: auto;
+    flex: 1 1 38%;
+    min-width: 0;
+  }
+  .sys-role-code,
+  .sys-row-text,
+  .sys-row-status,
+  .sys-time-cell {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 22vw;
+  }
+  .sys-role-desc {
+    display: none;
+  }
+  .sys-row-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin-left: auto;
+    min-width: 0;
+  }
+  .sys-action-btn {
+    flex: 0 0 auto;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+  }
+  .sys-form-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

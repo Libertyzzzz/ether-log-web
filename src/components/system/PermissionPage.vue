@@ -722,6 +722,19 @@ function getParentName(parentId: number): string {
   width: 100%;
 }
 
+.perm-table-row {
+  display: grid;
+  grid-template-columns: 60px 220px 1fr 100px 120px 90px 220px !important;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.85rem;
+  border-bottom: 1px solid #f1f5f9;
+  transition: background 0.15s;
+}
+.perm-table-row:hover {
+  background: rgba(99,102,241,0.03);
+}
+
 @media (max-width: 960px) {
   .perm-table-head,
   .perm-table-row {
@@ -739,8 +752,54 @@ function getParentName(parentId: number): string {
     display: none;
   }
   .perm-table-row {
-    grid-template-columns: 1fr !important;
-    gap: 0.5rem;
+    display: flex !important;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.45rem;
+    padding: 0.75rem 0.8rem;
+    overflow: hidden;
+    white-space: nowrap;
+    flex-wrap: nowrap;
+  }
+  .sys-perm-info {
+    width: auto;
+    flex: 1 1 36%;
+    min-width: 0;
+  }
+  .sys-perm-code,
+  .perm-type-tag,
+  .sys-row-sort,
+  .sys-row-status,
+  .sys-row-text {
+    display: inline-flex;
+    align-items: center;
+    justify-content: flex-start;
+    flex: 0 0 auto;
+    min-width: 0;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 22vw;
+  }
+  .sys-perm-path {
+    display: none;
+  }
+  .sys-row-actions {
+    display: flex;
+    flex-wrap: nowrap;
+    justify-content: flex-end;
+    gap: 0.35rem;
+    margin-left: auto;
+    min-width: 0;
+  }
+  .sys-action-btn {
+    flex: 0 0 auto;
+    justify-content: center;
+    min-width: 0;
+    padding: 0.3rem 0.45rem;
+  }
+  .sys-form-row {
+    grid-template-columns: 1fr;
   }
 }
 </style>

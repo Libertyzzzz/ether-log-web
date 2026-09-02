@@ -954,7 +954,7 @@ function openDashboard() {
 
 function openSystem() {
   closeUserMenu()
-  router.push({ name: 'system-role' })
+  router.push({ name: 'system-user' })
   closeArticleDetail()
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
