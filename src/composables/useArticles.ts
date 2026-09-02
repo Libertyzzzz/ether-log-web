@@ -71,8 +71,16 @@ export function useArticles() {
   }
 
   async function openArticleDetail(article: ArticleListItem): Promise<void> {
-    const url = buildArticleUrl(article.id, article.title)
-    await router.push(url)
+    const id = typeof article.id === 'number' ? article.id : Number(article.id)
+    if (!id || Number.isNaN(id)) return
+    const url = buildArticleUrl(id, article.title)
+    const preloadPromise = loadArticleById(id)
+    try {
+      await router.push(url)
+    } catch {
+      /* 防止 navigation aborted 吞掉 preload */
+    }
+    await preloadPromise
   }
 
   async function loadArticleById(id: number): Promise<void> {

@@ -1,6 +1,6 @@
 <script setup lang="ts">
-import { ref, computed, onMounted, onUnmounted } from 'vue'
-import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, MessageCircle, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot } from 'lucide-vue-next'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
+import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search } from 'lucide-vue-next'
 import type { ArticleListItem, Category } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 import { getReadingTime } from '../utils/format'
@@ -88,9 +88,56 @@ function loadMore() {
 }
 
 let sentinelObserver: IntersectionObserver | null = null
+let cardObserver: IntersectionObserver | null = null
 const sentinelRef = ref<HTMLElement | null>(null)
+const postsListRef = ref<HTMLElement | null>(null)
+const heroIsMobile = ref(false)
+function checkHeroMobile() { heroIsMobile.value = window.innerWidth <= 768 }
+const currentHeroClipPath = computed(() => heroIsMobile.value ? heroClipPathMobile.value : heroClipPath.value)
+
+function observeEntryCards() {
+  if (typeof IntersectionObserver === 'undefined') return
+  if (!cardObserver) {
+    cardObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            ;(entry.target as HTMLElement).classList.add('is-visible')
+            cardObserver?.unobserve(entry.target)
+          }
+        })
+      },
+      { rootMargin: '0px 0px -60px 0px', threshold: 0.08 }
+    )
+  }
+  const target = postsListRef.value
+  if (!target) return
+  const cards = target.querySelectorAll<HTMLElement>('.hp-feature-card, .hp-spotlight-card, .hp-compact-card')
+  cards.forEach((c) => {
+    c.classList.remove('is-visible')
+    cardObserver?.observe(c)
+  })
+}
+
+function onCatCardMove(e: MouseEvent, _key: string) {
+  const el = e.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const x = ((e.clientX - rect.left) / rect.width) * 100
+  const y = ((e.clientY - rect.top) / rect.height) * 100
+  el.style.setProperty('--spot-x', `${Math.max(0, Math.min(100, x))}%`)
+  el.style.setProperty('--spot-y', `${Math.max(0, Math.min(100, y))}%`)
+  el.style.setProperty('--spot-active', '1')
+}
+function onCatCardLeave(_key: string) {
+  const el = document.querySelector<HTMLElement>(`.hp-cat-card.module-${_key}`)
+  if (!el) return
+  el.style.setProperty('--spot-active', '0')
+}
 
 onMounted(() => {
+  checkHeroMobile()
+  window.addEventListener('resize', checkHeroMobile, { passive: true })
   if (typeof IntersectionObserver === 'undefined') return
   sentinelObserver = new IntersectionObserver(
     (entries) => {
@@ -104,8 +151,21 @@ onMounted(() => {
 })
 
 onUnmounted(() => {
+  window.removeEventListener('resize', checkHeroMobile)
   sentinelObserver?.disconnect()
+  cardObserver?.disconnect()
 })
+
+watch(
+  () => [props.filteredArticles.length, props.isLoadingArticles],
+  () => nextTick(() => observeEntryCards()),
+  { flush: 'post' }
+)
+watch(
+  () => postsListRef.value,
+  (v) => { if (v) nextTick(() => observeEntryCards()) },
+  { immediate: true, flush: 'post' }
+)
 
 const coverGradients = [
   'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
@@ -116,6 +176,105 @@ const coverGradients = [
 
 function getCoverGradient(index: number) {
   return coverGradients[index % coverGradients.length]
+}
+
+const heroAuroraShift = ref('translate(0, 0)')
+const heroShimmerShift = ref('translate(0, 0)')
+const heroCloudShift = ref('translate(0, 0)')
+const heroInnerRef = ref<HTMLElement | null>(null)
+let heroRaf = 0
+
+function handleHeroMouseMove(e: MouseEvent) {
+  if (!heroInnerRef.value) return
+  const rect = heroInnerRef.value.getBoundingClientRect()
+  const cx = rect.left + rect.width / 2
+  const cy = rect.top + rect.height / 2
+  const dx = (e.clientX - cx) / (rect.width / 2)
+  const dy = (e.clientY - cy) / (rect.height / 2)
+  const dxc = Math.max(-1, Math.min(1, dx))
+  const dyc = Math.max(-1, Math.min(1, dy))
+
+  cancelAnimationFrame(heroRaf)
+  heroRaf = window.requestAnimationFrame(() => {
+    heroAuroraShift.value = `translate(${dxc * 8}px, ${dyc * 6}px)`
+    heroShimmerShift.value = `translate(${dxc * 4}px, ${dyc * 3}px)`
+    heroCloudShift.value = `translate(${dxc * 3}px, ${dyc * 2}px)`
+  })
+}
+function handleHeroMouseLeave() {
+  cancelAnimationFrame(heroRaf)
+  heroRaf = window.requestAnimationFrame(() => {
+    heroAuroraShift.value = 'translate(0, 0)'
+    heroShimmerShift.value = 'translate(0, 0)'
+    heroCloudShift.value = 'translate(0, 0)'
+  })
+}
+
+let heroTicking = false
+const heroClipSeed = ref(0)
+function tickHeroClip() {
+  if (heroTicking) return
+  heroTicking = true
+  const step = () => {
+    heroClipSeed.value = (heroClipSeed.value + 1) % 10000
+    heroTicking = false
+  }
+  window.requestAnimationFrame(step)
+}
+setInterval(tickHeroClip, 2600)
+
+const heroClipWobble = (baseX: number, baseY: number, amp = 0.6) => {
+  const s = heroClipSeed.value
+  const ox = Math.sin(s * 0.37 + baseX) * amp
+  const oy = Math.cos(s * 0.31 + baseY) * amp
+  return `${Math.max(0, Math.min(100, baseX + ox))}% ${Math.max(0, Math.min(100, baseY + oy))}%`
+}
+const heroClipPath = computed(() => {
+  const p = [
+    [3, 2], [15, 0], [35, 1], [55, 0], [75, 2], [92, 1], [100, 8],
+    [99, 25], [100, 45], [98, 65], [100, 85], [97, 98],
+    [80, 100], [60, 99], [40, 100], [18, 99], [5, 100], [0, 92],
+    [1, 72], [0, 50], [2, 30], [0, 12],
+  ]
+  return `polygon(${p.map(pt => heroClipWobble(pt[0], pt[1], 0.55)).join(', ')})`
+})
+const heroClipPathMobile = computed(() => {
+  const p = [
+    [5, 2], [20, 0], [45, 1], [65, 0], [85, 2], [95, 1], [100, 10],
+    [99, 30], [100, 50], [98, 70], [100, 88], [96, 98],
+    [75, 100], [50, 99], [25, 100], [8, 99], [3, 100], [0, 90],
+    [1, 68], [0, 48], [2, 28], [0, 10],
+  ]
+  return `polygon(${p.map(pt => heroClipWobble(pt[0], pt[1], 0.7)).join(', ')})`
+})
+
+const cmdFocusBursts = ref<{ id: number; x: number; y: number; color: string }[]>([])
+let cmdFocusId = 0
+function burstCmdFocus(e: FocusEvent) {
+  const el = e.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const colors = [
+    'rgba(139, 92, 246, 0.65)',
+    'rgba(99, 102, 241, 0.55)',
+    'rgba(147, 197, 253, 0.5)',
+    'rgba(167, 139, 250, 0.55)',
+  ]
+  for (let i = 0; i < 4; i++) {
+    cmdFocusId++
+    const ox = rect.width * (0.15 + Math.random() * 0.7)
+    const oy = rect.height * (0.15 + Math.random() * 0.7)
+    cmdFocusBursts.value.push({
+      id: cmdFocusId,
+      x: ox,
+      y: oy,
+      color: colors[i % colors.length],
+    })
+    const id = cmdFocusId
+    setTimeout(() => {
+      cmdFocusBursts.value = cmdFocusBursts.value.filter(b => b.id !== id)
+    }, 900 + i * 80)
+  }
 }
 
 function formatDate(dateStr: string) {
@@ -161,130 +320,129 @@ function heroOpenDrawerOnly() {
   <div class="home-page">
     <!-- global SidebarNav mounted in App.vue; local instance removed -->
 
-    <!-- ── Hero ── -->
-    <section class="hp-hero">
-      <div class="hp-hero-inner">
-        <div class="hp-hero-copy">
-          <div class="hp-hero-badge-row">
-            <div class="hp-hero-greeting">
-              <span class="hp-greeting-dot"></span>
-              你好，我是 Ether
-            </div>
-            <span class="hp-hero-meta desktop-only">
-              <BookOpen :size="11" />
-              {{ totalArticles }} 篇文章 · 持续更新
-            </span>
+    <!-- ── Hero: ⌘K Command Palette 风格 ── -->
+    <section
+      class="hp-hero"
+      @mousemove="handleHeroMouseMove"
+      @mouseleave="handleHeroMouseLeave"
+    >
+      <div
+        class="hp-hero-inner"
+        ref="heroInnerRef"
+        :style="{
+          '--hero-aurora-shift': heroAuroraShift,
+          '--hero-shimmer-shift': heroShimmerShift,
+          '--hero-cloud-shift': heroCloudShift,
+          clipPath: currentHeroClipPath,
+          WebkitClipPath: currentHeroClipPath,
+        }"
+      >
+        <!-- 顶部状态行 -->
+        <div class="hp-hero-badge-row centered">
+          <div class="hp-hero-greeting">
+            <span class="hp-greeting-dot"></span>
+            你好，我是 Ether
           </div>
-          <h1 class="hp-hero-title">
-            NEXTIFY<br />
-            Builds <span class="hp-hero-accent">Systems.</span>
-          </h1>
-          <!-- PC/平板：产品化副标题 -->
-          <p class="hp-hero-sub desktop-only">
-            一个由写作、AI 助手与量化实验组成的个人知识系统。<br />
-            在代码、认知与数据之间，沉淀长期可复用的判断。
-          </p>
-          <!-- 移动端：精简一行副标题 -->
-          <p class="hp-hero-sub mobile-only">
-            写作、AI 助手与量化实验组成的个人知识系统。
-          </p>
-          <div class="hp-hero-actions">
-            <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')">
-              开始阅读
-              <ArrowRight :size="14" />
-            </button>
-            <!-- PC/平板：次级入口精简为文字链接 -->
-            <button class="hp-btn-link desktop-only" type="button" @click="$emit('navigate', 'guestbook')">
-              <MessageCircle :size="13" />
-              <span>留言板</span>
-            </button>
-          </div>
-          <!-- 移动端：次级入口改用 chip 形式 -->
-          <div class="hp-hero-chip-row mobile-only">
-            <button class="hp-hero-chip" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
-              <Star :size="12" />
-              <span>{{ showFeaturedOnly ? '全部' : '精选' }}</span>
-            </button>
-            <button class="hp-hero-chip" type="button" @click="$emit('navigate', 'guestbook')">
-              <MessageCircle :size="12" />
-              <span>留言</span>
-            </button>
-          </div>
+          <span class="hp-hero-meta">
+            <BookOpen :size="11" />
+            {{ totalArticles }} 篇文章 · 持续更新
+          </span>
+          <span class="hp-hero-meta ai-status-badge desktop-only">
+            <span class="hp-ai-status-dot-sm"></span>
+            AI 助手在线
+          </span>
         </div>
 
-        <!-- PC/平板：完整 AI 助手卡片 -->
-        <div class="hp-hero-ai desktop-only" @click="heroOpenDrawerOnly">
-          <!-- 玻璃态背景点缀（保留原装饰风格） -->
-          <span class="hp-ai-orb hp-ai-orb-1"></span>
-          <span class="hp-ai-orb hp-ai-orb-2"></span>
+        <!-- 标题：居中 + 单行 Builds Systems -->
+        <h1 class="hp-hero-title centered">
+          NEXTIFY Builds <span class="hp-hero-accent">Systems.</span>
+        </h1>
 
-          <!-- 卡片顶部：标题 + BETA + 在线状态 -->
-          <div class="hp-ai-header">
-            <div class="hp-ai-title">
-              <Sparkles :size="14" />
-              <span>ETHER</span>
-              <span class="hp-ai-beta">BETA</span>
-            </div>
-            <div class="hp-ai-status">
-              <span class="hp-ai-status-dot"></span>
-              <span>在线</span>
-            </div>
+        <!-- 副标题：桌面一行精简，移动端两行 -->
+        <p class="hp-hero-sub centered desktop-only">
+          写作 · AI 助手 · 量化实验 · 个人知识系统
+        </p>
+        <p class="hp-hero-sub centered mobile-only">
+          写作、AI 助手与量化实验组成的个人知识系统。
+        </p>
+
+        <!-- ⌘K 巨型输入框（桌面/平板） -->
+        <div class="hp-cmd-box desktop-only" @focusin="burstCmdFocus">
+          <div
+            v-for="b in cmdFocusBursts"
+            :key="b.id"
+            class="hp-cmd-burst"
+            :style="{ left: b.x + 'px', top: b.y + 'px', '--b-color': b.color }"
+          ></div>
+          <div class="hp-cmd-icons">
+            <Search :size="17" class="hp-cmd-icon-search" />
+            <span class="hp-cmd-sep"></span>
+            <Sparkles :size="14" class="hp-cmd-icon-spark" />
           </div>
-
-          <!-- 问候语 -->
-          <div class="hp-ai-greet">NEXTIFY AI Assistant · 有什么可以帮你？</div>
-
-          <!-- 输入区：阻止冒泡，避免触发 heroOpenDrawerOnly -->
-          <div class="hp-ai-input-wrap" @click.stop>
-            <input
-              v-model="heroInput"
-              type="text"
-              class="hp-ai-input"
-              placeholder="输入你的问题，或 / 选择示例"
-              @keyup.enter="heroSendFromInput"
-            />
+          <input
+            v-model="heroInput"
+            type="text"
+            class="hp-cmd-input"
+            placeholder="搜索文章 或 问 Ether AI 助手..."
+            @keyup.enter="heroSendFromInput"
+          />
+          <div class="hp-cmd-hints">
+            <span class="hp-cmd-kbd">⌘K</span>
+            <span class="hp-cmd-kbd light">↵</span>
             <button
-              class="hp-ai-send"
+              class="hp-cmd-send"
               type="button"
               :disabled="!heroInput.trim()"
               @click="heroSendFromInput"
               title="发送"
             >
-              <Send :size="15" />
-            </button>
-          </div>
-
-          <!-- 示例按钮区 -->
-          <div class="hp-ai-examples" @click.stop>
-            <button
-              v-for="q in heroExampleQuestions.slice(0, heroExampleIndex)"
-              :key="q"
-              type="button"
-              class="hp-ai-chip"
-              @click="heroSendExample(q)"
-            >
-              {{ q }}
-            </button>
-            <button
-              v-if="heroExampleIndex < heroExampleQuestions.length"
-              type="button"
-              class="hp-ai-chip hp-ai-chip-more"
-              @click="toggleHeroExamples"
-            >
-              更多 →
-            </button>
-            <button
-              v-else-if="heroExampleQuestions.length > 3"
-              type="button"
-              class="hp-ai-chip hp-ai-chip-more"
-              @click="toggleHeroExamples"
-            >
-              收起 ↑
+              <Send :size="14" />
             </button>
           </div>
         </div>
 
-        <!-- 移动端：紧凑 AI 触发条（仅在移动端显示） -->
+        <!-- 示例 chip 行（桌面端） -->
+        <div class="hp-cmd-examples desktop-only">
+          <button
+            v-for="q in heroExampleQuestions.slice(0, heroExampleIndex)"
+            :key="q"
+            type="button"
+            class="hp-cmd-chip"
+            @click="heroSendExample(q)"
+          >
+            {{ q }}
+          </button>
+          <button
+            v-if="heroExampleIndex < heroExampleQuestions.length"
+            type="button"
+            class="hp-cmd-chip more"
+            @click="toggleHeroExamples"
+          >
+            更多 →
+          </button>
+        </div>
+
+        <!-- CTA 行（桌面端） -->
+        <div class="hp-cmd-cta-row desktop-only">
+          <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')">
+            开始阅读
+            <ArrowRight :size="14" />
+          </button>
+          <button class="hp-cmd-cta" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
+            <Star :size="12" />
+            {{ showFeaturedOnly ? '全部文章' : '精选文章' }}
+          </button>
+          <button class="hp-cmd-cta" type="button" @click="heroOpenDrawerOnly">
+            <Sparkles :size="12" />
+            AI 助手
+          </button>
+          <button class="hp-cmd-cta" type="button" @click="$emit('navigate', 'quant-lab')">
+            <FlaskConical :size="12" />
+            量化实验
+          </button>
+        </div>
+
+        <!-- 移动端：紧凑 AI 触发条 + chip CTA -->
         <div class="hp-ai-mobile-bar mobile-only" @click="heroOpenDrawerOnly">
           <div class="hp-ai-mobile-left">
             <Sparkles :size="16" />
@@ -307,8 +465,20 @@ function heroOpenDrawerOnly() {
             </button>
           </div>
         </div>
+        <div class="hp-hero-chip-row mobile-only">
+          <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')" style="font-size:0.72rem;padding:0.48rem 0.95rem">
+            开始阅读 <ArrowRight :size="12" />
+          </button>
+          <button class="hp-hero-chip" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
+            <Star :size="12" />
+            <span>{{ showFeaturedOnly ? '全部' : '精选' }}</span>
+          </button>
+        </div>
       </div>
     </section>
+
+    <!-- ── Hero ⇄ 分类 无缝焊接带 ─ -->
+    <div class="hp-hero-cat-bridge" aria-hidden="true"></div>
 
     <!-- ── NEXTIFY 能力入口 ─ -->
     <section class="hp-categories">
@@ -320,6 +490,8 @@ function heroOpenDrawerOnly() {
             class="hp-cat-card"
             :class="`module-${module.key}`"
             @click="module.action"
+            @mousemove="onCatCardMove($event, module.key)"
+            @mouseleave="onCatCardLeave(module.key)"
           >
             <div class="hp-cat-icon">
               <component :is="module.icon" :size="18" />
@@ -403,10 +575,11 @@ function heroOpenDrawerOnly() {
           </div>
 
           <!-- 文章列表（主推 + 次重点 + 紧凑卡，保持后端数据结构不变） -->
-          <div v-else class="hp-posts-list hp-editorial-list">
+          <div v-else class="hp-posts-list hp-editorial-list" ref="postsListRef">
             <article
               v-if="leadArticle"
               class="hp-feature-card"
+              :style="{ '--i': '0' }"
               @click="$emit('openArticle', leadArticle)"
             >
               <div
@@ -443,6 +616,7 @@ function heroOpenDrawerOnly() {
                 v-for="(post, index) in spotlightArticles"
                 :key="post.id"
                 class="hp-spotlight-card"
+                :style="{ '--i': String(index + 1) }"
                 @click="$emit('openArticle', post)"
               >
                 <div
@@ -474,6 +648,7 @@ function heroOpenDrawerOnly() {
                 v-for="(post, index) in compactArticles"
                 :key="post.id"
                 class="hp-post-item hp-compact-card"
+                :style="{ '--i': String(index + 1 + spotlightArticles.length) }"
                 @click="$emit('openArticle', post)"
               >
                 <div
@@ -628,367 +803,581 @@ function heroOpenDrawerOnly() {
 /* ── 全局背景 ── */
 .home-page {
   background:
-    radial-gradient(circle at 12% 5%, rgba(68, 105, 255, 0.14), transparent 32rem),
-    radial-gradient(circle at 88% 0%, rgba(255, 223, 207, 0.42), transparent 30rem),
-    linear-gradient(180deg, #eaf0fb 0%, #f8faff 48%, #eef3fb 100%);
+    radial-gradient(ellipse 60% 35% at 15% 0%, rgba(167, 139, 250, 0.22), transparent 70%),
+    radial-gradient(ellipse 55% 30% at 85% 0%, rgba(125, 211, 252, 0.2), transparent 70%),
+    radial-gradient(ellipse 45% 25% at 50% 3%, rgba(196, 181, 253, 0.18), transparent 65%),
+    radial-gradient(circle at 12% 5%, rgba(68, 105, 255, 0.1), transparent 32rem),
+    radial-gradient(circle at 88% 0%, rgba(255, 223, 207, 0.3), transparent 30rem),
+    linear-gradient(180deg, #f0ebff 0%, #eaf0fb 18%, #f8faff 55%, #eef3fb 100%);
   color: #0f172a;
+  position: relative;
+  overflow: hidden;
+}
+.home-page::before {
+  content: '';
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 110%;
+  height: 34rem;
+  background:
+    radial-gradient(ellipse 40% 50% at 30% 20%, rgba(139, 92, 246, 0.15), transparent 70%),
+    radial-gradient(ellipse 35% 45% at 70% 25%, rgba(59, 130, 246, 0.12), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 50% 100%, rgba(167, 139, 250, 0.1), transparent 75%);
+  filter: blur(32px) saturate(130%);
+  pointer-events: none;
+  z-index: 0;
+}
+.home-page > * {
+  position: relative;
+  z-index: 1;
 }
 
 /* ════════════════════════════════
    HERO
 ════════════════════════════════ */
 .hp-hero {
-  padding-top: 6.1rem;
-  max-width: var(--content-max-width);
+  padding-top: 5.5rem;
+  max-width: calc(var(--nav-content-max-width) + 1.6rem);
   margin: 0 auto;
   padding-left: 0.9rem;
   padding-right: 0.9rem;
+  position: relative;
+}
+.hp-hero::before {
+  content: '';
+  position: absolute;
+  top: 2.8rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 85%;
+  height: calc(100% - 2.6rem);
+  background:
+    radial-gradient(ellipse 80% 50% at 20% 20%, rgba(167, 139, 250, 0.18), transparent 60%),
+    radial-gradient(ellipse 60% 45% at 85% 30%, rgba(125, 211, 252, 0.20), transparent 60%),
+    radial-gradient(ellipse 70% 50% at 50% 100%, rgba(196, 181, 253, 0.18), transparent 65%),
+    radial-gradient(ellipse 50% 35% at 10% 90%, rgba(244, 114, 182, 0.10), transparent 60%),
+    radial-gradient(ellipse 55% 40% at 92% 85%, rgba(96, 165, 250, 0.14), transparent 60%),
+    radial-gradient(ellipse 45% 42% at 18% 94%, rgba(255, 214, 200, 0.19), transparent 62%);
+  filter: blur(24px) saturate(120%);
+  opacity: 0.9;
+  pointer-events: none;
+  z-index: 0;
+  animation: hpCloudDrift 55s ease-in-out infinite;
+}
+@keyframes hpCloudDrift {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  25% {
+    transform: translateX(-47%) translateY(-3%) scale(1.03);
+  }
+  50% {
+    transform: translateX(-52%) translateY(2%) scale(0.98);
+  }
+  75% {
+    transform: translateX(-48%) translateY(2%) scale(1.02);
+  }
 }
 
 .hp-hero-inner {
   position: relative;
   background:
-    radial-gradient(circle at 75% 30%, rgba(139, 92, 246, 0.45), transparent 14rem),
-    radial-gradient(circle at 92% 75%, rgba(167, 139, 250, 0.35), transparent 18rem),
-    radial-gradient(circle at 10% 80%, rgba(59, 130, 246, 0.18), transparent 16rem),
-    linear-gradient(145deg, rgba(12, 18, 32, 0.96) 0%, rgba(24, 35, 55, 0.92) 46%, rgba(49, 46, 129, 0.82) 100%);
-  border: 1px solid rgba(191, 219, 254, 0.22);
-  /* 左右四角统一圆角，视觉更和谐 */
-  border-radius: 1.5rem;
-  overflow: hidden;
-  padding: 0.55rem 0.55rem;
-  display: grid;
-  grid-template-columns: 1.1fr 0.9fr;
-  gap: 0.14rem;
+    radial-gradient(circle at 5% 10%, rgba(248, 250, 255, 0.78), transparent 45%),
+    radial-gradient(circle at 95% 15%, rgba(237, 233, 254, 0.48), transparent 52%),
+    radial-gradient(circle at 50% 100%, rgba(224, 231, 255, 0.66), transparent 58%),
+    radial-gradient(circle at 12% 96%, rgba(255, 220, 210, 0.36), transparent 42%),
+    linear-gradient(135deg, rgba(248, 250, 255, 0.58) 0%, rgba(244, 247, 252, 0.48) 50%, rgba(238, 234, 254, 0.4) 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 200% 200%;
+  animation: hpHeroBgShift 21s ease-in-out infinite;
+  border: none;
+  border-radius: 0;
+  overflow: visible;
+  padding: 1.5rem 2.2rem 1.45rem;
+  margin: 0 0.2rem;
+  display: flex;
+  flex-direction: column;
   align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
   z-index: 1;
   box-shadow:
-    0 20px 60px rgba(15, 23, 42, 0.22),
-    inset 0 1px 0 rgba(255, 255, 255, 0.12);
+    0 0 0 1px rgba(248, 250, 255, 0.32),
+    0 40px 90px -20px rgba(99, 102, 241, 0.20),
+    0 20px 60px -30px rgba(139, 92, 246, 0.20),
+    0 0 130px -40px rgba(125, 211, 252, 0.29),
+    0 -22px 90px -42px rgba(255, 200, 180, 0.2);
+  backdrop-filter: blur(22px) saturate(170%);
+  -webkit-backdrop-filter: blur(22px) saturate(170%);
+  width: auto;
+  will-change: clip-path;
+}
+.hp-hero-inner::before {
+  --aurora-rot: 0deg;
+  content: '';
+  position: absolute;
+  top: -60%;
+  left: -60%;
+  width: 220%;
+  height: 220%;
+  background: conic-gradient(
+    from var(--aurora-rot) at 50% 50%,
+    transparent 0deg,
+    rgba(255, 255, 255, 0.18) 40deg,
+    rgba(196, 181, 253, 0.11) 80deg,
+    transparent 140deg,
+    transparent 200deg,
+    rgba(167, 243, 208, 0.10) 240deg,
+    rgba(147, 197, 253, 0.1) 280deg,
+    rgba(255, 255, 255, 0.18) 320deg,
+    transparent 360deg
+  );
+  transform: var(--hero-aurora-shift, translate(0, 0));
+  animation: hpHeroAurora 26s linear infinite;
+  pointer-events: none;
+  z-index: 0;
+  will-change: transform, background-image;
+}
+@property --aurora-rot {
+  syntax: '<angle>';
+  inherits: false;
+  initial-value: 0deg;
 }
 .hp-hero-inner::after {
   content: '';
   position: absolute;
-  inset: 0;
-  background:
-    linear-gradient(120deg, rgba(255, 255, 255, 0.08), transparent 35%),
-    radial-gradient(ellipse 80% 60% at 70% 40%, rgba(147, 197, 253, 0.14) 0%, transparent 70%);
+  top: -5%;
+  left: -100%;
+  width: 55%;
+  height: 110%;
+  background: linear-gradient(
+    100deg,
+    transparent 0%,
+    rgba(248, 250, 255, 0.24) 45%,
+    rgba(248, 250, 255, 0.44) 50%,
+    rgba(248, 250, 255, 0.24) 55%,
+    transparent 100%
+  );
+  transform: skewX(-12deg) var(--hero-shimmer-shift, translate(0, 0));
+  animation: hpHeroShimmer 13s ease-in-out infinite;
   pointer-events: none;
+  z-index: 0;
+  will-change: transform;
+}
+@keyframes hpHeroBgShift {
+  0%, 100% {
+    background-position: 0% 0%, 0% 0%, 0% 0%, 0% 100%, 0% 50%;
+    filter: saturate(100%);
+  }
+  25% {
+    background-position: 5% 8%, 95% 12%, 48% 95%, 8% 92%, 50% 0%;
+    filter: saturate(130%);
+  }
+  50% {
+    background-position: 10% 5%, 90% 8%, 52% 100%, 14% 96%, 100% 50%;
+    filter: saturate(110%);
+  }
+  75% {
+    background-position: 5% 12%, 95% 5%, 48% 92%, 10% 100%, 50% 100%;
+    filter: saturate(140%);
+  }
+}
+@keyframes hpHeroAurora {
+  0%   { --aurora-rot: 0deg;     opacity: 0.55; }
+  20%  { opacity: 0.85; }
+  50%  { --aurora-rot: 180deg;   opacity: 0.45; }
+  75%  { opacity: 0.9; }
+  100% { --aurora-rot: 360deg;   opacity: 0.55; }
+}
+@keyframes hpHeroShimmer {
+  0%   { left: -100%; opacity: 0; }
+  10%  { opacity: 0.85; }
+  30%  { left: 60%; opacity: 1; }
+  45%  { left: 120%; opacity: 0; }
+  100% { left: 120%; opacity: 0; }
 }
 
-/* 顶部 Badge 行（问候 + 文章数） */
+.hp-hero-inner > * {
+  position: relative;
+  z-index: 2;
+}
+
+/* —— 顶部状态行 —— */
 .hp-hero-badge-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  margin-bottom: 0.22rem;
-  gap: 0.18rem;
+  gap: 0.4rem;
   flex-wrap: wrap;
+  margin-bottom: 0.05rem;
+}
+.hp-hero-badge-row.centered {
+  justify-content: center;
+}
+.ai-status-badge {
+  color: #86efac !important;
+  font-weight: 700;
+}
+.hp-ai-status-dot-sm {
+  width: 5px; height: 5px;
+  border-radius: 50%;
+  background: #4ade80;
+  display: inline-block;
+  margin-right: 4px;
+  box-shadow: 0 0 6px rgba(74, 222, 128, 0.75);
+  animation: hpStatusPulse 2s ease-in-out infinite;
+}
+@keyframes hpStatusPulse {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50%      { transform: scale(1.35); opacity: 0.8; }
 }
 
-/* 左侧文案 */
+/* —— 问候与元信息 —— */
 .hp-hero-greeting {
   display: inline-flex;
   align-items: center;
-  gap: 0.25rem;
-  font-size: 0.7rem;
+  gap: 0.26rem;
+  font-size: 0.67rem;
   font-weight: 700;
-  color: #cbd5e1;
+  color: #64748b;
   letter-spacing: 0.02em;
 }
 .hp-greeting-dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #a78bfa;
+  background: #8b5cf6;
   animation: hpGreetingPulse 3s ease-in-out infinite;
 }
 @keyframes hpGreetingPulse {
   0%, 100% { transform: scale(1); opacity: 1; }
   50% { transform: scale(1.2); opacity: 0.7; }
 }
-
-/* 文章数小标签 */
 .hp-hero-meta {
   display: inline-flex;
   align-items: center;
-  gap: 0.18rem;
-  font-size: 0.7rem;
-  color: #cbd5e1;
+  gap: 0.2rem;
+  font-size: 0.67rem;
+  color: #64748b;
   font-weight: 600;
 }
-.hp-hero-meta svg {
-  color: #a78bfa;
-}
+.hp-hero-meta svg { color: #8b5cf6; }
 
+/* —— 标题 —— */
 .hp-hero-title {
-  margin: 0 0 0.35rem;
-  font-size: clamp(1.55rem, 2.65vw, 2.15rem);
-  font-weight: 900;
-  line-height: 1.1;
-  letter-spacing: -0.035em;
-  color: #f8fafc;
+  margin: 0;
+  font-size: clamp(1.5rem, 2.6vw, 2.2rem);
+  font-weight: 950;
+  line-height: 1.06;
+  letter-spacing: -0.04em;
+  color: #0f172a;
 }
+.hp-hero-title.centered { text-align: center; }
 .hp-hero-accent {
-  background: linear-gradient(90deg, #a78bfa 0%, #c4b5fd 50%, #ddd6fe 100%);
+  background: linear-gradient(90deg, #6366f1 0%, #8b5cf6 45%, #a78bfa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
   font-style: italic;
 }
 
+/* —— 副标题 —— */
 .hp-hero-sub {
-  margin: 0 0 0.25rem;
+  margin: 0;
   font-size: 0.8rem;
-  color: #cbd5e1;
-  line-height: 1.75;
-  font-weight: 400;
+  color: #475569;
+  line-height: 1.6;
+  font-weight: 450;
+  letter-spacing: 0.01em;
 }
+.hp-hero-sub.centered { text-align: center; max-width: 34rem; }
 
-.hp-hero-actions {
+/* —— ⌘K 巨型命令输入框 —— */
+.hp-cmd-box {
+  width: 100%;
+  max-width: 34rem;
+  margin-top: 0.25rem;
   display: flex;
   align-items: center;
-  gap: 0.14rem;
-  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding: 0.42rem 0.42rem 0.42rem 0.85rem;
+  background: rgba(255, 255, 255, 0.75);
+  border: 1px solid rgba(148, 163, 184, 0.2);
+  border-radius: 0.85rem;
+  backdrop-filter: blur(12px);
+  transition: border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow:
+    0 6px 24px rgba(99, 102, 241, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
 }
-.hp-btn-primary {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.1rem;
-  padding: 0.45rem 0.85rem;
-  border: 1px solid transparent;
-  border-radius: 9999px;
-  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
-  color: white;
-  font-size: 0.82rem;
-  font-weight: 800;
-  cursor: pointer;
-  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
-  box-shadow: 0 6px 20px rgba(99, 102, 241, 0.3), inset 0 1px 0 rgba(255,255,255,0.2);
-  letter-spacing: 0.02em;
+.hp-cmd-box:focus-within {
+  border-color: rgba(139, 92, 246, 0.45);
+  background: rgba(255, 255, 255, 0.92);
+  box-shadow:
+    0 10px 36px rgba(139, 92, 246, 0.18),
+    0 0 0 3px rgba(139, 92, 246, 0.12),
+    inset 0 1px 0 rgba(255, 255, 255, 1);
 }
-.hp-btn-primary:hover {
-  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
-  transform: translateY(-1.5px);
-  box-shadow: 0 10px 28px rgba(99, 102, 241, 0.4), inset 0 1px 0 rgba(255,255,255,0.2);
-}
-.hp-btn-primary svg {
-  transition: transform 0.2s ease;
-}
-.hp-btn-primary:hover svg {
-  transform: translateX(2px);
-}
-.hp-btn-link {
+.hp-cmd-icons {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid rgba(148, 163, 184, 0.2);
-  border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.25);
-  color: #cbd5e1;
-  font-size: 0.78rem;
-  font-weight: 600;
-  cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  flex-shrink: 0;
 }
-.hp-btn-link:hover {
-  background: rgba(59, 130, 246, 0.15);
-  border-color: rgba(96, 165, 250, 0.35);
-  color: #dbeafe;
-}
-
-/* —— Hero 右侧 AI 助手区域（融入 Hero，无独立卡片感） —— */
-.hp-hero-ai {
-  position: relative;
-  padding: 0.25rem 0 0.25rem 1.05rem;
-  /* 无独立背景 → 让 Hero 背景直接透过来 */
-  background: transparent;
-  border: none;
-  border-radius: 0;
-  cursor: pointer;
-  transition: transform 0.2s ease;
-  box-shadow: none;
-  overflow: visible;
-}
-.hp-hero-ai:hover {
-  /* 不再上浮（避免像卡片） */
-  box-shadow: none;
-}
-.hp-hero-ai:hover::before {
-  opacity: 1;
-}
-/* 左侧渐变分隔线（代替卡片边界） */
-.hp-hero-ai::before {
-  content: '';
-  position: absolute;
-  left: 0;
-  top: 10%;
-  bottom: 10%;
+.hp-cmd-icon-search { color: #94a3b8; }
+.hp-cmd-icon-spark { color: #8b5cf6; }
+.hp-cmd-sep {
   width: 1px;
-  background: linear-gradient(
-    to bottom,
-    transparent 0%,
-    rgba(167, 139, 250, 0.35) 25%,
-    rgba(167, 139, 250, 0.55) 50%,
-    rgba(167, 139, 250, 0.35) 75%,
-    transparent 100%
-  );
-  opacity: 0.7;
-  transition: opacity 0.2s ease;
-  pointer-events: none;
-}
-/* 内部光晕点缀 — 用 Hero 已有的颜色体系，避免新视觉元素 */
-.hp-ai-orb { display: none; }
-.hp-ai-orb-1 { display: none; }
-.hp-ai-orb-2 { display: none; }
-.hp-ai-header {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 0.48rem;
-}
-.hp-ai-title {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.4rem;
-  color: #e0e7ff;
-  font-size: 0.85rem;
-  font-weight: 800;
-  letter-spacing: 0.02em;
-}
-.hp-ai-beta {
+  height: 15px;
+  background: rgba(148, 163, 184, 0.25);
   display: inline-block;
-  font-size: 0.55rem;
-  font-weight: 700;
-  letter-spacing: 0.15em;
-  padding: 2px 6px;
-  border-radius: 4px;
-  background: linear-gradient(135deg, rgba(139, 92, 246, 0.25), rgba(96, 165, 250, 0.2));
-  color: #f5f3ff;
-  border: 1px solid rgba(167, 139, 250, 0.28);
 }
-.hp-ai-status {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  font-size: 0.65rem;
-  font-weight: 600;
-  color: #86efac;
-}
-.hp-ai-status-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: #4ade80;
-  box-shadow: 0 0 8px rgba(74, 222, 128, 0.7);
-  animation: hpStatusPulse 2s ease-in-out infinite;
-}
-@keyframes hpStatusPulse {
-  0%, 100% { transform: scale(1); opacity: 1; }
-  50%      { transform: scale(1.3); opacity: 0.8; }
-}
-.hp-ai-greet {
-  position: relative;
-  color: #cbd5e1;
-  font-size: 0.78rem;
-  font-weight: 500;
-  margin-bottom: 0.45rem;
-  letter-spacing: 0.01em;
-}
-/* 输入区 — 更轻量，像 Hero 内部的功能区 */
-.hp-ai-input-wrap {
-  position: relative;
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 4px 4px 4px 12px;
-  background: rgba(15, 23, 42, 0.45);
-  border: 1px solid rgba(148, 163, 184, 0.18);
-  border-radius: 9999px;
-  margin-bottom: 0.5rem;
-  transition: border-color 0.15s ease, background 0.15s ease;
-}
-.hp-ai-input-wrap:focus-within {
-  border-color: rgba(139, 92, 246, 0.45);
-  background: rgba(15, 23, 42, 0.6);
-}
-.hp-ai-input {
+.hp-cmd-input {
   flex: 1;
   min-width: 0;
   background: transparent;
   border: none;
   outline: none;
-  color: #f1f5f9;
-  font-size: 0.78rem;
+  color: #0f172a;
+  font-size: 0.82rem;
   font-weight: 500;
-  padding: 6px 0;
+  padding: 0.32rem 0.2rem;
+  font-family: inherit;
 }
-.hp-ai-input::placeholder {
+.hp-cmd-input::placeholder {
   color: #94a3b8;
   font-weight: 400;
 }
-.hp-ai-send {
+.hp-cmd-hints {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  flex-shrink: 0;
+}
+.hp-cmd-kbd {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px; height: 28px;
-  border-radius: 50%;
+  min-width: 1.85rem;
+  height: 1.45rem;
+  padding: 0 0.4rem;
+  border-radius: 5px;
+  background: rgba(241, 245, 249, 0.9);
+  border: 1px solid rgba(203, 213, 225, 0.6);
+  color: #475569;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.62rem;
+  font-weight: 700;
+  box-shadow: inset 0 -1px 0 rgba(148, 163, 184, 0.15);
+}
+.hp-cmd-kbd.light {
+  background: rgba(237, 233, 254, 0.85);
+  border-color: rgba(196, 181, 253, 0.6);
+  color: #6d28d9;
+}
+.hp-cmd-send {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.75rem; height: 1.75rem;
+  border-radius: 0.5rem;
   border: none;
   cursor: pointer;
   background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 100%);
   color: #ffffff;
-  transition: transform 0.15s ease;
+  transition: transform 0.15s ease, opacity 0.15s ease;
   flex-shrink: 0;
 }
-.hp-ai-send:hover:not(:disabled) { transform: scale(1.08); }
-.hp-ai-send:disabled {
-  background: rgba(99, 102, 241, 0.2);
-  color: rgba(226, 232, 240, 0.5);
+.hp-cmd-send:hover:not(:disabled) { transform: scale(1.08); }
+.hp-cmd-send:disabled {
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(148, 163, 184, 0.5);
   cursor: not-allowed;
 }
-/* 示例按钮 — 弱化玻璃态感，更像 Hero 内部的标签 */
-.hp-ai-examples {
-  position: relative;
+.hp-cmd-burst {
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-radius: 50%;
+  background: var(--b-color, rgba(139, 92, 246, 0.6));
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  animation: hpBurst 0.85s cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+  z-index: 1;
+}
+@keyframes hpBurst {
+  0% {
+    width: 0;
+    height: 0;
+    opacity: 0.9;
+  }
+  60% {
+    opacity: 0.6;
+  }
+  100% {
+    width: 44px;
+    height: 44px;
+    opacity: 0;
+  }
+}
+
+/* —— 示例 chip 行 —— */
+.hp-cmd-examples {
   display: flex;
   flex-wrap: wrap;
+  justify-content: center;
   gap: 0.35rem;
+  margin-top: 0;
 }
-.hp-ai-chip {
+.hp-cmd-chip {
   display: inline-flex;
   align-items: center;
-  padding: 4px 9px;
+  padding: 0.25rem 0.65rem;
   border-radius: 9999px;
-  background: rgba(30, 41, 59, 0.35);
-  border: 1px solid rgba(148, 163, 184, 0.15);
-  color: #cbd5e1;
-  font-size: 0.65rem;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #475569;
+  font-size: 0.66rem;
   font-weight: 600;
   cursor: pointer;
-  transition: background 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
 }
-.hp-ai-chip:hover {
-  background: rgba(59, 130, 246, 0.18);
-  border-color: rgba(139, 92, 246, 0.38);
-  color: #e0e7ff;
-}
-.hp-ai-chip-more {
-  background: rgba(139, 92, 246, 0.12);
+.hp-cmd-chip:hover {
+  background: rgba(139, 92, 246, 0.1);
   border-color: rgba(139, 92, 246, 0.3);
-  color: #c4b5fd;
-  font-weight: 700;
+  color: #6d28d9;
+  transform: translateY(-1px);
 }
-.hp-ai-chip-more:hover {
-  background: rgba(139, 92, 246, 0.22);
-  border-color: rgba(167, 139, 250, 0.5);
+.hp-cmd-chip.more {
+  background: rgba(139, 92, 246, 0.08);
+  border-color: rgba(139, 92, 246, 0.25);
+  color: #7c3aed;
+  font-weight: 750;
+}
+.hp-cmd-chip.more:hover {
+  background: rgba(139, 92, 246, 0.16);
+  border-color: rgba(139, 92, 246, 0.45);
+}
+
+/* —— CTA 行 —— */
+.hp-cmd-cta-row {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  margin-top: 0;
+}
+.hp-btn-primary {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.44rem 0.9rem;
+  border: 1px solid transparent;
+  border-radius: 9999px;
+  background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+  color: white;
+  font-size: 0.76rem;
+  font-weight: 800;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 5px 16px rgba(99, 102, 241, 0.25), inset 0 1px 0 rgba(255,255,255,0.2);
+  letter-spacing: 0.02em;
+}
+.hp-btn-primary:hover {
+  background: linear-gradient(135deg, #4f46e5 0%, #7c3aed 100%);
+  transform: translateY(-1.5px);
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.35), inset 0 1px 0 rgba(255,255,255,0.2);
+}
+.hp-btn-primary svg { transition: transform 0.2s ease; }
+.hp-btn-primary:hover svg { transform: translateX(2px); }
+.hp-cmd-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.28rem;
+  padding: 0.38rem 0.75rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  background: rgba(255, 255, 255, 0.55);
+  color: #475569;
+  font-size: 0.7rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  backdrop-filter: blur(8px);
+}
+.hp-cmd-cta:hover {
+  background: rgba(99, 102, 241, 0.08);
+  border-color: rgba(99, 102, 241, 0.25);
+  color: #4f46e5;
+  transform: translateY(-1px);
+}
+.hp-cmd-cta.active {
+  background: rgba(99, 102, 241, 0.14);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #4338ca;
 }
 
 /* ════════════════════════════════
    分类卡片（横向滚动）
 ════════════════════════════════ */
+.home-page { position: relative; }
+.hp-hero-cat-bridge {
+  position: absolute;
+  top: calc(5.5rem + 55%);
+  left: 0; right: 0;
+  height: 9rem;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 40% 100% at 30% 0%, rgba(255, 255, 255, 0.18), transparent 70%),
+    radial-gradient(ellipse 38% 100% at 72% 0%, rgba(244, 238, 255, 0.22), transparent 72%),
+    radial-gradient(ellipse 70% 80% at 50% 50%, rgba(226, 232, 255, 0.12), transparent 75%);
+  filter: blur(36px) saturate(130%);
+  animation: hpBridgeDrift 50s ease-in-out infinite;
+}
+@keyframes hpBridgeDrift {
+  0%, 100% { opacity: 0.9; transform: translateY(0); }
+  50%      { opacity: 1;   transform: translateY(6px); }
+}
+
 .hp-categories {
   background: transparent;
-  padding: 1rem 0 0.5rem;
+  padding: 1.2rem 0 0.5rem;
+  position: relative;
+}
+.hp-categories::before {
+  content: '';
+  position: absolute;
+  top: -2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 88%;
+  height: 9rem;
+  background:
+    radial-gradient(ellipse 60% 80% at 25% 20%, rgba(196, 181, 253, 0.18), transparent 70%),
+    radial-gradient(ellipse 55% 70% at 75% 30%, rgba(147, 197, 253, 0.15), transparent 70%),
+    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(221, 214, 254, 0.14), transparent 75%);
+  filter: blur(28px) saturate(125%);
+  pointer-events: none;
+  z-index: 0;
+  animation: hpCatCloudDrift 65s ease-in-out infinite reverse;
+}
+@keyframes hpCatCloudDrift {
+  0%, 100% {
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+  30% {
+    transform: translateX(-53%) translateY(4%) scale(1.04);
+  }
+  60% {
+    transform: translateX(-47%) translateY(-2%) scale(0.97);
+  }
+  85% {
+    transform: translateX(-51%) translateY(3%) scale(1.02);
+  }
 }
 .hp-categories-wrapper {
   max-width: var(--nav-content-max-width);
@@ -997,6 +1386,8 @@ function heroOpenDrawerOnly() {
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  position: relative;
+  z-index: 1;
 }
 .hp-categories-inner {
   flex: 1;
@@ -1015,50 +1406,150 @@ function heroOpenDrawerOnly() {
   width: 2rem;
   height: 2rem;
   border-radius: 50%;
-  border: 1px solid rgba(191,219,254,0.32);
-  background: rgba(255,255,255,0.78);
+  border: 1px solid rgba(191, 219, 254, 0.28);
+  background: rgba(255, 255, 255, 0.55);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
   color: #64748b;
   cursor: pointer;
   display: flex;
   align-items: center;
   justify-content: center;
   transition: all 0.15s;
-  box-shadow: 0 4px 12px rgba(70,91,128,0.08);
+  box-shadow: 0 4px 14px rgba(70, 91, 128, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
 }
-.hp-cat-scroll-btn:hover { background: #fff; color: #2563eb; border-color: rgba(79,124,255,0.34); }
+.hp-cat-scroll-btn:hover { background: rgba(255, 255, 255, 0.75); color: #2563eb; border-color: rgba(79, 124, 255, 0.28); }
 .hp-cat-card {
   display: flex;
   align-items: center;
   gap: 0.6rem;
-  padding: 0.6rem 0.75rem;
-  border-radius: 0.85rem;
-  background: rgba(255,255,255,0.78);
-  border: 1px solid rgba(191,219,254,0.32);
+  padding: 0.65rem 0.8rem;
+  border-radius: 0.95rem;
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(248, 250, 255, calc(0.24 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(226, 232, 240, 0.45);
+  backdrop-filter: blur(14px) saturate(130%);
+  -webkit-backdrop-filter: blur(14px) saturate(130%);
   cursor: pointer;
-  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s;
-  box-shadow: 0 8px 22px rgba(70,91,128,0.07);
+  transition: box-shadow 0.2s, border-color 0.2s, transform 0.2s, background 0.2s;
+  box-shadow:
+    0 10px 28px rgba(70, 91, 128, 0.05),
+    0 0 0 1px rgba(255, 255, 255, 0.35) inset;
   flex-shrink: 0;
   min-width: 0;
+  position: relative;
+  overflow: hidden;
 }
-.hp-cat-card.module-blog .hp-cat-icon { background: #eff6ff; color: #2563eb; }
-.hp-cat-card.module-ether .hp-cat-icon { background: #f5f3ff; color: #7c3aed; }
-.hp-cat-card.module-quant .hp-cat-icon { background: #ecfdf5; color: #059669; }
-.hp-cat-card.module-assessment .hp-cat-icon { background: #fff1f2; color: #e11d48; }
-.hp-cat-card.module-notes .hp-cat-icon { background: #fff7ed; color: #ea580c; }
+.hp-cat-card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(100deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.2) 50%,
+    transparent 100%
+  );
+  transform: skewX(-15deg);
+  pointer-events: none;
+  transition: left 0.5s ease;
+}
+.hp-cat-card.module-blog .hp-cat-icon { background: rgba(219, 234, 254, 0.65); color: #2563eb; }
+.hp-cat-card.module-ether .hp-cat-icon { background: rgba(237, 233, 254, 0.7); color: #7c3aed; }
+.hp-cat-card.module-quant .hp-cat-icon { background: rgba(209, 250, 229, 0.65); color: #059669; }
+.hp-cat-card.module-assessment .hp-cat-icon { background: rgba(255, 228, 230, 0.65); color: #e11d48; }
+.hp-cat-card.module-notes .hp-cat-icon { background: rgba(255, 237, 213, 0.65); color: #ea580c; }
+.hp-cat-card::after {
+  content: '';
+  position: absolute;
+  inset: -30%;
+  border-radius: inherit;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  z-index: -1;
+  filter: blur(14px);
+}
+.hp-cat-card.module-blog::after      { background: radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.18), transparent 65%); }
+.hp-cat-card.module-ether::after     { background: radial-gradient(circle at 50% 50%, rgba(139, 92, 246, 0.2), transparent 65%); }
+.hp-cat-card.module-quant::after     { background: radial-gradient(circle at 50% 50%, rgba(16, 185, 129, 0.18), transparent 65%); }
+.hp-cat-card.module-assessment::after{ background: radial-gradient(circle at 50% 50%, rgba(225, 29, 72, 0.16), transparent 65%); }
+.hp-cat-card.module-notes::after     { background: radial-gradient(circle at 50% 50%, rgba(234, 88, 12, 0.17), transparent 65%); }
 .hp-cat-card:hover {
-  box-shadow: 0 14px 34px rgba(59,130,246,0.12);
-  border-color: rgba(79,124,255,0.34);
-  transform: translateY(-2px);
+  box-shadow:
+    0 16px 40px rgba(99, 102, 241, 0.1),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+  transform: translateY(-2.5px);
+}
+.hp-cat-card.module-blog:hover {
+  border-color: rgba(59, 130, 246, 0.3);
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(219, 234, 254, calc(0.26 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(239, 246, 255, 0.7);
+}
+.hp-cat-card.module-ether:hover {
+  border-color: rgba(139, 92, 246, 0.32);
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(237, 233, 254, calc(0.26 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(245, 243, 255, 0.7);
+}
+.hp-cat-card.module-quant:hover {
+  border-color: rgba(16, 185, 129, 0.28);
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(209, 250, 229, calc(0.26 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(236, 253, 245, 0.7);
+}
+.hp-cat-card.module-assessment:hover {
+  border-color: rgba(225, 29, 72, 0.26);
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(255, 228, 230, calc(0.24 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(255, 241, 242, 0.7);
+}
+.hp-cat-card.module-notes:hover {
+  border-color: rgba(234, 88, 12, 0.28);
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.5 * var(--spot-active, 0))) 0%,
+      rgba(255, 237, 213, calc(0.25 * var(--spot-active, 0))) 25%,
+      transparent 55%),
+    rgba(255, 247, 237, 0.7);
+}
+.hp-cat-card:hover::after { opacity: 1; }
+.hp-cat-card:hover::before {
+  left: 130%;
+  transition: left 0.65s ease;
 }
 .hp-cat-card.active {
-  background: linear-gradient(135deg, #3b82f6 0%, #6366f1 100%);
-  border-color: rgba(147,197,253,0.46);
-  box-shadow: 0 14px 34px rgba(37,99,235,0.26);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.85) 0%, rgba(139, 92, 246, 0.82) 100%);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  border-color: rgba(196, 181, 253, 0.45);
+  box-shadow:
+    0 16px 42px rgba(99, 102, 241, 0.22),
+    0 0 0 1px rgba(255, 255, 255, 0.25) inset;
 }
-.hp-cat-card.active .hp-cat-icon { background: rgba(255,255,255,0.15); color: white; }
+.hp-cat-card.active .hp-cat-icon { background: rgba(255, 255, 255, 0.18); color: white; }
 .hp-cat-card.active .hp-cat-info strong { color: white; }
-.hp-cat-card.active .hp-cat-info span { color: rgba(255,255,255,0.7); }
-.hp-cat-card.active .hp-cat-arrow { color: rgba(255,255,255,0.6); }
+.hp-cat-card.active .hp-cat-info span { color: rgba(255, 255, 255, 0.75); }
+.hp-cat-card.active .hp-cat-arrow { color: rgba(255, 255, 255, 0.65); }
 
 .hp-cat-icon {
   width: 2rem;
@@ -1211,7 +1702,19 @@ function heroOpenDrawerOnly() {
   border: 1px solid rgba(203, 213, 225, 0.5);
   cursor: pointer;
   box-shadow: 0 14px 36px rgba(70, 91, 128, 0.08);
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 65ms);
+  opacity: 0;
+  transform: translateY(22px);
+  will-change: transform, opacity;
+}
+.hp-feature-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .hp-feature-card:hover {
   border-color: rgba(99, 102, 241, 0.24);
@@ -1298,7 +1801,19 @@ function heroOpenDrawerOnly() {
   background: rgba(255, 255, 255, 0.88);
   border: 1px solid rgba(203, 213, 225, 0.5);
   cursor: pointer;
-  transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    opacity 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 65ms);
+  opacity: 0;
+  transform: translateY(22px);
+  will-change: transform, opacity;
+}
+.hp-spotlight-card.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .hp-spotlight-card:hover {
   border-color: rgba(99, 102, 241, 0.24);
@@ -1362,7 +1877,20 @@ function heroOpenDrawerOnly() {
   background: rgba(255,255,255,0.82);
   border: 1px solid rgba(203,213,225,0.5);
   cursor: pointer;
-  transition: background 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease, border-color 0.2s ease;
+  transition:
+    background 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.4s cubic-bezier(0.2, 0.7, 0.2, 1),
+    border-color 0.2s ease,
+    opacity 0.5s cubic-bezier(0.2, 0.7, 0.2, 1);
+  transition-delay: calc(var(--i, 0) * 65ms);
+  opacity: 0;
+  transform: translateY(20px);
+  will-change: transform, opacity;
+}
+.hp-post-item.is-visible {
+  opacity: 1;
+  transform: translateY(0);
 }
 .hp-post-item:hover {
   background: rgba(255,255,255,0.96);
@@ -1819,49 +2347,52 @@ function heroOpenDrawerOnly() {
   display: flex;
   gap: 0.45rem;
   flex-wrap: wrap;
-  margin-top: 0.65rem;
+  margin-top: 0.6rem;
 }
 .hp-hero-chip {
   display: inline-flex;
   align-items: center;
   gap: 0.3rem;
-  padding: 0.4rem 0.65rem;
+  padding: 0.38rem 0.62rem;
   border-radius: 999px;
-  background: rgba(15, 23, 42, 0.35);
-  border: 1px solid rgba(191, 219, 254, 0.22);
-  color: #dbeafe;
+  background: rgba(255, 255, 255, 0.65);
+  border: 1px solid rgba(148, 163, 184, 0.18);
+  color: #475569;
   font-size: 0.7rem;
   font-weight: 600;
   cursor: pointer;
   transition: background 0.15s, border-color 0.15s;
+  backdrop-filter: blur(8px);
 }
-.hp-hero-chip:hover { background: rgba(59, 130, 246, 0.25); border-color: rgba(147, 197, 253, 0.4); }
+.hp-hero-chip:hover { background: rgba(99, 102, 241, 0.1); border-color: rgba(99, 102, 241, 0.3); }
 .hp-hero-chip.active {
-  background: rgba(79, 124, 255, 0.32);
-  border-color: rgba(147, 197, 253, 0.55);
-  color: #ffffff;
+  background: rgba(99, 102, 241, 0.15);
+  border-color: rgba(99, 102, 241, 0.4);
+  color: #4338ca;
 }
 
 /* ── 移动端：紧凑 AI 触发条 ── */
 .hp-ai-mobile-bar {
   display: none;
-  margin-top: 1rem;
-  padding: 0.55rem 0.6rem 0.55rem 0.85rem;
+  margin-top: 0.9rem;
+  padding: 0.5rem 0.55rem 0.5rem 0.8rem;
   border-radius: 9999px;
-  background: rgba(15, 23, 42, 0.55);
-  border: 1px solid rgba(191, 219, 254, 0.2);
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(148, 163, 184, 0.2);
   align-items: center;
   gap: 0.6rem;
   cursor: pointer;
   transition: background 0.15s;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 4px 16px rgba(99, 102, 241, 0.08);
 }
-.hp-ai-mobile-bar:hover { background: rgba(15, 23, 42, 0.7); }
+.hp-ai-mobile-bar:hover { background: rgba(255, 255, 255, 0.9); }
 
 .hp-ai-mobile-left {
   display: inline-flex;
   align-items: center;
   gap: 0.35rem;
-  color: #c4b5fd;
+  color: #7c3aed;
   font-size: 0.7rem;
   font-weight: 700;
   white-space: nowrap;
@@ -1872,9 +2403,9 @@ function heroOpenDrawerOnly() {
   display: flex;
   align-items: center;
   gap: 0.3rem;
-  background: rgba(15, 23, 42, 0.35);
+  background: rgba(241, 245, 249, 0.7);
   border-radius: 9999px;
-  padding: 0.3rem 0.35rem 0.3rem 0.7rem;
+  padding: 0.28rem 0.32rem 0.28rem 0.68rem;
   min-width: 0;
 }
 .hp-ai-mobile-input input {
@@ -1883,7 +2414,7 @@ function heroOpenDrawerOnly() {
   background: transparent;
   border: none;
   outline: none;
-  color: #f1f5f9;
+  color: #0f172a;
   font-size: 0.75rem;
   font-weight: 500;
   padding: 0;
@@ -1905,8 +2436,8 @@ function heroOpenDrawerOnly() {
 }
 .hp-ai-mobile-send:hover:not(:disabled) { transform: scale(1.08); }
 .hp-ai-mobile-send:disabled {
-  background: rgba(99, 102, 241, 0.2);
-  color: rgba(226, 232, 240, 0.5);
+  background: rgba(148, 163, 184, 0.2);
+  color: rgba(148, 163, 184, 0.5);
   cursor: not-allowed;
 }
 
@@ -1923,18 +2454,21 @@ function heroOpenDrawerOnly() {
   .home-page { padding-bottom: 4.75rem; }
 
   /* Hero 移动端：压缩间距与字号 */
-  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 4.15rem; padding-bottom: 0.2rem; }
+  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 3.8rem; padding-bottom: 0.2rem; }
   .hp-hero-inner {
     grid-template-columns: 1fr;
-    padding: 1rem 1rem 1rem;
-    border-radius: 1rem;
-    gap: 0.75rem;
+    padding: 0.8rem 0.9rem 0.8rem;
+    border-radius: 0;
+    margin: 0 0.1rem;
+    gap: 0.55rem;
     box-shadow:
-      0 14px 36px rgba(15, 23, 42, 0.18),
-      inset 0 1px 0 rgba(255, 255, 255, 0.12);
+      0 30px 70px -25px rgba(99, 102, 241, 0.18),
+      0 15px 40px -25px rgba(139, 92, 246, 0.22),
+      0 0 80px -35px rgba(125, 211, 252, 0.22),
+      0 0 0 1px rgba(255, 255, 255, 0.28);
   }
   .hp-hero-badge-row {
-    margin-bottom: 0.7rem;
+    margin-bottom: 0.5rem;
     flex-wrap: wrap;
     gap: 0.4rem;
   }
@@ -1947,10 +2481,10 @@ function heroOpenDrawerOnly() {
     font-size: 0.65rem;
     padding: 0.2rem 0.45rem;
   }
-  .hp-hero-title { margin-bottom: 0.42rem; font-size: 1.48rem; line-height: 1.14; }
-  .hp-hero-sub { margin-bottom: 0.8rem; font-size: 0.78rem; line-height: 1.65; max-width: 18rem; }
+  .hp-hero-title { margin-bottom: 0.35rem; font-size: 1.35rem; line-height: 1.14; }
+  .hp-hero-sub { margin-bottom: 0.7rem; font-size: 0.78rem; line-height: 1.65; max-width: 18rem; }
   .hp-hero-actions { gap: 0.45rem; margin-bottom: 0.2rem; }
-  .hp-btn-primary { padding: 0.55rem 1.1rem; font-size: 0.75rem; }
+  .hp-btn-primary { padding: 0.52rem 1.05rem; font-size: 0.74rem; }
   .hp-ai-mobile-bar { display: flex; }
 
   /* 分类卡片：缩小图标和间距 */
@@ -2174,7 +2708,7 @@ function heroOpenDrawerOnly() {
 }
 
 @media (max-width: 480px) {
-  .hp-hero-inner { padding: 0.85rem 0.9rem 1rem; border-radius: 0.95rem; }
+  .hp-hero-inner { padding: 0.85rem 0.9rem 0.95rem; border-radius: 0; }
   .hp-hero-title { font-size: 1.05rem; }
   .hp-hero-sub { font-size: 0.75rem; }
 

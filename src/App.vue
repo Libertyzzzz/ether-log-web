@@ -113,15 +113,21 @@ const { isDark, toggleDark } = useDarkMode()
 const { open: openAIAssistant } = useAIAssistant()
 
 watch(
-  () => route.name,
-  async (newRouteName) => {
+  [() => route.name, () => route.params.articleSlug ?? null],
+  async ([newRouteName, newSlug], [oldRouteName, oldSlug]) => {
     if (newRouteName === 'post-detail') {
-      await loadArticleFromRoute()
+      const slugChanged = newSlug !== oldSlug
+      const routeEntered = newRouteName !== oldRouteName
+      if (slugChanged || routeEntered) {
+        await loadArticleFromRoute()
+      }
     } else {
-      closeArticleDetail()
+      if (oldRouteName === 'post-detail') {
+        closeArticleDetail()
+      }
     }
   },
-  { immediate: true }
+  { immediate: true, flush: 'post' }
 )
 
 const categories = ref<Category[]>([])

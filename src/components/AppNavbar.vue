@@ -128,19 +128,30 @@ const isContentPage = computed(() => contentPageNames.has(String(route.name)))
 const allowAutoHide = computed(() => isMobile.value && isContentPage.value)
 
 const isVisible = ref(true)
+const scrollDepth = ref(0)
 let lastScrollY = 0
 let ticking = false
 const MIN_DELTA = 8
 const TOP_BUFFER = 120
+const HERO_DEPTH_START = 160
+const HERO_DEPTH_END = 420
 
 function getScrollY() {
   return window.scrollY || window.pageYOffset || document.documentElement.scrollTop || 0
+}
+
+function updateScrollDepth(y: number) {
+  if (y <= HERO_DEPTH_START) { scrollDepth.value = 0; return }
+  if (y >= HERO_DEPTH_END)   { scrollDepth.value = 1; return }
+  scrollDepth.value = (y - HERO_DEPTH_START) / (HERO_DEPTH_END - HERO_DEPTH_START)
 }
 
 function handleScroll() {
   if (!ticking) {
     window.requestAnimationFrame(() => {
       const currentY = getScrollY()
+
+      updateScrollDepth(currentY)
 
       if (!allowAutoHide.value) {
         isVisible.value = true
@@ -178,6 +189,7 @@ function handleScroll() {
 function resetNavState() {
   isVisible.value = true
   lastScrollY = getScrollY()
+  updateScrollDepth(lastScrollY)
 }
 
 watch(
@@ -200,6 +212,7 @@ watch(
 onMounted(() => {
   checkMobile()
   lastScrollY = getScrollY()
+  updateScrollDepth(lastScrollY)
   window.addEventListener('resize', checkMobile)
   window.addEventListener('scroll', handleScroll, { passive: true })
   document.addEventListener('click', handleDocumentClick)
@@ -214,7 +227,11 @@ onUnmounted(() => {
 
 <template>
   <div class="nav-shell">
-    <nav class="nav-standard" :class="{ 'nav-hidden': !isVisible }">
+    <nav
+      class="nav-standard"
+      :class="{ 'nav-hidden': !isVisible }"
+      :style="{ '--nav-scroll-depth': scrollDepth }"
+    >
       <div class="nav-content">
       <!-- 1. 左侧：Logo (始终靠左) -->
       <div class="nav-logo" @click="$emit('navigate', 'home')">
@@ -458,12 +475,39 @@ onUnmounted(() => {
 /* ── 基础布局 (PC) ── */
 .nav-standard {
   position: fixed; top: 0; left: 0; right: 0; height: 5rem;
-  background: var(--nav-bg); backdrop-filter: blur(20px);
-  -webkit-backdrop-filter: blur(20px);
-  z-index: 1000; transition: transform 0.4s cubic-bezier(0.16, 1, 0.3, 1), background-color 0.3s;
-  /* 处理 iOS 刘海/灵动岛 safe-area（移动端生效，PC 端 env() 返回 0，无副作用 */
+  background: rgba(255, 255, 255, calc(0.48 + var(--nav-scroll-depth, 0) * 0.34));
+  backdrop-filter: blur(calc(24px - var(--nav-scroll-depth, 0) * 4px)) saturate(calc(160% + var(--nav-scroll-depth, 0) * 40%));
+  -webkit-backdrop-filter: blur(calc(24px - var(--nav-scroll-depth, 0) * 4px)) saturate(calc(160% + var(--nav-scroll-depth, 0) * 40%));
+  z-index: 1000;
+  transition:
+    transform 0.4s cubic-bezier(0.16, 1, 0.3, 1),
+    background-color 0.35s ease,
+    box-shadow 0.35s ease;
   padding-top: env(safe-area-inset-top);
   box-sizing: border-box;
+  box-shadow:
+    0 1px 0 rgba(255, 255, 255, calc(0.7 + var(--nav-scroll-depth, 0) * 0.2)) inset,
+    0 -1px 0 rgba(226, 232, 240, calc(0.25 + var(--nav-scroll-depth, 0) * 0.25)) inset,
+    0 calc(var(--nav-scroll-depth, 0) * 10px) calc(var(--nav-scroll-depth, 0) * 28px) rgba(15, 23, 42, calc(var(--nav-scroll-depth, 0) * 0.07));
+}
+.nav-standard::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  width: 70%;
+  height: 1px;
+  background: linear-gradient(90deg,
+    transparent 0%,
+    rgba(148, 163, 184, 0.12) 20%,
+    rgba(99, 102, 241, 0.18) 50%,
+    rgba(148, 163, 184, 0.12) 80%,
+    transparent 100%
+  );
+  opacity: calc(0.02 + var(--nav-scroll-depth, 0) * 0.98);
+  transition: opacity 0.35s ease;
+  pointer-events: none;
 }
 /* 桌面端永远不隐藏（即 nav-hidden 类对桌面端无视觉效果） */
 .nav-standard.nav-hidden { transform: translateY(0); }
@@ -493,7 +537,7 @@ onUnmounted(() => {
   border-radius: 0.5rem;
   white-space: nowrap;
 }
-.nav-links button:hover { color: #0f172a; background: rgba(241, 245, 249, 0.7); }
+.nav-links button:hover { color: #0f172a; background: rgba(255, 255, 255, 0.55); }
 
 /* PC 操作 */
 .nav-actions { display: flex; gap: 0.08rem; align-items: center; margin-left: 0.02rem; }
@@ -501,21 +545,39 @@ onUnmounted(() => {
   display: inline-flex; align-items: center; justify-content: center; gap: 0.1rem;
   min-height: 2rem;
   padding: 0.28rem 0.38rem; border-radius: 0.62rem; border: none;
-  background: #0f172a; color: white; font-size: 0.7rem; font-weight: 750;
+  background: rgba(15, 23, 42, 0.72);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  color: white; font-size: 0.7rem; font-weight: 750;
   line-height: 1;
   white-space: nowrap;
   cursor: pointer; transition: all 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.18) inset;
 }
-.nav-action-button:hover { transform: translateY(-1px); }
-.nav-action-button.lab { background: #eff6ff; color: #2563eb; border: 1px solid rgba(37, 99, 235, 0.18); }
-.nav-action-button.secondary { background: #f1f5f9; color: #475569; }
+.nav-action-button:hover { transform: translateY(-1px); background: rgba(15, 23, 42, 0.82); }
+.nav-action-button.lab {
+  background: rgba(219, 234, 254, 0.55);
+  color: #1d4ed8;
+  border: 1px solid rgba(37, 99, 235, 0.14);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+}
+.nav-action-button.secondary {
+  background: rgba(241, 245, 249, 0.55);
+  color: #475569;
+  border: 1px solid rgba(226, 232, 240, 0.5);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  box-shadow: none;
+}
 .nav-action-button.has-dropdown {
   padding-right: 0.55rem;
 }
 .nav-action-button.active {
-  background: #e2e8f0;
+  background: rgba(255, 255, 255, 0.75);
   color: #0f172a;
-  box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.08);
+  box-shadow: inset 0 2px 6px rgba(15, 23, 42, 0.06), 0 0 0 1px rgba(255, 255, 255, 0.6) inset;
 }
 .nav-action-chevron {
   margin-left: 2px;
@@ -567,12 +629,15 @@ onUnmounted(() => {
   width: 6.4rem;
   height: 2rem;
   padding: 0 0.3rem;
-  border: 1px solid #e2e8f0;
+  border: 1px solid rgba(226, 232, 240, 0.55);
   border-radius: 0.6rem;
-  background: #f8fafc;
+  background: rgba(255, 255, 255, 0.48);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   color: #94a3b8;
   cursor: pointer;
   transition: all 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
 }
 .nav-search-trigger span {
   min-width: 0;
@@ -581,8 +646,8 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 .nav-search-trigger:hover {
-  border-color: #cbd5e1;
-  background: #f1f5f9;
+  border-color: rgba(148, 163, 184, 0.5);
+  background: rgba(255, 255, 255, 0.65);
   color: #64748b;
 }
 kbd {
@@ -675,12 +740,17 @@ kbd {
 .status-badge-wrapper { position: relative; }
 .status-badge {
   display: flex; align-items: center; gap: 0.38rem; min-height: 2rem; padding: 0 0.58rem;
-  border-radius: 0.62rem; background: #f8fafc; border: 1px solid #e2e8f0;
+  border-radius: 0.62rem;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(226, 232, 240, 0.55);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
   font-size: 0.62rem; font-weight: 800; color: #64748b; white-space: nowrap;
   flex-shrink: 0; cursor: pointer; transition: all 0.2s ease;
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.35) inset;
 }
-.status-badge:hover { border-color: #cbd5e1; background: #f1f5f9; }
-.status-badge.active { background: #0f172a; color: white; border-color: #0f172a; }
+.status-badge:hover { border-color: rgba(148, 163, 184, 0.5); background: rgba(255, 255, 255, 0.65); }
+.status-badge.active { background: rgba(15, 23, 42, 0.78); color: white; border-color: rgba(15, 23, 42, 0.4); box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.15) inset; }
 .status-badge .dot { width: 6px; height: 6px; border-radius: 50%; background: #10b981; }
 
 /* ── 移动端快捷入口 */
@@ -883,7 +953,9 @@ kbd {
 @media (max-width: 768px) {
   .nav-standard {
     height: calc(3.25rem + env(safe-area-inset-top));
-    background: rgba(248, 250, 252, 0.86);
+    background: rgba(255, 255, 255, 0.58);
+    backdrop-filter: blur(20px) saturate(150%);
+    -webkit-backdrop-filter: blur(20px) saturate(150%);
     will-change: transform;
     -webkit-transform: translate3d(0, 0, 0);
     transform: translate3d(0, 0, 0);
