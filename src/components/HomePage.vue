@@ -2,8 +2,7 @@
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
 import type { ArticleListItem, Category, Tag as BlogTag } from '../types/blog'
-import { getArticleCategory, getArticleSummary } from '../utils/article'
-import { getReadingTime } from '../utils/format'
+import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 
 const props = defineProps<{
@@ -647,7 +646,7 @@ function heroOpenDrawerOnly() {
                   <span class="hp-post-sep">·</span>
                   <span class="hp-post-date">{{ formatDate(leadArticle.createTime) }}</span>
                   <span class="hp-post-sep">·</span>
-                  <span class="hp-post-reading"><Clock :size="10" /> {{ getReadingTime(leadArticle.summary || '') }} min</span>
+                  <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(leadArticle) }} min</span>
                 </div>
                 <button class="hp-feature-read" type="button" @click.stop="$emit('openArticle', leadArticle)">
                   阅读主推 <ArrowRight :size="13" />
@@ -681,7 +680,7 @@ function heroOpenDrawerOnly() {
                   <div class="hp-post-meta">
                     <span>{{ formatDate(post.createTime) }}</span>
                     <span class="hp-post-sep">·</span>
-                    <span class="hp-post-reading"><Clock :size="10" /> {{ getReadingTime(post.summary || '') }} min</span>
+                    <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(post) }} min</span>
                   </div>
                 </div>
                 <div v-if="showActions" class="hp-card-admin-actions" @click.stop>
@@ -714,7 +713,7 @@ function heroOpenDrawerOnly() {
                   <div class="hp-post-meta">
                     <span class="hp-post-date">{{ formatDate(post.createTime) }}</span>
                     <span class="hp-post-sep">·</span>
-                    <span class="hp-post-reading"><Clock :size="10" /> {{ getReadingTime(post.summary || '') }} min</span>
+                    <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(post) }} min</span>
                   </div>
                 </div>
 
