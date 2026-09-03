@@ -116,6 +116,7 @@ let sentinelObserver: IntersectionObserver | null = null
 let cardObserver: IntersectionObserver | null = null
 const sentinelRef = ref<HTMLElement | null>(null)
 const postsListRef = ref<HTMLElement | null>(null)
+const postsMainScrollRef = ref<HTMLElement | null>(null)
 const heroIsMobile = ref(false)
 function checkHeroMobile() { heroIsMobile.value = window.innerWidth <= 768 }
 const currentHeroClipPath = computed(() => heroIsMobile.value ? heroClipPathMobile.value : heroClipPath.value)
@@ -176,26 +177,47 @@ function onAboutCardLeave(e: MouseEvent) {
   el.style.setProperty('--spot-active', '0')
 }
 
-onMounted(() => {
-  checkHeroMobile()
-  window.addEventListener('resize', checkHeroMobile, { passive: true })
+function setupSentinelObserver() {
   if (typeof IntersectionObserver === 'undefined') return
+  sentinelObserver?.disconnect()
+  sentinelObserver = null
+
+  const isDesktop = window.innerWidth > 1024
+  const root: Element | null = isDesktop ? postsMainScrollRef.value : null
+
   sentinelObserver = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && hasMore.value && !props.isLoadingMore) {
         loadMore()
       }
     },
-    { rootMargin: '120px' }
+    {
+      root,
+      rootMargin: isDesktop ? '80px 0px 80px 0px' : '120px',
+    }
   )
   if (sentinelRef.value) sentinelObserver.observe(sentinelRef.value)
+}
+
+onMounted(() => {
+  checkHeroMobile()
+  window.addEventListener('resize', checkHeroMobile, { passive: true })
+  window.addEventListener('resize', setupSentinelObserver, { passive: true })
+  setupSentinelObserver()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkHeroMobile)
+  window.removeEventListener('resize', setupSentinelObserver)
   sentinelObserver?.disconnect()
   cardObserver?.disconnect()
 })
+
+watch(
+  () => postsMainScrollRef.value,
+  () => { nextTick(() => setupSentinelObserver()) },
+  { flush: 'post' }
+)
 
 watch(
   () => [props.filteredArticles.length, props.isLoadingArticles],
@@ -551,7 +573,7 @@ function heroOpenDrawerOnly() {
     <section id="posts" class="hp-posts">
       <div class="hp-posts-inner">
         <!-- 左栏：文章流 -->
-        <div class="hp-posts-main">
+        <div class="hp-posts-main" ref="postsMainScrollRef">
           <div class="hp-section-header">
             <h2 class="hp-section-title">
               Latest from NEXTIFY
@@ -1738,6 +1760,27 @@ function heroOpenDrawerOnly() {
   flex-direction: column;
   gap: 1.25rem;
 }
+@media (min-width: 1025px) {
+  .hp-posts-main {
+    max-height: calc(100vh - 4.5rem - 1.25rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.5rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+    scrollbar-gutter: stable;
+  }
+  .hp-posts-main::-webkit-scrollbar { width: 7px; }
+  .hp-posts-main::-webkit-scrollbar-track { background: transparent; }
+  .hp-posts-main::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.45);
+    border-radius: 10px;
+    transition: background 0.2s ease;
+  }
+  .hp-posts-main::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.7);
+  }
+}
 
 .hp-section-header {
   display: flex;
@@ -2226,6 +2269,26 @@ function heroOpenDrawerOnly() {
   gap: 1rem;
   position: sticky;
   top: 4.5rem;
+}
+@media (min-width: 1025px) {
+  .hp-posts-sidebar {
+    max-height: calc(100vh - 4.5rem - 1.25rem);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 0.4rem;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
+    scrollbar-gutter: stable;
+  }
+  .hp-posts-sidebar::-webkit-scrollbar { width: 6px; }
+  .hp-posts-sidebar::-webkit-scrollbar-track { background: transparent; }
+  .hp-posts-sidebar::-webkit-scrollbar-thumb {
+    background: rgba(148, 163, 184, 0.4);
+    border-radius: 10px;
+  }
+  .hp-posts-sidebar::-webkit-scrollbar-thumb:hover {
+    background: rgba(99, 102, 241, 0.65);
+  }
 }
 .hp-sidebar-card {
   padding: 1.35rem 1.4rem;
