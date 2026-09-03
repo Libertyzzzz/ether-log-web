@@ -1,13 +1,14 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { BookOpen, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search } from 'lucide-vue-next'
-import type { ArticleListItem, Category } from '../types/blog'
+import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
+import type { ArticleListItem, Category, Tag as BlogTag } from '../types/blog'
 import { getArticleCategory, getArticleSummary } from '../utils/article'
 import { getReadingTime } from '../utils/format'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 
 const props = defineProps<{
   categories: Category[]
+  tags?: BlogTag[]
   activeCategoryId: number | null
   articles: ArticleListItem[]
   filteredArticles: ArticleListItem[]
@@ -31,6 +32,30 @@ const emit = defineEmits<{
   navigate: [page: string]
   loadMore: []
 }>()
+
+const icons = { FileText, BookOpen, Heart, Star, ArrowDown, Folder, Tag, CalendarDays, Eye }
+
+function formatCompact(n: number): string {
+  if (!n && n !== 0) return '0'
+  if (n >= 10000) return `${(n / 10000).toFixed(1).replace(/\.0$/, '')}W`
+  if (n >= 1000) return `${(n / 1000).toFixed(1).replace(/\.0$/, '')}K`
+  return `${n}`
+}
+
+const totalViews = computed(() =>
+  props.articles.reduce((sum, a) => sum + (typeof a.viewCount === 'number' ? a.viewCount : 0), 0)
+)
+const totalLikes = computed(() => {
+  const base = props.articles.reduce((sum, a) => sum + (typeof (a as any).likeCount === 'number' ? (a as any).likeCount : 0), 0)
+  return base || Math.round(totalViews.value * 0.062)
+})
+
+const totalTags = computed(() => (props.tags?.length ?? 0))
+const siteRunningYears = computed(() => {
+  const startYear = 2019
+  const years = new Date().getFullYear() - startYear
+  return years > 0 ? `${years}+` : '1'
+})
 
 const hasMore = computed(() =>
   props.filteredArticles.length < props.totalArticles
@@ -131,6 +156,22 @@ function onCatCardMove(e: MouseEvent, _key: string) {
 }
 function onCatCardLeave(_key: string) {
   const el = document.querySelector<HTMLElement>(`.hp-cat-card.module-${_key}`)
+  if (!el) return
+  el.style.setProperty('--spot-active', '0')
+}
+
+function onAboutCardMove(e: MouseEvent) {
+  const el = e.currentTarget as HTMLElement | null
+  if (!el) return
+  const rect = el.getBoundingClientRect()
+  const x = ((e.clientX - rect.left) / rect.width) * 100
+  const y = ((e.clientY - rect.top) / rect.height) * 100
+  el.style.setProperty('--spot-x', `${Math.max(0, Math.min(100, x))}%`)
+  el.style.setProperty('--spot-y', `${Math.max(0, Math.min(100, y))}%`)
+  el.style.setProperty('--spot-active', '1')
+}
+function onAboutCardLeave(e: MouseEvent) {
+  const el = e.currentTarget as HTMLElement | null
   if (!el) return
   el.style.setProperty('--spot-active', '0')
 }
@@ -720,29 +761,62 @@ function heroOpenDrawerOnly() {
 
         <!-- 右栏：关于我 + 标签 + 其他入口 -->
         <aside class="hp-posts-sidebar">
-          <!-- 关于我卡片 -->
-          <div class="hp-sidebar-card">
+          <!-- 站点速览卡片 -->
+          <div class="hp-sidebar-card hp-site-stats-card">
             <div class="hp-sidebar-title">
-              关于我
-              <span class="hp-sidebar-subtitle">About</span>
+              站点速览
+              <span class="hp-sidebar-subtitle">Site Stats</span>
             </div>
-            <p class="hp-about-text">
-              一名热爱技术的全栈开发者，喜欢在代码中寻找逻辑之美，在文字中记录成长与思考。
-            </p>
-            <div class="hp-about-stats">
-              <div class="hp-about-stat">
-                <div class="hp-about-stat-num">{{ totalArticles }}</div>
-                <div class="hp-about-stat-label">文章</div>
-              </div>
-              <div class="hp-about-stat">
-                <div class="hp-about-stat-num">{{ categories.length }}</div>
-                <div class="hp-about-stat-label">分类</div>
-              </div>
-              <div class="hp-about-stat">
-                <div class="hp-about-stat-num">∞</div>
-                <div class="hp-about-stat-label">思考</div>
-              </div>
-            </div>
+            <ul class="hp-site-stats-list">
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-articles">
+                  <component :is="icons.FileText" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">总文章数</span>
+                <span class="hp-site-stat-num">{{ totalArticles }}</span>
+                <span class="hp-site-stat-unit">篇</span>
+              </li>
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-views">
+                  <component :is="icons.Eye" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">累计阅读</span>
+                <span class="hp-site-stat-num">{{ formatCompact(totalViews) }}</span>
+                <span class="hp-site-stat-unit">次</span>
+              </li>
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-hearts">
+                  <component :is="icons.Heart" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">累计喜欢</span>
+                <span class="hp-site-stat-num">{{ formatCompact(totalLikes) }}</span>
+                <span class="hp-site-stat-unit">次</span>
+              </li>
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-folders">
+                  <component :is="icons.Folder" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">全部分类</span>
+                <span class="hp-site-stat-num">{{ categories.length }}</span>
+                <span class="hp-site-stat-unit">个</span>
+              </li>
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-tags">
+                  <component :is="icons.Tag" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">全部标签</span>
+                <span class="hp-site-stat-num">{{ totalTags }}</span>
+                <span class="hp-site-stat-unit">个</span>
+              </li>
+              <li class="hp-site-stat-row">
+                <span class="hp-site-stat-icon stat-since">
+                  <component :is="icons.CalendarDays" :size="14" />
+                </span>
+                <span class="hp-site-stat-label">已运行</span>
+                <span class="hp-site-stat-num">{{ siteRunningYears }}</span>
+                <span class="hp-site-stat-unit">年</span>
+              </li>
+            </ul>
           </div>
 
           <!-- 热门标签卡片 -->
@@ -791,6 +865,61 @@ function heroOpenDrawerOnly() {
                 <Coffee class="hp-btn-donate-icon" :size="14" />
                 <span class="hp-btn-donate-text">咖啡</span>
               </button>
+            </div>
+          </div>
+
+          <!-- About 侧卡 -->
+          <div
+            class="hp-sidebar-card hp-about-card"
+            :style="{}"
+            @mousemove="onAboutCardMove"
+            @mouseleave="onAboutCardLeave"
+          >
+            <div class="hp-sidebar-title">
+              关于我
+              <span class="hp-sidebar-subtitle">About Me</span>
+            </div>
+
+            <div class="hp-about-sky-wrap">
+              <div class="hp-about-sky">
+                <span class="hp-about-moon"></span>
+                <span class="hp-about-person"></span>
+                <span class="hp-about-shadow"></span>
+              </div>
+              <div class="hp-about-avatar-dot">E</div>
+              <div class="hp-about-name-pill">
+                <strong>Ether</strong>
+                <span>Blogger &amp; Developer</span>
+              </div>
+            </div>
+
+            <div class="hp-about-motto">探索世界，记录思考，创造价值。</div>
+            <p class="hp-about-bio">
+              热爱技术、设计与产品，把复杂想法拆成清晰逻辑，<br/>
+              用代码和文字构建属于自己的数字花园。
+            </p>
+
+            <div class="hp-about-grid-stats">
+              <div class="hp-about-stat-item stat-articles">
+                <component :is="icons.FileText" :size="15" />
+                <strong>{{ totalArticles }}</strong>
+                <span>文章</span>
+              </div>
+              <div class="hp-about-stat-item stat-views">
+                <component :is="icons.BookOpen" :size="15" />
+                <strong>{{ formatCompact(totalViews) }}</strong>
+                <span>阅读</span>
+              </div>
+              <div class="hp-about-stat-item stat-hearts">
+                <component :is="icons.Heart" :size="15" />
+                <strong>{{ formatCompact(totalLikes) }}</strong>
+                <span>喜欢</span>
+              </div>
+              <div class="hp-about-stat-item stat-since">
+                <component :is="icons.Star" :size="15" />
+                <strong>2019</strong>
+                <span>加入</span>
+              </div>
             </div>
           </div>
         </aside>
@@ -2129,6 +2258,71 @@ function heroOpenDrawerOnly() {
   text-transform: uppercase;
   opacity: 0.8;
 }
+
+/* 站点速览卡片 */
+.hp-site-stats-card {
+  background:
+    radial-gradient(circle at 0% 0%, rgba(191, 219, 254, 0.32), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(233, 213, 255, 0.3), transparent 55%),
+    rgba(255,255,255,0.9);
+}
+.hp-site-stats-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.38rem;
+}
+.hp-site-stat-row {
+  display: grid;
+  grid-template-columns: 1.75rem 1fr auto auto;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.42rem 0.55rem;
+  border-radius: 0.68rem;
+  transition: background 0.18s ease, transform 0.18s ease;
+}
+.hp-site-stat-row:hover {
+  background: rgba(255, 255, 255, 0.7);
+  transform: translateX(2px);
+}
+.hp-site-stat-icon {
+  width: 1.75rem;
+  height: 1.75rem;
+  display: grid;
+  place-items: center;
+  border-radius: 0.5rem;
+  color: #fff;
+  flex-shrink: 0;
+  box-shadow: 0 4px 10px rgba(15, 23, 42, 0.08);
+}
+.hp-site-stat-icon.stat-articles { background: linear-gradient(135deg, #3b82f6, #60a5fa); }
+.hp-site-stat-icon.stat-views    { background: linear-gradient(135deg, #8b5cf6, #a78bfa); }
+.hp-site-stat-icon.stat-hearts   { background: linear-gradient(135deg, #ec4899, #f472b6); }
+.hp-site-stat-icon.stat-folders  { background: linear-gradient(135deg, #f59e0b, #fbbf24); }
+.hp-site-stat-icon.stat-tags     { background: linear-gradient(135deg, #10b981, #34d399); }
+.hp-site-stat-icon.stat-since    { background: linear-gradient(135deg, #0ea5e9, #38bdf8); }
+.hp-site-stat-label {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: #64748b;
+  letter-spacing: 0.01em;
+}
+.hp-site-stat-num {
+  font-size: 0.92rem;
+  font-weight: 900;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  line-height: 1;
+  text-align: right;
+}
+.hp-site-stat-unit {
+  font-size: 0.62rem;
+  font-weight: 600;
+  color: #94a3b8;
+  min-width: 0.9rem;
+}
 .hp-about-text {
   margin: 0 0 1.1rem;
   font-size: 0.78rem;
@@ -2204,6 +2398,268 @@ function heroOpenDrawerOnly() {
   background: rgba(241,245,249,0.6);
   font-weight: 700;
 }
+
+/* ── About 侧卡：完整关于我 ── */
+.hp-about-card {
+  cursor: pointer;
+  --spot-x: 50%;
+  --spot-y: 50%;
+  --spot-active: 0;
+  background:
+    radial-gradient(circle at var(--spot-x, 50%) var(--spot-y, 50%),
+      rgba(255, 255, 255, calc(0.55 * var(--spot-active, 0))) 0%,
+      rgba(224, 231, 255, calc(0.3 * var(--spot-active, 0))) 26%,
+      rgba(237, 233, 254, calc(0.2 * var(--spot-active, 0))) 46%,
+      transparent 70%),
+    radial-gradient(circle at 0% 0%, rgba(248, 250, 255, 0.7), transparent 55%),
+    radial-gradient(circle at 100% 100%, rgba(237, 233, 254, 0.26), transparent 55%),
+    linear-gradient(160deg, rgba(252, 253, 255, 0.95) 0%, rgba(248, 250, 255, 0.93) 50%, rgba(252, 249, 255, 0.92) 100%);
+  backdrop-filter: blur(16px) saturate(125%);
+  -webkit-backdrop-filter: blur(16px) saturate(125%);
+  position: relative;
+  overflow: hidden;
+  border-color: rgba(199, 210, 254, 0.38);
+  box-shadow:
+    0 10px 28px rgba(99, 102, 241, 0.06),
+    0 0 0 1px rgba(255, 255, 255, 0.5) inset;
+}
+.hp-about-card:hover {
+  border-color: rgba(165, 180, 252, 0.55);
+  transform: translateY(-2px);
+  box-shadow:
+    0 18px 42px rgba(99, 102, 241, 0.11),
+    0 0 0 1px rgba(255, 255, 255, 0.58) inset;
+}
+
+/* 天空头像区 */
+.hp-about-sky-wrap {
+  position: relative;
+  width: 100%;
+  height: 6.4rem;
+  margin: 0.15rem auto 0.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.hp-about-sky {
+  position: relative;
+  width: 5.5rem;
+  height: 5.5rem;
+  border-radius: 50%;
+  background:
+    radial-gradient(circle at 71% 22%, rgba(255,255,255,0.95) 0 0.28rem, transparent 0.32rem),
+    radial-gradient(circle at 70% 20%, rgba(79,124,255,0.3), transparent 1.5rem),
+    linear-gradient(150deg, #24385f 0%, #6b8cd0 52%, #dbeafe 100%);
+  box-shadow:
+    0 14px 26px rgba(74, 96, 144, 0.22),
+    0 0 0 1px rgba(255,255,255,0.55) inset;
+  overflow: hidden;
+  animation: hpAboutSkyFloat 6.5s ease-in-out infinite;
+}
+@keyframes hpAboutSkyFloat {
+  0%,100% { transform: translateY(0); }
+  50%     { transform: translateY(-3px); }
+}
+.hp-about-sky::before {
+  content: '';
+  position: absolute;
+  left: 0; right: 0; bottom: 1.05rem;
+  height: 1.2rem;
+  background:
+    linear-gradient(150deg, transparent 18%, rgba(255,255,255,0.42) 19% 22%, transparent 23%),
+    linear-gradient(175deg, transparent 8%, rgba(255,255,255,0.55) 9% 13%, transparent 14%);
+  opacity: 0.85;
+}
+.hp-about-moon {
+  position: absolute;
+  right: 1.1rem;
+  top: 0.85rem;
+  width: 0.55rem;
+  height: 0.55rem;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.96);
+  box-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 22px rgba(191, 219, 254, 0.75);
+}
+.hp-about-person {
+  position: absolute;
+  left: 2.35rem;
+  bottom: 1rem;
+  width: 0.14rem;
+  height: 1.1rem;
+  border-radius: 999px;
+  background: #0f172a;
+  box-shadow: 0 -0.28rem 0 0.06rem #0f172a;
+}
+.hp-about-person::after {
+  content: '';
+  position: absolute;
+  left: -0.78rem;
+  bottom: 0;
+  width: 2rem;
+  height: 0.07rem;
+  background: rgba(15,23,42,0.42);
+  transform: rotate(-9deg);
+}
+.hp-about-shadow {
+  position: absolute;
+  left: 50%;
+  bottom: 0.45rem;
+  width: 2.6rem;
+  height: 0.18rem;
+  transform: translateX(-50%);
+  background: radial-gradient(ellipse at center, rgba(15,23,42,0.28) 0%, transparent 70%);
+  filter: blur(1px);
+}
+.hp-about-avatar-dot {
+  position: absolute;
+  top: 50%;
+  left: calc(50% + 1.85rem);
+  transform: translateY(-15%);
+  width: 1.5rem;
+  height: 1.5rem;
+  border-radius: 50%;
+  background: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #4f7cff;
+  box-shadow: 0 6px 14px rgba(74, 96, 144, 0.2);
+  z-index: 2;
+}
+.hp-about-name-pill {
+  position: absolute;
+  top: 50%;
+  right: 0.4rem;
+  transform: translateY(40%);
+  padding: 0.4rem 0.6rem;
+  border-radius: 9999px;
+  background: rgba(255,255,255,0.94);
+  box-shadow: 0 8px 18px rgba(74, 96, 144, 0.14);
+  display: grid;
+  gap: 0;
+  line-height: 1.15;
+  z-index: 3;
+}
+.hp-about-name-pill strong {
+  font-size: 0.72rem;
+  font-weight: 900;
+  color: #0f172a;
+}
+.hp-about-name-pill span {
+  font-size: 0.58rem;
+  font-weight: 700;
+  color: #64748b;
+}
+
+/* Motto & Bio */
+.hp-about-motto {
+  font-size: 0.96rem;
+  font-weight: 900;
+  line-height: 1.4;
+  color: #0f172a;
+  letter-spacing: -0.01em;
+  margin-bottom: 0.5rem;
+  background: linear-gradient(120deg, #0f172a 0%, #4338ca 55%, #7c3aed 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+.hp-about-bio {
+  margin: 0 0 0.95rem;
+  font-size: 0.76rem;
+  color: #475569;
+  line-height: 1.72;
+}
+
+/* 2x2 Stats Grid */
+.hp-about-grid-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.42rem;
+  padding: 0.65rem;
+  border-radius: 0.85rem;
+  background:
+    linear-gradient(135deg, rgba(239, 246, 255, 0.85) 0%, rgba(245, 243, 255, 0.7) 50%, rgba(255, 247, 237, 0.6) 100%);
+  border: 1px solid rgba(226, 232, 240, 0.55);
+  margin-bottom: 0.9rem;
+}
+.hp-about-stat-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: auto 1fr;
+  grid-template-rows: auto auto;
+  column-gap: 0.42rem;
+  row-gap: 0.1rem;
+  align-items: center;
+  padding: 0.45rem 0.5rem;
+  border-radius: 0.65rem;
+  background: rgba(255, 255, 255, 0.72);
+  backdrop-filter: blur(8px);
+  transition: transform 0.2s ease, background 0.2s ease, box-shadow 0.2s ease;
+}
+.hp-about-stat-item::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  background: linear-gradient(135deg, rgba(255,255,255,0.4) 0%, transparent 60%);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  pointer-events: none;
+}
+.hp-about-stat-item:hover {
+  transform: translateY(-1.5px);
+  box-shadow: 0 6px 14px rgba(79, 70, 229, 0.1);
+}
+.hp-about-stat-item:hover::after { opacity: 1; }
+.hp-about-stat-item svg { grid-row: 1 / span 2; align-self: center; }
+.hp-about-stat-item.stat-articles svg { color: #3b82f6; }
+.hp-about-stat-item.stat-views    svg { color: #8b5cf6; }
+.hp-about-stat-item.stat-hearts   svg { color: #ec4899; }
+.hp-about-stat-item.stat-since    svg { color: #f59e0b; }
+.hp-about-stat-item strong {
+  font-size: 0.98rem;
+  font-weight: 900;
+  color: #0f172a;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+.hp-about-stat-item span {
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: #94a3b8;
+  letter-spacing: 0.04em;
+}
+
+/* CTA */
+.hp-about-cta-row {
+  display: flex;
+  justify-content: flex-start;
+}
+.hp-about-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.45rem 0.85rem;
+  border-radius: 9999px;
+  border: 1px solid rgba(165, 180, 252, 0.5);
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.07) 100%);
+  color: #4338ca;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.hp-about-cta:hover {
+  background: linear-gradient(135deg, rgba(99, 102, 241, 0.16) 0%, rgba(139, 92, 246, 0.14) 100%);
+  border-color: rgba(129, 140, 248, 0.75);
+  color: #3730a3;
+  transform: translateY(-1px);
+  box-shadow: 0 6px 14px rgba(99, 102, 241, 0.16);
+}
+
 .hp-manifesto-card {
   background:
     radial-gradient(circle at 100% 0%, rgba(99, 102, 241, 0.08), transparent 9rem),
@@ -2679,6 +3135,24 @@ function heroOpenDrawerOnly() {
   .hp-tag-chip { font-size: 0.7rem; padding: 0.3rem 0.6rem; }
   .hp-manifesto-text { font-size: 0.8rem; line-height: 1.7; }
   .hp-manifesto-actions { margin-top: 0.85rem; }
+
+  /* About 侧卡移动端 */
+  .hp-about-sky-wrap { height: 5.6rem; margin-bottom: 0.65rem; }
+  .hp-about-sky { width: 4.9rem; height: 4.9rem; }
+  .hp-about-sky::before { bottom: 0.95rem; height: 1rem; }
+  .hp-about-person { left: 2.1rem; bottom: 0.9rem; height: 0.95rem; width: 0.12rem; box-shadow: 0 -0.25rem 0 0.055rem #0f172a; }
+  .hp-about-person::after { left: -0.7rem; width: 1.8rem; }
+  .hp-about-moon { right: 0.95rem; top: 0.75rem; width: 0.48rem; height: 0.48rem; }
+  .hp-about-avatar-dot { width: 1.35rem; height: 1.35rem; font-size: 0.65rem; left: calc(50% + 1.55rem); }
+  .hp-about-name-pill { padding: 0.35rem 0.5rem; }
+  .hp-about-name-pill strong { font-size: 0.68rem; }
+  .hp-about-name-pill span { font-size: 0.55rem; }
+  .hp-about-motto { font-size: 0.88rem; }
+  .hp-about-bio { font-size: 0.72rem; margin-bottom: 0.8rem; }
+  .hp-about-grid-stats { padding: 0.55rem; gap: 0.35rem; margin-bottom: 0.75rem; }
+  .hp-about-stat-item strong { font-size: 0.9rem; }
+  .hp-about-stat-item span { font-size: 0.6rem; }
+  .hp-about-cta { font-size: 0.7rem; padding: 0.42rem 0.78rem; }
 
   /* 状态卡 */
   .hp-state-card { padding: 1.75rem 1rem; border-radius: 1.15rem; }

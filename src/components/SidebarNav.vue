@@ -5,7 +5,6 @@ import {
   FileText,
   Folder,
   Home,
-  Info,
   MoveRight,
   Plus,
   BookOpen,
@@ -44,7 +43,6 @@ const allowSidebar = computed(() => {
 const navItems = [
   { id: 'home', label: '首页', icon: Home, filled: true },
   { id: 'posts', label: '文章', icon: FileText, filled: true },
-  { id: 'about', label: '关于我', icon: Info, filled: true },
 ]
 
 const directories = computed<ArticleDirectory[]>(() => {

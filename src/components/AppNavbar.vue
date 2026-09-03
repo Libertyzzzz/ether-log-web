@@ -2,7 +2,7 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Info, Settings,
+  User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Settings,
   Folder, Tag, MessageSquare, Users, Shield, Key, ChevronDown
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
@@ -71,6 +71,7 @@ const emit = defineEmits<{
 
 const isMobile = ref(false)
 const showSystemDropdown = ref(false)
+const userMenuFromTabbar = ref(false)
 const systemDropdownRef = ref<HTMLElement | null>(null)
 let systemCloseTimer: ReturnType<typeof setTimeout> | null = null
 
@@ -118,7 +119,7 @@ const checkMobile = () => {
 }
 
 const contentPageNames = new Set([
-  'posts', 'about', 'guestbook', 'profile',
+  'posts', 'guestbook', 'profile',
   'publish', 'publish-edit', 'quant-lab',
   'assessment-home', 'assessment-evaluate',
   'assessment-processing', 'assessment-result', 'assessment-share'
@@ -239,11 +240,10 @@ onUnmounted(() => {
         <span class="logo-text">NEXTIFY</span>
       </div>
 
-      <!-- 2. 中间：Home / Posts / About（PC 和移动端都水平显示，移动端缩小字体和间距） -->
+      <!-- 2. 中间：Home / Posts（PC 和移动端都水平显示，移动端缩小字体和间距） -->
       <div class="nav-links">
         <button type="button" @click="$emit('navigate', 'home')">Home</button>
         <button type="button" @click="$emit('navigate', 'posts')">Posts</button>
-        <button type="button" @click="$emit('navigate', 'about')">About</button>
       </div>
 
       <!-- 搜索作为独立工具位，避免挤压右侧操作按钮 -->
@@ -383,19 +383,24 @@ onUnmounted(() => {
             <div class="dot"></div>
             <span>{{ isLoggedIn ? 'IN' : 'SYSTEM READY' }}</span>
           </div>
-          <!-- 移动端：仅小圆点（点击区域放大到 44px） -->
+          <!-- 移动端：仅小圆点（点击区域放大到 44px）- 登录后隐藏，由底部 My 替代 -->
           <button
+            v-if="!isLoggedIn"
             class="status-dot-btn mobile-only"
             :class="{ active: showUserMenu, logged: isLoggedIn }"
             type="button"
-            @click="$emit('toggleStatus')"
+            @click.stop="userMenuFromTabbar = false; $emit('toggleStatus')"
             :title="isLoggedIn ? '账户' : '登录'"
           >
             <span class="status-dot-inner"></span>
           </button>
 
           <Transition name="dropdown-fade">
-            <div v-if="showUserMenu" class="user-dropdown-menu right-menu" @click.stop>
+            <div
+              v-if="showUserMenu && !(isMobile && isLoggedIn && userMenuFromTabbar)"
+              class="user-dropdown-menu right-menu"
+              @click.stop
+            >
               <div v-if="isLoggedIn" class="dropdown-header">
                 <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
                 <div class="dropdown-user-info">
@@ -430,7 +435,36 @@ onUnmounted(() => {
       </div>
     </nav>
 
-    <div class="mobile-tabbar" :class="{ 'tabbar-hidden': !isVisible }" aria-label="移动端主导航">
+    <div
+      class="mobile-tabbar"
+      :class="[{ 'tabbar-hidden': !isVisible, 'tabbar-4col': isLoggedIn }]"
+      :style="isLoggedIn ? { gridTemplateColumns: 'repeat(4, 1fr)' } : {}"
+      aria-label="移动端主导航"
+    >
+      <!-- 移动端 My 弹出菜单：直接在 tabbar 内用 absolute 定位，从上方弹出 -->
+      <Transition name="tabbar-menu-fade">
+        <div
+          v-if="isLoggedIn && showUserMenu && userMenuFromTabbar"
+          class="tabbar-user-menu"
+          @click.stop
+        >
+          <div class="dropdown-header">
+            <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
+            <div class="dropdown-user-info">
+              <strong>{{ getLoginUserName(loginUser) }}</strong>
+              <span>{{ loginUser.email || 'Admin' }}</span>
+            </div>
+          </div>
+          <div class="dropdown-divider"></div>
+          <button v-if="canAccessDashboardArticle" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-article' })"><FileText :size="14" /> 文章管理</button>
+          <button v-if="canAccessDashboardCategory" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-category' })"><Folder :size="14" /> 分类管理</button>
+          <button v-if="canAccessDashboardTag" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-tag' })"><Tag :size="14" /> 标签管理</button>
+          <button v-if="canAccessDashboardComment" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-comment' })"><MessageSquare :size="14" /> 评论管理</button>
+          <div v-if="canAccessDashboardArticle || canAccessDashboardCategory || canAccessDashboardTag || canAccessDashboardComment" class="dropdown-divider"></div>
+          <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
+        </div>
+      </Transition>
+
       <button
         type="button"
         class="mobile-tabbar-item"
@@ -459,13 +493,14 @@ onUnmounted(() => {
         <span>Lab</span>
       </button>
       <button
+        v-if="isLoggedIn"
         type="button"
         class="mobile-tabbar-item"
-        :class="{ active: route.name === 'about' }"
-        @click="$emit('navigate', 'about')"
+        :class="{ active: showUserMenu }"
+        @click.stop="userMenuFromTabbar = true; $emit('toggleStatus')"
       >
-        <Info :size="17" />
-        <span>About</span>
+        <User :size="17" />
+        <span>My</span>
       </button>
     </div>
   </div>
@@ -1036,7 +1071,7 @@ kbd {
     -webkit-backdrop-filter: blur(18px);
     z-index: 1001;
     display: grid;
-    grid-template-columns: repeat(4, 1fr);
+    grid-template-columns: repeat(3, 1fr);
     gap: 0.25rem;
   }
   .mobile-tabbar-item {
@@ -1068,6 +1103,29 @@ kbd {
   }
   .mobile-tabbar-item:active {
     transform: scale(0.96);
+  }
+
+  /* 移动端 My 菜单：在 tabbar 内部上方弹出 */
+  .tabbar-user-menu {
+    position: absolute;
+    right: 0;
+    bottom: calc(100% + 0.6rem);
+    width: 13rem;
+    background: white;
+    border-radius: 1rem;
+    border: 1px solid #e2e8f0;
+    box-shadow: 0 -10px 35px rgba(15, 23, 42, 0.18);
+    padding: 0.6rem;
+    z-index: 1002;
+  }
+  .tabbar-menu-fade-enter-active,
+  .tabbar-menu-fade-leave-active {
+    transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  .tabbar-menu-fade-enter-from,
+  .tabbar-menu-fade-leave-to {
+    opacity: 0;
+    transform: translateY(12px) scale(0.96);
   }
 }
 @media (max-width: 480px) {

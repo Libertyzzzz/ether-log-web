@@ -20,12 +20,7 @@ const router = createRouter({
       component: App,
       meta: { page: 'posts' }
     },
-    {
-      path: '/about',
-      name: 'about',
-      component: App,
-      meta: { page: 'about' }
-    },
+
     {
       path: '/guestbook',
       name: 'guestbook',

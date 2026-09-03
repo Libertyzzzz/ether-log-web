@@ -4,7 +4,6 @@ import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import QRCode from 'qrcode'
 import confetti from 'canvas-confetti'
-import AboutSection from './components/AboutSection.vue'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
 import AIAssistant from './components/AIAssistant.vue'
@@ -128,6 +127,23 @@ watch(
     }
   },
   { immediate: true, flush: 'post' }
+)
+
+watch(
+  [() => route.name, () => route.params.articleId ?? null],
+  async ([newRouteName, newArticleId], [oldRouteName, oldArticleId]) => {
+    const newPage = newRouteName === 'publish' || newRouteName === 'publish-edit'
+    const oldPage = oldRouteName === 'publish' || oldRouteName === 'publish-edit'
+    if (newPage && (newRouteName !== oldRouteName || newArticleId !== oldArticleId)) {
+      const articleId = newArticleId != null ? Number(newArticleId) : undefined
+      await startPublishPage(Number.isFinite(articleId) ? articleId : undefined)
+    } else if (!newPage && oldPage) {
+      if (showPublishModal.value) {
+        closePublishModal(true)
+      }
+    }
+  },
+  { immediate: false, flush: 'post' }
 )
 
 const categories = ref<Category[]>([])
@@ -604,17 +620,21 @@ async function loadArticleForEdit(articleId: number) {
 }
 
 async function startPublishPage(articleId?: number) {
+  const normalizedId = typeof articleId === 'number' && Number.isFinite(articleId) ? articleId : null
+  if (showPublishModal.value && editingArticleId.value === normalizedId) {
+    return
+  }
   closeArticleDetail()
   publishError.value = ''
   showPublishModal.value = true
   isPreviewingMarkdown.value = true
   refreshPublishDraftState()
 
-  if (articleId) {
-    editingArticleId.value = articleId
-    await loadArticleForEdit(articleId)
-    const draft = loadPublishDraft(articleId)
-    if (draft?.articleId === articleId) {
+  if (normalizedId != null) {
+    editingArticleId.value = normalizedId
+    await loadArticleForEdit(normalizedId)
+    const draft = loadPublishDraft(normalizedId)
+    if (draft?.articleId === normalizedId) {
       const confirmed = window.confirm('检测到这篇文章的本地草稿，是否恢复草稿内容？')
       if (confirmed) {
         applyPublishFormSnapshot(draft.form)
@@ -902,17 +922,21 @@ function handleSearchSelect(article: ArticleListItem) {
 }
 
 const showUserMenu = ref(false)
+let userMenuToggling = false
 
 function handleStatusClick() {
+  userMenuToggling = true
   showUserMenu.value = !showUserMenu.value
+  setTimeout(() => { userMenuToggling = false }, 0)
 }
 function closeUserMenu() {
   showUserMenu.value = false
 }
 
 function handleClickOutside(event: MouseEvent) {
+  if (userMenuToggling) return
   const target = event.target as HTMLElement
-  if (!target.closest('.status-badge-wrapper')) {
+  if (!target.closest('.status-badge-wrapper') && !target.closest('.mobile-tabbar')) {
     closeUserMenu()
   }
 }
@@ -942,6 +966,8 @@ function navigateToSection(sectionId: string) {
     }
   })
 }
+
+
 
 function openProfile() {
   closeUserMenu()
@@ -1151,7 +1177,7 @@ onUnmounted(() => {
       />
 
       <!-- Global sidebar (hover from left edge) - only on home, posts, about, and article detail -->
-      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about' || isArticleDetailOpen" :articles="allArticles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || isArticleDetailOpen" :articles="allArticles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
 
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView
@@ -1171,8 +1197,9 @@ onUnmounted(() => {
         />
         <div v-else-if="!showPublishModal" class="main-content-wrapper">
           <HomePage
-            v-if="currentPage === 'home' || currentPage === 'posts' || currentPage === 'about'"
+            v-if="currentPage === 'home' || currentPage === 'posts'"
             :categories="categories"
+            :tags="tags"
             :active-category-id="activeCategoryId"
             :articles="articles"
             :filtered-articles="filteredArticles"
@@ -1187,6 +1214,7 @@ onUnmounted(() => {
             @edit-article="openPublishModal"
             @delete-article="deleteArticle"
             @scroll-to-posts="navigateToSection('posts')"
+
             @toggle-featured="showFeaturedOnly = $event"
             @open-assessment="openAssessment"
             @open-donate="openDonate"
@@ -1282,9 +1310,8 @@ onUnmounted(() => {
             @open-login="openLoginModal"
           />
 
-          <AboutSection v-if="currentPage === 'about'" />
           <ContactSection v-if="currentPage === 'home'" />
-          <AppFooter v-if="['home', 'posts', 'about', 'guestbook', 'quant-lab'].includes(currentPage)" />
+          <AppFooter v-if="['home', 'posts', 'guestbook', 'quant-lab'].includes(currentPage)" />
         </div>
       </Transition>
 
