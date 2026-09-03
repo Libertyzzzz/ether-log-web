@@ -116,7 +116,6 @@ let sentinelObserver: IntersectionObserver | null = null
 let cardObserver: IntersectionObserver | null = null
 const sentinelRef = ref<HTMLElement | null>(null)
 const postsListRef = ref<HTMLElement | null>(null)
-const postsMainScrollRef = ref<HTMLElement | null>(null)
 const heroIsMobile = ref(false)
 function checkHeroMobile() { heroIsMobile.value = window.innerWidth <= 768 }
 const currentHeroClipPath = computed(() => heroIsMobile.value ? heroClipPathMobile.value : heroClipPath.value)
@@ -182,19 +181,13 @@ function setupSentinelObserver() {
   sentinelObserver?.disconnect()
   sentinelObserver = null
 
-  const isDesktop = window.innerWidth > 1024
-  const root: Element | null = isDesktop ? postsMainScrollRef.value : null
-
   sentinelObserver = new IntersectionObserver(
     (entries) => {
       if (entries[0].isIntersecting && hasMore.value && !props.isLoadingMore) {
         loadMore()
       }
     },
-    {
-      root,
-      rootMargin: isDesktop ? '80px 0px 80px 0px' : '120px',
-    }
+    { rootMargin: '120px' }
   )
   if (sentinelRef.value) sentinelObserver.observe(sentinelRef.value)
 }
@@ -202,22 +195,14 @@ function setupSentinelObserver() {
 onMounted(() => {
   checkHeroMobile()
   window.addEventListener('resize', checkHeroMobile, { passive: true })
-  window.addEventListener('resize', setupSentinelObserver, { passive: true })
   setupSentinelObserver()
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkHeroMobile)
-  window.removeEventListener('resize', setupSentinelObserver)
   sentinelObserver?.disconnect()
   cardObserver?.disconnect()
 })
-
-watch(
-  () => postsMainScrollRef.value,
-  () => { nextTick(() => setupSentinelObserver()) },
-  { flush: 'post' }
-)
 
 watch(
   () => [props.filteredArticles.length, props.isLoadingArticles],
@@ -573,7 +558,7 @@ function heroOpenDrawerOnly() {
     <section id="posts" class="hp-posts">
       <div class="hp-posts-inner">
         <!-- 左栏：文章流 -->
-        <div class="hp-posts-main" ref="postsMainScrollRef">
+        <div class="hp-posts-main">
           <div class="hp-section-header">
             <h2 class="hp-section-title">
               Latest from NEXTIFY
@@ -1760,27 +1745,6 @@ function heroOpenDrawerOnly() {
   flex-direction: column;
   gap: 1.25rem;
 }
-@media (min-width: 1025px) {
-  .hp-posts-main {
-    max-height: calc(100vh - 4.5rem - 1.25rem);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 0.5rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
-    scrollbar-gutter: stable;
-  }
-  .hp-posts-main::-webkit-scrollbar { width: 7px; }
-  .hp-posts-main::-webkit-scrollbar-track { background: transparent; }
-  .hp-posts-main::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.45);
-    border-radius: 10px;
-    transition: background 0.2s ease;
-  }
-  .hp-posts-main::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.7);
-  }
-}
 
 .hp-section-header {
   display: flex;
@@ -2266,32 +2230,17 @@ function heroOpenDrawerOnly() {
 .hp-posts-sidebar {
   display: flex;
   flex-direction: column;
-  gap: 1rem;
-  position: sticky;
-  top: 4.5rem;
+  gap: 0.85rem;
+  position: static;
 }
-@media (min-width: 1025px) {
+@media (min-width: 1025px) and (min-height: 1000px) {
   .hp-posts-sidebar {
-    max-height: calc(100vh - 4.5rem - 1.25rem);
-    overflow-y: auto;
-    overflow-x: hidden;
-    padding-right: 0.4rem;
-    scrollbar-width: thin;
-    scrollbar-color: rgba(148, 163, 184, 0.45) transparent;
-    scrollbar-gutter: stable;
-  }
-  .hp-posts-sidebar::-webkit-scrollbar { width: 6px; }
-  .hp-posts-sidebar::-webkit-scrollbar-track { background: transparent; }
-  .hp-posts-sidebar::-webkit-scrollbar-thumb {
-    background: rgba(148, 163, 184, 0.4);
-    border-radius: 10px;
-  }
-  .hp-posts-sidebar::-webkit-scrollbar-thumb:hover {
-    background: rgba(99, 102, 241, 0.65);
+    position: sticky;
+    top: 4.5rem;
   }
 }
 .hp-sidebar-card {
-  padding: 1.35rem 1.4rem;
+  padding: 1.1rem 1.1rem;
   border-radius: 1.1rem;
   background: rgba(255,255,255,0.9);
   border: 1px solid rgba(203,213,225,0.45);
@@ -2310,7 +2259,7 @@ function heroOpenDrawerOnly() {
   font-size: 0.88rem;
   font-weight: 800;
   color: #0f172a;
-  margin-bottom: 0.85rem;
+  margin-bottom: 0.78rem;
   letter-spacing: 0.02em;
 }
 .hp-sidebar-subtitle {
@@ -2335,14 +2284,14 @@ function heroOpenDrawerOnly() {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 0.38rem;
+  gap: 0.22rem;
 }
 .hp-site-stat-row {
   display: grid;
   grid-template-columns: 1.75rem 1fr auto auto;
   align-items: center;
   gap: 0.55rem;
-  padding: 0.42rem 0.55rem;
+  padding: 0.34rem 0.48rem;
   border-radius: 0.68rem;
   transition: background 0.18s ease, transform 0.18s ease;
 }
@@ -2430,10 +2379,10 @@ function heroOpenDrawerOnly() {
 .hp-tags-cloud {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.35rem;
+  gap: 0.4rem;
 }
 .hp-tag-chip {
-  padding: 0.32rem 0.75rem;
+  padding: 0.32rem 0.8rem;
   border-radius: 9999px;
   border: 1px solid rgba(203,213,225,0.55);
   background: rgba(248,250,252,0.7);
@@ -2498,16 +2447,16 @@ function heroOpenDrawerOnly() {
 .hp-about-sky-wrap {
   position: relative;
   width: 100%;
-  height: 6.4rem;
-  margin: 0.15rem auto 0.75rem;
+  height: 5.8rem;
+  margin: 0.25rem auto 0.7rem;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 .hp-about-sky {
   position: relative;
-  width: 5.5rem;
-  height: 5.5rem;
+  width: 5.2rem;
+  height: 5.2rem;
   border-radius: 50%;
   background:
     radial-gradient(circle at 71% 22%, rgba(255,255,255,0.95) 0 0.28rem, transparent 0.32rem),
@@ -2526,8 +2475,8 @@ function heroOpenDrawerOnly() {
 .hp-about-sky::before {
   content: '';
   position: absolute;
-  left: 0; right: 0; bottom: 1.05rem;
-  height: 1.2rem;
+  left: 0; right: 0; bottom: 0.99rem;
+  height: 1.13rem;
   background:
     linear-gradient(150deg, transparent 18%, rgba(255,255,255,0.42) 19% 22%, transparent 23%),
     linear-gradient(175deg, transparent 8%, rgba(255,255,255,0.55) 9% 13%, transparent 14%);
@@ -2535,30 +2484,30 @@ function heroOpenDrawerOnly() {
 }
 .hp-about-moon {
   position: absolute;
-  right: 1.1rem;
-  top: 0.85rem;
-  width: 0.55rem;
-  height: 0.55rem;
+  right: 1.04rem;
+  top: 0.83rem;
+  width: 0.52rem;
+  height: 0.52rem;
   border-radius: 50%;
   background: rgba(255,255,255,0.96);
   box-shadow: 0 0 10px rgba(255,255,255,0.8), 0 0 22px rgba(191, 219, 254, 0.75);
 }
 .hp-about-person {
   position: absolute;
-  left: 2.35rem;
-  bottom: 1rem;
-  width: 0.14rem;
-  height: 1.1rem;
+  left: 2.2rem;
+  bottom: 0.96rem;
+  width: 0.13rem;
+  height: 1.04rem;
   border-radius: 999px;
   background: #0f172a;
-  box-shadow: 0 -0.28rem 0 0.06rem #0f172a;
+  box-shadow: 0 -0.26rem 0 0.05rem #0f172a;
 }
 .hp-about-person::after {
   content: '';
   position: absolute;
-  left: -0.78rem;
+  left: -0.74rem;
   bottom: 0;
-  width: 2rem;
+  width: 1.84rem;
   height: 0.07rem;
   background: rgba(15,23,42,0.42);
   transform: rotate(-9deg);
@@ -2566,9 +2515,9 @@ function heroOpenDrawerOnly() {
 .hp-about-shadow {
   position: absolute;
   left: 50%;
-  bottom: 0.45rem;
-  width: 2.6rem;
-  height: 0.18rem;
+  bottom: 0.42rem;
+  width: 2.42rem;
+  height: 0.16rem;
   transform: translateX(-50%);
   background: radial-gradient(ellipse at center, rgba(15,23,42,0.28) 0%, transparent 70%);
   filter: blur(1px);
@@ -2576,16 +2525,16 @@ function heroOpenDrawerOnly() {
 .hp-about-avatar-dot {
   position: absolute;
   top: 50%;
-  left: calc(50% + 1.85rem);
+  left: calc(50% + 1.75rem);
   transform: translateY(-15%);
-  width: 1.5rem;
-  height: 1.5rem;
+  width: 1.36rem;
+  height: 1.36rem;
   border-radius: 50%;
   background: #ffffff;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
   color: #4f7cff;
   box-shadow: 0 6px 14px rgba(74, 96, 144, 0.2);
@@ -2594,9 +2543,9 @@ function heroOpenDrawerOnly() {
 .hp-about-name-pill {
   position: absolute;
   top: 50%;
-  right: 0.4rem;
+  right: 0.36rem;
   transform: translateY(40%);
-  padding: 0.4rem 0.6rem;
+  padding: 0.36rem 0.54rem;
   border-radius: 9999px;
   background: rgba(255,255,255,0.94);
   box-shadow: 0 8px 18px rgba(74, 96, 144, 0.14);
@@ -2606,32 +2555,32 @@ function heroOpenDrawerOnly() {
   z-index: 3;
 }
 .hp-about-name-pill strong {
-  font-size: 0.72rem;
+  font-size: 0.68rem;
   font-weight: 900;
   color: #0f172a;
 }
 .hp-about-name-pill span {
-  font-size: 0.58rem;
+  font-size: 0.55rem;
   font-weight: 700;
   color: #64748b;
 }
 
 /* Motto & Bio */
 .hp-about-motto {
-  font-size: 0.96rem;
+  font-size: 0.94rem;
   font-weight: 900;
-  line-height: 1.4;
+  line-height: 1.44;
   color: #0f172a;
   letter-spacing: -0.01em;
-  margin-bottom: 0.5rem;
+  margin-bottom: 0.52rem;
   background: linear-gradient(120deg, #0f172a 0%, #4338ca 55%, #7c3aed 100%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
 }
 .hp-about-bio {
-  margin: 0 0 0.95rem;
-  font-size: 0.76rem;
+  margin: 0 0 0.84rem;
+  font-size: 0.77rem;
   color: #475569;
   line-height: 1.72;
 }
@@ -2640,13 +2589,13 @@ function heroOpenDrawerOnly() {
 .hp-about-grid-stats {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 0.42rem;
-  padding: 0.65rem;
+  gap: 0.44rem;
+  padding: 0.6rem;
   border-radius: 0.85rem;
   background:
     linear-gradient(135deg, rgba(239, 246, 255, 0.85) 0%, rgba(245, 243, 255, 0.7) 50%, rgba(255, 247, 237, 0.6) 100%);
   border: 1px solid rgba(226, 232, 240, 0.55);
-  margin-bottom: 0.9rem;
+  margin-bottom: 0.62rem;
 }
 .hp-about-stat-item {
   position: relative;
@@ -2656,7 +2605,7 @@ function heroOpenDrawerOnly() {
   column-gap: 0.42rem;
   row-gap: 0.1rem;
   align-items: center;
-  padding: 0.45rem 0.5rem;
+  padding: 0.5rem 0.55rem;
   border-radius: 0.65rem;
   background: rgba(255, 255, 255, 0.72);
   backdrop-filter: blur(8px);
@@ -2704,13 +2653,13 @@ function heroOpenDrawerOnly() {
 .hp-about-cta {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.45rem 0.85rem;
+  gap: 0.37rem;
+  padding: 0.54rem 0.96rem;
   border-radius: 9999px;
   border: 1px solid rgba(165, 180, 252, 0.5);
   background: linear-gradient(135deg, rgba(99, 102, 241, 0.08) 0%, rgba(139, 92, 246, 0.07) 100%);
   color: #4338ca;
-  font-size: 0.72rem;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.2s ease;
@@ -2731,17 +2680,17 @@ function heroOpenDrawerOnly() {
 .hp-manifesto-text {
   margin: 0;
   color: #1e293b;
-  font-size: 0.86rem;
+  font-size: 0.84rem;
   font-weight: 800;
-  line-height: 1.75;
+  line-height: 1.72;
 }
 .hp-manifesto-author {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  margin-top: 0.85rem;
+  margin-top: 0.68rem;
   color: #64748b;
-  font-size: 0.72rem;
+  font-size: 0.73rem;
   font-style: normal;
   font-weight: 800;
 }
@@ -2755,8 +2704,8 @@ function heroOpenDrawerOnly() {
 .hp-manifesto-actions {
   display: flex;
   flex-wrap: wrap;
-  gap: 0.45rem;
-  margin-top: 1rem;
+  gap: 0.55rem;
+  margin-top: 0.92rem;
 }
 .hp-load-more-btn {
   display: inline-flex;
@@ -2824,10 +2773,10 @@ function heroOpenDrawerOnly() {
 
 .hp-btn-donate,
 .hp-btn-assessment {
-  display: inline-flex; align-items: center; gap: 0.5rem;
-  padding: 0.55rem 1rem;
+  display: inline-flex; align-items: center; gap: 0.47rem;
+  padding: 0.62rem 1.05rem;
   border-radius: 9999px;
-  font-size: 0.75rem;
+  font-size: 0.76rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
