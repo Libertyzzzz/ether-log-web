@@ -681,7 +681,7 @@ async function publishArticle() {
     clearPublishDraft()
     resetPublishForm()
     await closePublishModal(true)
-    showAppToast(finalArticleId ? '文章保存成功！' : '文章发布成功！', 'success')
+    showAppToast(editingArticleId.value ? '文章更新成功！' : '文章发布成功！', 'success')
     await refreshArticleData()
     if (finalArticleId && selectedArticle.value?.id === finalArticleId) {
       await openArticleDetail(selectedArticle.value)

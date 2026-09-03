@@ -169,8 +169,8 @@ function onAboutCardMove(e: MouseEvent) {
   el.style.setProperty('--spot-y', `${Math.max(0, Math.min(100, y))}%`)
   el.style.setProperty('--spot-active', '1')
 }
-function onAboutCardLeave(e: MouseEvent) {
-  const el = e.currentTarget as HTMLElement | null
+function onAboutCardLeave(_e: MouseEvent) {
+  const el = _e.currentTarget as HTMLElement | null
   if (!el) return
   el.style.setProperty('--spot-active', '0')
 }
@@ -204,7 +204,7 @@ onUnmounted(() => {
 })
 
 watch(
-  () => [props.filteredArticles.length, props.isLoadingArticles],
+  () => [props.filteredArticles.length, props.isLoadingArticles, props.categories.length, props.tags?.length ?? 0],
   () => nextTick(() => observeEntryCards()),
   { flush: 'post' }
 )
@@ -946,7 +946,9 @@ function heroOpenDrawerOnly() {
     linear-gradient(180deg, #f0ebff 0%, #eaf0fb 18%, #f8faff 55%, #eef3fb 100%);
   color: #0f172a;
   position: relative;
-  overflow: hidden;
+  overflow: visible;
+  min-height: 100vh;
+  isolation: isolate;
 }
 .home-page::before {
   content: '';
@@ -2225,6 +2227,10 @@ function heroOpenDrawerOnly() {
 
 /* ════════════════════════════════
    右栏：关于我 + 标签
+   ※ 知乎式 sticky 行为
+      1. 用天然高度 —— 不设 height / max-height / overflow-y
+      2. sticky 以最近的块级祖先（hp-posts-inner, 即 hp-posts section）为边界
+      3. 左侧继续长，右栏到底后"钉"在视口底部不再下移；上滚时同步上滚
 ════════════════════════════════ */
 .hp-posts-sidebar {
   display: flex;
@@ -2232,10 +2238,17 @@ function heroOpenDrawerOnly() {
   gap: 0.85rem;
   position: static;
 }
-@media (min-width: 1025px) and (min-height: 1000px) {
+@media (min-width: 1025px) {
   .hp-posts-sidebar {
     position: sticky;
-    top: 4.5rem;
+    top: calc(5rem + 14px);
+    /*
+       ⚠️ 故意不加 height / max-height / overflow-y
+       这样 sidebar 本身是自然高度，sticky 会
+       - 先"贴着"导航栏下移
+       - 等 sidebar 底部触到容器（hp-posts）底部时，钉住不动
+       - 上滚时再贴着容器上滚回顶部
+    */
   }
 }
 .hp-sidebar-card {
