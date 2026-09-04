@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
-import type { ArticleListItem, Category, Tag as BlogTag } from '../types/blog'
+import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
 import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
 
@@ -17,7 +17,13 @@ const props = defineProps<{
   isLoadingMore: boolean
   showActions: boolean
   showFeaturedOnly: boolean
+  loginUser?: Partial<LoginUser> | null
 }>()
+
+function resolveAuthor(article: ArticleListItem): string | null {
+  const direct = article.author?.trim()
+  return direct ? direct : null
+}
 
 const emit = defineEmits<{
   toggleCategory: [categoryId: number]
@@ -642,8 +648,10 @@ function heroOpenDrawerOnly() {
                 <h3 class="hp-feature-title">{{ leadArticle.title }}</h3>
                 <p class="hp-feature-summary">{{ getArticleSummary(leadArticle) }}</p>
                 <div class="hp-post-meta">
-                  <span class="hp-post-author">Ether</span>
-                  <span class="hp-post-sep">·</span>
+                  <template v-if="resolveAuthor(leadArticle)">
+                    <span class="hp-post-author">{{ resolveAuthor(leadArticle) }}</span>
+                    <span class="hp-post-sep">·</span>
+                  </template>
                   <span class="hp-post-date">{{ formatDate(leadArticle.createTime) }}</span>
                   <span class="hp-post-sep">·</span>
                   <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(leadArticle) }} min</span>
@@ -678,6 +686,10 @@ function heroOpenDrawerOnly() {
                   <h3 class="hp-spotlight-title">{{ post.title }}</h3>
                   <p class="hp-spotlight-summary">{{ getArticleSummary(post) }}</p>
                   <div class="hp-post-meta">
+                    <template v-if="resolveAuthor(post)">
+                      <span class="hp-post-author">{{ resolveAuthor(post) }}</span>
+                      <span class="hp-post-sep">·</span>
+                    </template>
                     <span>{{ formatDate(post.createTime) }}</span>
                     <span class="hp-post-sep">·</span>
                     <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(post) }} min</span>
@@ -711,6 +723,10 @@ function heroOpenDrawerOnly() {
                   <h3 class="hp-post-title">{{ post.title }}</h3>
                   <p class="hp-post-summary">{{ getArticleSummary(post) }}</p>
                   <div class="hp-post-meta">
+                    <template v-if="resolveAuthor(post)">
+                      <span class="hp-post-author">{{ resolveAuthor(post) }}</span>
+                      <span class="hp-post-sep">·</span>
+                    </template>
                     <span class="hp-post-date">{{ formatDate(post.createTime) }}</span>
                     <span class="hp-post-sep">·</span>
                     <span class="hp-post-reading"><Clock :size="10" /> {{ getArticleReadingTime(post) }} min</span>

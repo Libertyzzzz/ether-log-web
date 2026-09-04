@@ -581,6 +581,11 @@ onBeforeUnmount(() => {
           </label>
 
           <label class="sidebar-field">
+            <span>作者</span>
+            <input class="sidebar-input" :value="publishForm.author ?? ''" @input="publishForm.author = ($event.target as HTMLInputElement).value || null" placeholder="不填则默认显示为你的昵称" />
+          </label>
+
+          <label class="sidebar-field">
             <span>摘要</span>
             <textarea class="sidebar-input sidebar-textarea" v-model="publishForm.summary" placeholder="首页卡片摘要"></textarea>
           </label>

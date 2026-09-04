@@ -323,6 +323,7 @@ function mapArticleRecord(record: any): ArticleListItem {
     createTime: record.createTime || '',
     updateTime: record.updateTime ?? null,
     status: typeof record.status === 'number' ? record.status : (record.status === '0' || record.status === 0) ? 0 : record.status ? Number(record.status) : 1,
+    author: record.author ?? null,
   }
 }
 

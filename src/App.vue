@@ -300,6 +300,7 @@ const publishForm = reactive<ArticlePublishRequest>({
   categoryId: 1,
   tagIds: [],
   imageIds: [],
+  author: null,
 })
 const markdownPreviewHtml = computed(() => renderMarkdown(publishForm.content))
 const uploadedImageMap = reactive<Map<string, number>>(new Map())
@@ -331,6 +332,7 @@ function clonePublishForm(): ArticlePublishRequest {
     categoryId: publishForm.categoryId,
     tagIds: [...publishForm.tagIds],
     imageIds: [...publishForm.imageIds],
+    author: publishForm.author ?? null,
   }
 }
 
@@ -348,6 +350,7 @@ function applyPublishFormSnapshot(snapshot: ArticlePublishRequest) {
   publishForm.categoryId = snapshot.categoryId || categories.value[0]?.id || 1
   publishForm.tagIds = Array.isArray(snapshot.tagIds) ? [...snapshot.tagIds] : []
   publishForm.imageIds = Array.isArray(snapshot.imageIds) ? [...snapshot.imageIds] : []
+  publishForm.author = snapshot.author ?? null
   nextTick(() => {
     lastSavedPublishSnapshot.value = JSON.stringify(clonePublishForm())
     isApplyingPublishSnapshot = false
@@ -545,6 +548,7 @@ function resetPublishForm() {
     categoryId: categories.value[0]?.id || 1,
     tagIds: [],
     imageIds: [],
+    author: null,
   })
   uploadedImageMap.clear()
   isPreviewingMarkdown.value = true
@@ -564,6 +568,7 @@ function fillPublishForm(article: ArticleDetail) {
     categoryId: article.categoryId || categories.value[0]?.id || 1,
     tagIds: Array.isArray(article.tagIds) ? article.tagIds : [],
     imageIds: [],
+    author: article.author ?? null,
   })
   uploadedImageMap.clear()
 }
@@ -1209,6 +1214,7 @@ onUnmounted(() => {
             :is-loading-more="isLoadingMore"
             :show-actions="showActionsOnPage"
             :show-featured-only="showFeaturedOnly"
+            :login-user="loginUser"
             @toggle-category="toggleCategory"
             @open-article="openArticleDetail"
             @edit-article="openPublishModal"

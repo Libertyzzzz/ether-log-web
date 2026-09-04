@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
-import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen, Sparkles } from 'lucide-vue-next'
-import type { ArticleDetail, ArticleListItem } from '../types/blog'
+import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen, Sparkles, User } from 'lucide-vue-next'
+import type { ArticleDetail, ArticleListItem, LoginUser } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
 import { getReadingTime } from '../utils/format'
 import { renderMarkdown } from '../utils/markdown'
@@ -16,6 +16,8 @@ const props = defineProps<{
   showActions: boolean
   previousArticle: ArticleListItem | null
   nextArticle: ArticleListItem | null
+  isLoggedIn?: boolean
+  loginUser?: Partial<LoginUser> | null
 }>()
 
 defineEmits<{
@@ -24,6 +26,11 @@ defineEmits<{
   delete: [articleId: number]
   openArticle: [article: ArticleListItem]
 }>()
+
+const resolvedAuthor = computed<string | null>(() => {
+  const direct = props.article.author?.trim()
+  return direct ? direct : null
+})
 
 // 从正文中提取标题生成目录
 const headings = computed(() => {
@@ -127,6 +134,10 @@ onMounted(() => {
           <p v-if="article.subtitle" class="sidebar-subtitle">{{ article.subtitle }}</p>
 
           <div class="sidebar-stats">
+            <span v-if="resolvedAuthor" class="sidebar-stat">
+              <User :size="11" />
+              {{ resolvedAuthor }}
+            </span>
             <span class="sidebar-stat">
               <Clock :size="11" />
               {{ article.createTime?.slice(0, 10) || '—' }}
@@ -241,6 +252,7 @@ onMounted(() => {
           <p v-if="article.subtitle" class="article-main-subtitle">{{ article.subtitle }}</p>
           <div class="article-main-meta">
             <span class="article-main-category">{{ getArticleCategory(article) }}</span>
+            <span v-if="resolvedAuthor" class="article-main-author"><User :size="10" /> {{ resolvedAuthor }}</span>
             <span class="article-main-date">{{ article.createTime?.slice(0, 10) }}</span>
             <span class="article-main-views">{{ article.viewCount || 0 }} views</span>
             <span class="article-main-views">{{ readingMinutes }} min read</span>
@@ -701,17 +713,24 @@ onMounted(() => {
   text-transform: uppercase;
   color: #2563eb;
 }
+.article-main-author,
 .article-main-date,
 .article-main-views {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
   font-size: 0.78rem;
   color: #94a3b8;
   font-weight: 600;
 }
+.article-main-author::before,
 .article-main-date::before,
 .article-main-views::before {
   content: '·';
   margin-right: 0.75rem;
   color: #e2e8f0;
+  display: inline-flex;
+  align-items: center;
 }
 .article-main-tags {
   display: flex;

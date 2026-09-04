@@ -43,6 +43,7 @@ export interface ArticleListItem {
   createTime: string
   updateTime?: string | null
   status?: number
+  author?: string | null
 }
 
 export interface ArticleDetail extends ArticleListItem {
@@ -68,6 +69,7 @@ export interface ArticlePublishRequest {
   categoryId: number
   tagIds: number[]
   imageIds: number[]
+  author?: string | null
 }
 
 export interface LoginUser {
