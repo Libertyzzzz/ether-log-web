@@ -920,6 +920,7 @@ async function verifyMainAccess() {
 }
 
 const showSearchModal = ref(false)
+const searchModalQuery = ref('')
 
 function handleSearchSelect(article: ArticleListItem) {
   showSearchModal.value = false
@@ -1057,8 +1058,14 @@ function showAppToast(message: string, type: 'success' | 'error' | 'info' = 'inf
 function handleKeyDown(e: KeyboardEvent) {
   if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
     e.preventDefault()
+    searchModalQuery.value = ''
     showSearchModal.value = !showSearchModal.value
   }
+}
+
+function openSearchWithQuery(query: string) {
+  searchModalQuery.value = query ?? ''
+  showSearchModal.value = true
 }
 
 let publishDraftTimer: number | undefined
@@ -1174,7 +1181,7 @@ onUnmounted(() => {
         @open-quant-lab="openQuantLab"
         @open-login="openLoginModal"
         @toggle-status="handleStatusClick"
-        @open-search="showSearchModal = true"
+        @open-search="openSearchWithQuery('')"
         @logout="handleLogout"
         @toggle-dark="toggleDark"
         @close-user-menu="closeUserMenu"
@@ -1226,6 +1233,7 @@ onUnmounted(() => {
             @open-donate="openDonate"
             @navigate="navigateToSection"
             @load-more="loadMoreArticles"
+            @open-search="openSearchWithQuery"
           />
 
           <ProfilePage
@@ -1378,7 +1386,7 @@ onUnmounted(() => {
         </div>
       </Teleport>
 
-      <SearchModal :show="showSearchModal" :articles="articles" @close="showSearchModal = false" @select="handleSearchSelect" />
+      <SearchModal :show="showSearchModal" :articles="articles" :initial-query="searchModalQuery" @close="showSearchModal = false" @select="handleSearchSelect" />
 
       <AppToast :message="toastMessage" :type="toastType" :show="showToast" />
       <AppConfirmDialog

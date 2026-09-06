@@ -407,12 +407,14 @@ export async function deleteArticle(articleId: number): Promise<void> {
   }
 }
 
-export async function searchArticles(keyword: string): Promise<any[]> {
-  const response = await axios.get('/api/articles/search', {
-    params: { keyword },
+export async function searchArticles(keyword: string, pageNum = 1, pageSize = 10): Promise<ArticleListItem[]> {
+  const response = await axios.get<ResultResponse<PageResponse<ArticleListItem>>>('/api/articles/search', {
+    params: { keyword, pageNum, pageSize },
   })
   if (response.data.code === 200) {
-    return response.data.data || []
+    const data = response.data.data
+    const records = Array.isArray(data?.records) ? data.records : Array.isArray(data) ? data : []
+    return records.map(mapArticleRecord)
   }
   return []
 }

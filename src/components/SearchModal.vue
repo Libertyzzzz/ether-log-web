@@ -7,6 +7,7 @@ import { searchArticles } from '../api'
 const props = defineProps<{
   show: boolean
   articles: ArticleListItem[]
+  initialQuery?: string
 }>()
 
 const emit = defineEmits<{
@@ -52,7 +53,7 @@ watch(searchQuery, (newQuery) => {
 
 watch(() => props.show, (isShowing) => {
   if (isShowing) {
-    searchQuery.value = ''
+    searchQuery.value = props.initialQuery ?? ''
     setTimeout(() => searchInput.value?.focus(), 50)
   }
 })

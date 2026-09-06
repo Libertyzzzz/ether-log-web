@@ -36,6 +36,7 @@ const emit = defineEmits<{
   openDonate: []
   navigate: [page: string]
   loadMore: []
+  openSearch: [query: string]
 }>()
 
 const icons = { FileText, BookOpen, Heart, Star, ArrowDown, Folder, Tag, CalendarDays, Eye }
@@ -350,7 +351,17 @@ function toggleHeroExamples() {
   heroExampleIndex.value = heroExampleIndex.value === 3 ? heroExampleQuestions.length : 3
 }
 
-async function heroSendFromInput() {
+function heroSearchFromInput() {
+  const text = heroInput.value.trim()
+  if (!text) {
+    emit('openSearch', '')
+    return
+  }
+  heroInput.value = ''
+  emit('openSearch', text)
+}
+
+async function heroSendToAI() {
   const text = heroInput.value.trim()
   if (!text) return
   heroInput.value = ''
@@ -358,10 +369,9 @@ async function heroSendFromInput() {
   await ai.sendFreeChat(text)
 }
 
-async function heroSendExample(text: string) {
+function heroSendExample(text: string) {
   heroInput.value = ''
-  ai.open()
-  await ai.sendFreeChat(text)
+  emit('openSearch', text)
 }
 
 function heroOpenDrawerOnly() {
@@ -436,8 +446,8 @@ function heroOpenDrawerOnly() {
             v-model="heroInput"
             type="text"
             class="hp-cmd-input"
-            placeholder="搜索文章 或 问 Ether AI 助手..."
-            @keyup.enter="heroSendFromInput"
+            placeholder="搜索文章..."
+            @keyup.enter="heroSearchFromInput"
           />
           <div class="hp-cmd-hints">
             <span class="hp-cmd-kbd">⌘K</span>
@@ -446,8 +456,8 @@ function heroOpenDrawerOnly() {
               class="hp-cmd-send"
               type="button"
               :disabled="!heroInput.trim()"
-              @click="heroSendFromInput"
-              title="发送"
+              @click="heroSendToAI"
+              title="问 Ether AI 助手"
             >
               <Send :size="14" />
             </button>
@@ -505,14 +515,15 @@ function heroOpenDrawerOnly() {
             <input
               v-model="heroInput"
               type="text"
-              placeholder="有什么可以帮你？"
-              @keyup.enter="heroSendFromInput"
+              placeholder="搜索文章..."
+              @keyup.enter="heroSearchFromInput"
             />
             <button
               class="hp-ai-mobile-send"
               type="button"
               :disabled="!heroInput.trim()"
-              @click="heroSendFromInput"
+              @click="heroSendToAI"
+              title="问 Ether AI 助手"
             >
               <Send :size="14" />
             </button>
