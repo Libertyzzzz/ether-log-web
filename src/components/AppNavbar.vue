@@ -438,7 +438,6 @@ onUnmounted(() => {
     <div
       class="mobile-tabbar"
       :class="[{ 'tabbar-hidden': !isVisible, 'tabbar-4col': isLoggedIn }]"
-      :style="isLoggedIn ? { gridTemplateColumns: 'repeat(4, 1fr)' } : {}"
       aria-label="移动端主导航"
     >
       <!-- 移动端 My 弹出菜单：直接在 tabbar 内用 absolute 定位，从上方弹出 -->
@@ -1058,10 +1057,13 @@ kbd {
   .mobile-tabbar {
     position: fixed;
     top: auto !important;
-    left: 50%;
+    left: 0.75rem;
+    right: 0.75rem;
     bottom: max(0.75rem, env(safe-area-inset-bottom));
-    transform: translateX(-50%);
-    width: min(calc(100vw - 1.5rem), 25rem);
+    transform: none;
+    max-width: 25rem;
+    margin-left: auto;
+    margin-right: auto;
     padding: 0.35rem;
     border-radius: 1.2rem;
     background: rgba(255, 255, 255, 0.86);
@@ -1071,8 +1073,12 @@ kbd {
     -webkit-backdrop-filter: blur(18px);
     z-index: 1001;
     display: grid;
-    grid-template-columns: repeat(3, 1fr);
+    grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.25rem;
+    overflow: hidden;
+  }
+  .mobile-tabbar.tabbar-4col {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
   }
   .mobile-tabbar-item {
     min-width: 0;
@@ -1099,7 +1105,7 @@ kbd {
     box-shadow: 0 8px 18px rgba(15, 23, 42, 0.16);
   }
   .mobile-tabbar.tabbar-hidden {
-    transform: translateX(-50%) translateY(calc(100% + 1.5rem));
+    transform: translateY(calc(100% + 1.5rem));
   }
   .mobile-tabbar-item:active {
     transform: scale(0.96);
@@ -1141,7 +1147,9 @@ kbd {
   .status-dot-btn { width: 2rem; height: 2rem; border-radius: 0.68rem; }
   .nav-icon-btn svg { width: 16px; height: 16px; }
   .mobile-tabbar {
-    width: min(calc(100vw - 1rem), 23.5rem);
+    left: 0.5rem;
+    right: 0.5rem;
+    max-width: 23.5rem;
     border-radius: 1rem;
   }
   .mobile-tabbar-item {

@@ -890,13 +890,9 @@ function heroOpenDrawerOnly() {
             </blockquote>
             <cite class="hp-manifesto-author">Ether</cite>
             <div class="hp-manifesto-actions">
-              <button class="hp-btn-assessment" type="button" @click="$emit('openAssessment')">
-                <Sparkles :size="14" />
-                <span>人间估值</span>
-              </button>
               <button class="hp-btn-donate" type="button" @click="$emit('openDonate')">
                 <Coffee class="hp-btn-donate-icon" :size="14" />
-                <span class="hp-btn-donate-text">咖啡</span>
+                <span class="hp-btn-donate-text">给阿姨点一杯卡布奇诺</span>
               </button>
             </div>
           </div>
@@ -2719,9 +2715,9 @@ function heroOpenDrawerOnly() {
 .hp-manifesto-text {
   margin: 0;
   color: #1e293b;
-  font-size: 0.84rem;
-  font-weight: 800;
-  line-height: 1.72;
+  font-size: 0.88rem;
+  font-weight: 600;
+  line-height: 1.75;
 }
 .hp-manifesto-author {
   display: inline-flex;
@@ -2735,15 +2731,14 @@ function heroOpenDrawerOnly() {
 }
 .hp-manifesto-author::before {
   content: '';
-  width: 18px;
-  height: 1px;
-  border-radius: 999px;
-  background: linear-gradient(90deg, #a78bfa, transparent);
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #a78bfa, #6366f1);
 }
 .hp-manifesto-actions {
   display: flex;
-  flex-wrap: wrap;
-  gap: 0.55rem;
+  justify-content: center;
   margin-top: 0.92rem;
 }
 .hp-load-more-btn {
@@ -2810,29 +2805,21 @@ function heroOpenDrawerOnly() {
   white-space: nowrap;
 }
 
-.hp-btn-donate,
-.hp-btn-assessment {
+.hp-btn-donate {
   display: inline-flex; align-items: center; gap: 0.47rem;
-  padding: 0.62rem 1.05rem;
+  padding: 0.55rem 1.1rem;
   border-radius: 9999px;
-  font-size: 0.76rem;
+  border: 1px solid rgba(99,102,241,0.22);
+  background: rgba(255, 255, 255, 0.78);
+  color: #4f46e5;
+  font-size: 0.75rem;
   font-weight: 700;
   cursor: pointer;
   transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
+  backdrop-filter: blur(4px);
 }
-.hp-btn-donate {
-  border: 1px solid rgba(99,102,241,0.25);
-  background: rgba(255, 255, 255, 0.72);
-  color: #4f46e5;
-}
-.hp-btn-assessment {
-  border: 1px solid rgba(225, 29, 72, 0.18);
-  background: linear-gradient(135deg, rgba(255, 241, 242, 0.82), rgba(245, 243, 255, 0.74));
-  color: #be123c;
-}
-.hp-btn-donate:hover,
-.hp-btn-assessment:hover {
+.hp-btn-donate:hover {
   background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
   color: white;
   border-color: transparent;
@@ -3224,8 +3211,7 @@ function heroOpenDrawerOnly() {
   .hp-end-divider { padding: 1.75rem 0 0.75rem; gap: 0.75rem; }
   .hp-end-line { flex: 0 0 40px; }
   .hp-end-text { font-size: 0.7rem; }
-  .hp-btn-donate,
-  .hp-btn-assessment {
+  .hp-btn-donate {
     padding: 0.45rem 0.82rem;
     gap: 0.4rem;
     font-size: 0.7rem;
