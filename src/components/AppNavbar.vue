@@ -1019,7 +1019,7 @@ kbd {
 
   .nav-right { gap: 0.35rem; }
   .nav-mobile-tools {
-    max-width: calc(100vw - 8.5rem);
+    max-width: calc(100% - 8.5rem);
     justify-content: flex-end;
     overflow: visible;
     z-index: 30;
