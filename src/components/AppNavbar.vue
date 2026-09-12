@@ -341,8 +341,8 @@ onUnmounted(() => {
           <Search :size="18" />
         </button>
 
-        <div v-if="isLoggedIn && canAccessSystem" class="nav-mobile-tools mobile-only">
-          <div class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef" @mouseleave="handleSystemMouseLeave">
+        <div v-if="isLoggedIn && (canAccessSystem || canAccessProfile || canAccessDashboard)" class="nav-mobile-tools mobile-only">
+          <div v-if="canAccessSystem" class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef" @mouseleave="handleSystemMouseLeave">
             <button
               class="nav-mobile-slot system has-dropdown"
               :class="{ active: showSystemDropdown }"
@@ -373,6 +373,8 @@ onUnmounted(() => {
               </div>
             </Transition>
           </div>
+          <button v-if="canAccessProfile" class="nav-mobile-slot" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
+          <button v-if="canAccessDashboard" class="nav-mobile-slot" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
         </div>
 
         <div class="status-badge-wrapper">
