@@ -373,8 +373,6 @@ onUnmounted(() => {
               </div>
             </Transition>
           </div>
-          <button v-if="canAccessProfile" class="nav-mobile-slot" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
-          <button v-if="canAccessDashboard" class="nav-mobile-slot" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
         </div>
 
         <div class="status-badge-wrapper">
@@ -1017,12 +1015,12 @@ kbd {
     display: none;
   }
 
-  .nav-right { gap: 0.35rem; }
+  .nav-right { gap: 0.35rem; min-width: 0; flex: 0 1 auto; }
   .nav-mobile-tools {
-    max-width: calc(100% - 8.5rem);
     justify-content: flex-end;
     overflow: visible;
     z-index: 30;
+    flex: 0 0 auto;
   }
   .nav-action-wrapper.system-dropdown-wrap {
     position: relative;
@@ -1075,7 +1073,6 @@ kbd {
     display: grid;
     grid-template-columns: repeat(3, minmax(0, 1fr));
     gap: 0.25rem;
-    overflow: hidden;
   }
   .mobile-tabbar.tabbar-4col {
     grid-template-columns: repeat(4, minmax(0, 1fr));

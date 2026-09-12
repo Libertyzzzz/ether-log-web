@@ -429,6 +429,9 @@ function collectPublishImageIds() {
 async function saveArticleWithStatus(status: 0 | 1 | 2) {
   collectPublishImageIds()
   const payload: ArticlePublishRequest = { ...clonePublishForm(), status }
+  if (!payload.author?.trim()) {
+    payload.author = loginUser.value.nickname || loginUser.value.username || '匿名用户'
+  }
   if (editingArticleId.value) {
     return updateArticle(editingArticleId.value, payload)
   }
