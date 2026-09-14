@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
+import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye, MessageSquare } from 'lucide-vue-next'
 import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
 import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
@@ -495,13 +495,9 @@ function heroOpenDrawerOnly() {
             <Star :size="12" />
             {{ showFeaturedOnly ? '全部文章' : '精选文章' }}
           </button>
-          <button class="hp-cmd-cta" type="button" @click="heroOpenDrawerOnly">
-            <Sparkles :size="12" />
-            AI 助手
-          </button>
-          <button class="hp-cmd-cta" type="button" @click="$emit('navigate', 'quant-lab')">
-            <FlaskConical :size="12" />
-            量化实验
+          <button class="hp-cmd-cta" type="button" @click="$emit('navigate', 'guestbook')">
+            <MessageSquare :size="12" />
+            留言板
           </button>
         </div>
 
@@ -536,6 +532,10 @@ function heroOpenDrawerOnly() {
           <button class="hp-hero-chip" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
             <Star :size="12" />
             <span>{{ showFeaturedOnly ? '全部' : '精选' }}</span>
+          </button>
+          <button class="hp-hero-chip" type="button" @click="$emit('navigate', 'guestbook')">
+            <MessageSquare :size="12" />
+            <span>留言板</span>
           </button>
         </div>
       </div>
@@ -2833,8 +2833,8 @@ function heroOpenDrawerOnly() {
    响应式
 ════════════════════════════════ */
 /* 显示/隐藏工具类（与 Navbar 保持一致，避免泄漏 scoped 类名冲突问题 */
-.desktop-only { display: inherit; }
-.mobile-only { display: none; }
+.desktop-only { display: flex !important; }
+.mobile-only { display: none !important; }
 
 /* ── 移动端：Hero chip 行（次级入口） ── */
 .hp-hero-chip-row {
@@ -3223,18 +3223,17 @@ function heroOpenDrawerOnly() {
   .hp-hero-title { font-size: 1.05rem; }
   .hp-hero-sub { font-size: 0.75rem; }
 
-  /* 移动端 AI 触发条：从横排改竖排（避免更窄屏拥挤 */
+  /* 移动端 AI 触发条：保持单行显示 */
   .hp-ai-mobile-bar {
-    padding: 0.7rem 0.85rem;
-    border-radius: 1rem;
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 0.55rem;
+    padding: 0.5rem 0.55rem 0.5rem 0.8rem;
+    border-radius: 9999px;
+    flex-direction: row;
+    align-items: center;
+    gap: 0.5rem;
   }
-  .hp-ai-mobile-left { font-size: 0.75rem; }
+  .hp-ai-mobile-left { font-size: 0.72rem; }
   .hp-ai-mobile-input {
-    width: 100%;
-    padding: 0.35rem 0.4rem 0.35rem 0.8rem;
+    padding: 0.3rem 0.35rem 0.3rem 0.65rem;
   }
 
   /* 分类卡片：超窄屏进一步压缩，隐藏描述 */
