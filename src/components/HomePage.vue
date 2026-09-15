@@ -2948,12 +2948,12 @@ function heroOpenDrawerOnly() {
   .home-page { padding-bottom: 4.75rem; }
 
   /* Hero 移动端：压缩间距与字号 */
-  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 3.5rem; padding-bottom: 0; }
+  .hp-hero { padding-left: 0.46rem; padding-right: 0.46rem; padding-top: 3.5rem; padding-bottom: 0; }
   .hp-hero-inner {
     grid-template-columns: 1fr;
     padding: 0.64rem 0.8rem 0.66rem;
     border-radius: 0;
-    margin: 0 0.1rem;
+    margin: 0;
     gap: 0.28rem;
     box-shadow:
       0 30px 70px -25px rgba(99, 102, 241, 0.18),
@@ -3229,8 +3229,8 @@ function heroOpenDrawerOnly() {
 }
 
 @media (max-width: 480px) {
-  .hp-hero { padding-top: 3.35rem; }
-  .hp-hero-inner { padding: 0.6rem 0.72rem 0.62rem; border-radius: 0; gap: 0.26rem; }
+  .hp-hero { padding-left: 0.38rem; padding-right: 0.38rem; padding-top: 3.35rem; }
+  .hp-hero-inner { padding: 0.6rem 0.76rem 0.62rem; border-radius: 0; gap: 0.26rem; }
   .hp-hero-title { font-size: 1.02rem; }
   .hp-hero-sub { font-size: 0.72rem; line-height: 1.38; margin-bottom: 0.04rem; }
 
