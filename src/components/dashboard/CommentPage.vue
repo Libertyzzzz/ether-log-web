@@ -578,4 +578,75 @@ const totalLikes = computed(() => allItems.value.reduce((s, c) => s + (c.likeCou
   .comment-table-head { display: none; }
   .batch-action-bar { flex-direction: column; align-items: flex-start; }
 }
+@media (max-width: 640px) {
+  .batch-action-bar {
+    gap: 0.6rem;
+    padding: 0.75rem;
+  }
+  .batch-actions {
+    width: 100%;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.4rem;
+  }
+  .batch-btn {
+    justify-content: center;
+    min-width: 0;
+  }
+  .comment-table-row {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: flex-start;
+    gap: 0.55rem 0.65rem;
+  }
+  .comment-table-row > span:first-child {
+    grid-row: 1 / span 2;
+    padding-top: 0.45rem;
+  }
+  .sys-comment-user,
+  .sys-comment-body,
+  .sys-comment-article,
+  .comment-status,
+  .comment-table-row .sys-row-actions {
+    grid-column: 2;
+  }
+  .sys-comment-user {
+    align-items: flex-start;
+  }
+  .sys-comment-content {
+    -webkit-line-clamp: 2;
+    font-size: 0.78rem;
+  }
+  .comment-table-row:active .sys-comment-content,
+  .comment-table-row:focus-within .sys-comment-content {
+    -webkit-line-clamp: 6;
+  }
+  .sys-comment-reply {
+    line-height: 1.4;
+    word-break: break-word;
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+  .comment-table-row:active .sys-comment-reply,
+  .comment-table-row:focus-within .sys-comment-reply {
+    -webkit-line-clamp: 3;
+  }
+  .sys-comment-article {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.4;
+  }
+  .comment-table-row:active .sys-comment-article,
+  .comment-table-row:focus-within .sys-comment-article {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .comment-table-row .sys-row-actions {
+    justify-content: flex-start !important;
+  }
+}
 </style>

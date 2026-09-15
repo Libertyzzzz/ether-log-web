@@ -509,4 +509,54 @@ const totalViews = computed(() => allItems.value.reduce((s, a) => s + (a.viewCou
   }
   .sys-table-head { display: none; }
 }
+@media (max-width: 640px) {
+  .article-table-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.6rem;
+  }
+  .sys-article-info {
+    align-items: flex-start;
+    gap: 0.55rem;
+  }
+  .sys-article-cover {
+    width: 2.8rem;
+    height: 2.8rem;
+    border-radius: 0.55rem;
+  }
+  .sys-article-title {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .sys-article-summary {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+    line-height: 1.45;
+  }
+  .article-table-row:active .sys-article-title,
+  .article-table-row:focus-within .sys-article-title {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .article-table-row:active .sys-article-summary,
+  .article-table-row:focus-within .sys-article-summary {
+    -webkit-line-clamp: 3;
+  }
+  .sys-article-tags {
+    flex-wrap: wrap;
+    gap: 0.25rem;
+  }
+  .sys-top-btn {
+    align-self: flex-start;
+  }
+  .article-status {
+    align-self: flex-start;
+  }
+}
 </style>

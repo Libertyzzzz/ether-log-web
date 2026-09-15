@@ -696,4 +696,57 @@ async function handleDelete() {
 .sys-btn-confirm:hover {
   background: #4338ca;
 }
+@media (max-width: 640px) {
+  .tag-cloud-grid {
+    grid-template-columns: 1fr;
+    gap: 0.6rem;
+  }
+  .tag-card {
+    padding: 0.75rem 0.8rem;
+    border-radius: 0.85rem;
+  }
+  .tag-card-top {
+    align-items: flex-start;
+    gap: 0.45rem;
+  }
+  .tag-chip {
+    max-width: calc(100% - 4.25rem);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .tag-card:active .tag-chip,
+  .tag-card:focus-within .tag-chip {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .tag-card-meta {
+    flex-wrap: wrap;
+    gap: 0.35rem 0.55rem;
+  }
+  .sys-modal-overlay {
+    padding: 0.75rem;
+    align-items: end;
+  }
+  .sys-modal {
+    border-radius: 1rem;
+    max-height: 88vh;
+  }
+  .sys-modal-header,
+  .sys-modal-body,
+  .sys-modal-footer {
+    padding-left: 1rem;
+    padding-right: 1rem;
+  }
+  .sys-modal-footer {
+    flex-wrap: wrap;
+  }
+  .sys-btn-cancel,
+  .sys-btn-confirm {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+  }
+}
 </style>

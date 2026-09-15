@@ -610,7 +610,26 @@ function getParentName(parentId: number): string {
 
 .perm-table-head,
 .perm-table-row {
-  grid-template-columns: 60px 220px 1fr 100px 120px 90px 220px !important;
+  grid-template-columns:
+    60px
+    minmax(210px, 1.15fr)
+    minmax(220px, 1.35fr)
+    72px
+    minmax(96px, 0.6fr)
+    76px
+    minmax(180px, auto) !important;
+  column-gap: 0.65rem;
+}
+
+.perm-table-head > *,
+.perm-table-row > * {
+  min-width: 0;
+  justify-self: start;
+}
+
+.perm-table-head > span {
+  width: auto !important;
+  text-align: left;
 }
 
 .sys-row-sort {
@@ -674,6 +693,8 @@ function getParentName(parentId: number): string {
 }
 
 .sys-perm-code {
+  display: block;
+  justify-self: start;
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   font-size: 0.74rem;
   color: #6366f1;
@@ -682,19 +703,25 @@ function getParentName(parentId: number): string {
   padding: 0.25rem 0.55rem;
   border-radius: 0.4rem;
   width: fit-content;
+  min-width: 0;
+  max-width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  max-width: 240px;
 }
 
 .perm-type-tag {
   display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  justify-content: center;
   font-size: 0.65rem;
   padding: 0.15rem 0.5rem;
   border-radius: 999px;
   font-weight: 700;
   width: fit-content;
+  max-width: 100%;
+  white-space: nowrap;
 }
 .perm-type-tag.type-menu {
   background: rgba(99, 102, 241, 0.1);
@@ -717,6 +744,10 @@ function getParentName(parentId: number): string {
   background: rgba(59, 130, 246, 0.15);
 }
 
+.sys-row-actions {
+  justify-self: start;
+}
+
 .sys-form-item select,
 .sys-form-item input {
   width: 100%;
@@ -724,9 +755,17 @@ function getParentName(parentId: number): string {
 
 .perm-table-row {
   display: grid;
-  grid-template-columns: 60px 220px 1fr 100px 120px 90px 220px !important;
+  grid-template-columns:
+    60px
+    minmax(210px, 1.15fr)
+    minmax(220px, 1.35fr)
+    72px
+    minmax(96px, 0.6fr)
+    76px
+    minmax(180px, auto) !important;
   align-items: center;
-  gap: 0.35rem;
+  column-gap: 0.65rem;
+  row-gap: 0.35rem;
   padding: 0.85rem;
   border-bottom: 1px solid #f1f5f9;
   transition: background 0.15s;
@@ -735,10 +774,15 @@ function getParentName(parentId: number): string {
   background: rgba(99,102,241,0.03);
 }
 
-@media (max-width: 960px) {
+@media (max-width: 1080px) {
   .perm-table-head,
   .perm-table-row {
-    grid-template-columns: 60px 200px 1fr 80px 80px 220px !important;
+    grid-template-columns:
+      60px
+      minmax(190px, 1.05fr)
+      minmax(180px, 1.35fr)
+      72px
+      minmax(176px, auto) !important;
   }
   .perm-table-head > span:nth-child(5),
   .perm-table-head > span:nth-child(6),
@@ -755,16 +799,35 @@ function getParentName(parentId: number): string {
     display: flex !important;
     flex-direction: row;
     align-items: center;
-    gap: 0.45rem;
-    padding: 0.75rem 0.8rem;
-    overflow: hidden;
-    white-space: nowrap;
-    flex-wrap: nowrap;
+    gap: 0.55rem;
+    padding: 0.85rem;
+    overflow: visible;
+    white-space: normal;
+    flex-wrap: wrap;
   }
   .sys-perm-info {
-    width: auto;
-    flex: 1 1 36%;
+    width: 100%;
+    flex: 1 1 auto;
     min-width: 0;
+  }
+  .sys-perm-name,
+  .sys-perm-path {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sys-perm-path {
+    display: block;
+    line-height: 1.4;
+    word-break: break-all;
+  }
+  .perm-table-row:active .sys-perm-name,
+  .perm-table-row:focus-within .sys-perm-name,
+  .perm-table-row:active .sys-perm-path,
+  .perm-table-row:focus-within .sys-perm-path {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .sys-perm-code,
   .perm-type-tag,
@@ -774,29 +837,37 @@ function getParentName(parentId: number): string {
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 22vw;
+    max-width: 100%;
+    line-height: 1.45;
   }
-  .sys-perm-path {
-    display: none;
+  .perm-table-row:active .sys-perm-code,
+  .perm-table-row:focus-within .sys-perm-code,
+  .perm-table-row:active .sys-row-text,
+  .perm-table-row:focus-within .sys-row-text {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .sys-row-actions {
     display: flex;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-    gap: 0.35rem;
-    margin-left: auto;
+    flex-wrap: wrap;
+    justify-content: flex-start;
+    gap: 0.38rem;
+    margin-left: 0;
     min-width: 0;
+    flex: 1 1 100%;
+    padding-top: 0.15rem;
   }
   .sys-action-btn {
-    flex: 0 0 auto;
+    flex: 1 1 calc(50% - 0.25rem);
     justify-content: center;
     min-width: 0;
-    padding: 0.3rem 0.45rem;
+    padding: 0.36rem 0.5rem;
   }
   .sys-form-row {
     grid-template-columns: 1fr;

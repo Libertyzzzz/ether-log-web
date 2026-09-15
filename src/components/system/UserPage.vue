@@ -1356,14 +1356,14 @@ function getRoleText(value: number | '') {
     display: flex;
     flex-direction: row;
     align-items: center;
-    gap: 0.45rem;
-    overflow: hidden;
-    white-space: nowrap;
-    flex-wrap: nowrap;
+    gap: 0.45rem 0.55rem;
+    overflow: visible;
+    white-space: normal;
+    flex-wrap: wrap;
   }
   .sys-user-info {
-    width: auto;
-    flex: 1 1 34%;
+    width: 100%;
+    flex: 1 1 auto;
     display: flex;
     align-items: center;
     gap: 0.55rem;
@@ -1371,18 +1371,27 @@ function getRoleText(value: number | '') {
   }
   .sys-user-meta {
     display: flex;
-    flex-direction: row;
-    align-items: center;
+    flex-direction: column;
+    align-items: flex-start;
     gap: 0.35rem;
-    flex-wrap: nowrap;
+    flex-wrap: wrap;
     min-width: 0;
-    overflow: hidden;
+    overflow: visible;
   }
   .sys-user-name,
   .sys-user-sub {
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    max-width: 100%;
+  }
+  .sys-table-row:active .sys-user-name,
+  .sys-table-row:focus-within .sys-user-name,
+  .sys-table-row:active .sys-user-sub,
+  .sys-table-row:focus-within .sys-user-sub {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .sys-user-contact,
   .sys-row-role,
@@ -1392,11 +1401,24 @@ function getRoleText(value: number | '') {
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    line-height: 1.45;
+  }
+  .sys-row-main:active .sys-user-contact,
+  .sys-row-main:focus-within .sys-user-contact,
+  .sys-row-main:active .sys-row-role,
+  .sys-row-main:focus-within .sys-row-role,
+  .sys-row-main:active .sys-row-text,
+  .sys-row-main:focus-within .sys-row-text,
+  .sys-row-main:active .sys-time-cell,
+  .sys-row-main:focus-within .sys-time-cell {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .sys-row-role {
     flex: 1 1 auto;
@@ -1406,7 +1428,7 @@ function getRoleText(value: number | '') {
   .sys-time-cell,
   .sys-row-status,
   .sys-row-text {
-    max-width: 26vw;
+    max-width: 100%;
   }
   .sys-user-contact {
     flex-shrink: 1;
@@ -1414,6 +1436,7 @@ function getRoleText(value: number | '') {
   .sys-row-actions {
     flex-wrap: wrap;
     justify-content: flex-start;
+    padding-top: 0.15rem;
   }
   .sys-action-btn {
     flex: 1 1 calc(50% - 0.25rem);

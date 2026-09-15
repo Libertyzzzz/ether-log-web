@@ -1036,18 +1036,78 @@ const canAccessSystem = computed(() => isSuperAdmin.value || hasRole(['ROLE_ADMI
 }
 @media (max-width:600px) {
   .db-page { padding-top: 3.75rem; }
-  .db-body { padding: 0 0.8rem 4rem; }
+  .db-body { padding: 0 0.75rem 4rem; gap: 0.8rem; }
   .db-hero { padding: 0 0.8rem; }
   .db-hero-inner { padding: 1rem 1rem; }
   .db-stats-grid { grid-template-columns:repeat(2,1fr); }
+  .db-stat-card { padding: 0.85rem 0.8rem; border-radius: 0.95rem; }
+  .db-card { padding: 0.9rem; border-radius: 1rem; }
+  .db-card-header { align-items: flex-start; gap: 0.65rem; flex-wrap: wrap; }
+  .db-card-header-actions { width: 100%; }
+  .db-btn-sm { justify-content: center; }
+  .db-filter-bar { gap: 0.4rem; }
+  .db-search-wrap,
+  .db-filter-select {
+    flex: 1 1 100%;
+    min-width: 0;
+  }
+  .db-search-input,
+  .db-filter-select {
+    min-height: 2.25rem;
+    font-size: 0.76rem;
+  }
   .db-media-banner { flex-direction: column; gap: 0.75rem; align-items: flex-start; }
   .db-media-banner-right { align-self: flex-end; }
-  .db-table-head,
-  .db-table-row { grid-template-columns:1fr auto; }
-  .db-table-head span:nth-child(2),
-  .db-table-head span:nth-child(3),
-  .db-table-row .db-row-cat,
-  .db-table-row .db-row-status { display:none; }
+  .db-table-head { display: none; }
+  .db-table-row {
+    display: flex;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.55rem;
+    padding: 0.8rem;
+    border: 1px solid #eef2f7;
+    border-radius: 0.85rem;
+    margin-bottom: 0.55rem;
+  }
+  .db-row-title {
+    align-items: flex-start;
+  }
+  .db-row-title span,
+  .draft-info strong {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    line-height: 1.35;
+  }
+  .db-table-row:active .db-row-title span,
+  .db-table-row:focus-within .db-row-title span,
+  .draft-item:active .draft-info strong,
+  .draft-item:focus-within .draft-info strong {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
+  .db-row-cat,
+  .db-row-status {
+    display: inline-flex;
+    align-self: flex-start;
+  }
+  .db-row-actions {
+    justify-content: flex-start;
+  }
+  .db-action-btn {
+    flex: 1 1 calc(50% - 0.25rem);
+    justify-content: center;
+    min-height: 1.8rem;
+  }
+  .draft-item {
+    align-items: flex-start;
+    padding: 0.65rem 0;
+  }
+  .draft-actions {
+    flex-wrap: wrap;
+    justify-content: flex-end;
+  }
   .db-hero-inner { flex-wrap:wrap; }
   .db-hero-left { width:100%; }
   .db-btn-new { width:100%; justify-content:center; }

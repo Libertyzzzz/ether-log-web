@@ -459,11 +459,13 @@ function permTypeClass(t: number | undefined) {
               <span v-if="item.description" class="sys-role-desc">{{ item.description }}</span>
             </div>
           </div>
-          <span class="sys-role-code">{{ item.roleCode }}</span>
-          <span class="sys-row-text">#{{ item.sort ?? 0 }}</span>
-          <span class="sys-row-status" :class="item.status === 1 ? 'active' : 'disabled'">
-            {{ item.status === 1 ? '正常' : '禁用' }}
-          </span>
+          <div class="sys-role-mobile-meta">
+            <span class="sys-role-code">{{ item.roleCode }}</span>
+            <span class="sys-row-text">#{{ item.sort ?? 0 }}</span>
+            <span class="sys-row-status" :class="item.status === 1 ? 'active' : 'disabled'">
+              {{ item.status === 1 ? '正常' : '禁用' }}
+            </span>
+          </div>
           <span class="sys-row-text sys-time-cell">
             {{ item.createTime?.slice(0, 16)?.replace('T', ' ') || '—' }}
           </span>
@@ -777,6 +779,10 @@ function permTypeClass(t: number | undefined) {
   grid-template-columns: 180px 1fr 90px 90px 160px 280px !important;
 }
 
+.sys-role-mobile-meta {
+  display: contents;
+}
+
 .sys-role-info { display: flex; align-items: center; gap: 0.65rem; min-width: 0; }
 .sys-role-badge {
   width: 2.25rem; height: 2.25rem;
@@ -945,24 +951,55 @@ textarea:focus {
     grid-template-columns: 160px 1fr 80px 80px 280px !important;
   }
   .role-table-head > span:nth-child(5),
-  .role-table-row > span:nth-child(5) { display: none; }
+  .role-table-row > .sys-time-cell { display: none; }
 }
 @media (max-width: 640px) {
   .role-table-head { display: none; }
   .role-table-row {
     display: flex;
-    flex-direction: row;
-    align-items: center;
-    gap: 0.45rem;
-    padding: 0.75rem 0.8rem;
+    flex-direction: column;
+    align-items: stretch;
+    gap: 0.72rem;
+    padding: 1rem;
     overflow: hidden;
-    white-space: nowrap;
-    flex-wrap: nowrap;
   }
   .sys-role-info {
-    width: auto;
-    flex: 1 1 38%;
+    width: 100%;
     min-width: 0;
+  }
+  .sys-role-meta,
+  .sys-role-name-wrap {
+    min-width: 0;
+  }
+  .sys-role-name-wrap {
+    width: 100%;
+    flex-wrap: nowrap;
+    row-gap: 0.25rem;
+  }
+  .sys-role-name {
+    flex: 0 1 auto;
+  }
+  .sys-role-tag {
+    flex: 0 0 auto;
+  }
+  .sys-role-name,
+  .sys-role-desc {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .sys-role-desc {
+    display: block;
+    max-width: none;
+    line-height: 1.45;
+  }
+  .role-table-row:active .sys-role-name,
+  .role-table-row:focus-within .sys-role-name,
+  .role-table-row:active .sys-role-desc,
+  .role-table-row:focus-within .sys-role-desc {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
   }
   .sys-role-code,
   .sys-row-text,
@@ -971,29 +1008,70 @@ textarea:focus {
     display: inline-flex;
     align-items: center;
     justify-content: flex-start;
-    flex: 0 0 auto;
+    flex: 0 1 auto;
     min-width: 0;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 22vw;
+    max-width: 100%;
+    line-height: 1.45;
   }
-  .sys-role-desc {
+  .sys-role-mobile-meta {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    align-items: center;
+    gap: 0.45rem;
+    width: 100%;
+    min-width: 0;
+  }
+  .sys-role-code {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    padding-right: 0.55rem;
+  }
+  .sys-role-mobile-meta > .sys-row-text:not(.sys-time-cell),
+  .sys-role-mobile-meta > .sys-row-status {
+    flex: none;
+    width: fit-content;
+    max-width: none;
+    overflow: visible;
+  }
+  .role-table-row > .sys-time-cell {
     display: none;
   }
+  .role-table-row:active .sys-role-code,
+  .role-table-row:focus-within .sys-role-code,
+  .role-table-row:active .sys-row-text,
+  .role-table-row:focus-within .sys-row-text,
+  .role-table-row:active .sys-time-cell,
+  .role-table-row:focus-within .sys-time-cell {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+  }
   .sys-row-actions {
-    display: flex;
-    flex-wrap: nowrap;
-    justify-content: flex-end;
-    gap: 0.35rem;
-    margin-left: auto;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    width: 100%;
+    gap: 0.38rem;
+    margin-left: 0;
     min-width: 0;
+    max-width: 100%;
+    overflow: visible;
+    padding-top: 0.15rem;
   }
   .sys-action-btn {
-    flex: 0 0 auto;
     justify-content: center;
     min-width: 0;
-    padding: 0.3rem 0.45rem;
+    padding: 0.36rem 0.5rem;
+    overflow: hidden;
+    white-space: nowrap;
+  }
+  .sys-action-btn.danger {
+    width: auto;
+    grid-column: 1 / -1;
   }
   .sys-form-row {
     grid-template-columns: 1fr;

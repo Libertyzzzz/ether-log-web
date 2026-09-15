@@ -526,7 +526,7 @@ function heroOpenDrawerOnly() {
           </div>
         </div>
         <div class="hp-hero-chip-row mobile-only">
-          <button class="hp-btn-primary" type="button" @click="$emit('scrollToPosts')" style="font-size:0.72rem;padding:0.48rem 0.95rem">
+          <button class="hp-btn-primary hp-hero-primary-mobile" type="button" @click="$emit('scrollToPosts')">
             开始阅读 <ArrowRight :size="12" />
           </button>
           <button class="hp-hero-chip" type="button" :class="{ active: showFeaturedOnly }" @click="$emit('toggleFeatured', !showFeaturedOnly)">
@@ -2948,13 +2948,13 @@ function heroOpenDrawerOnly() {
   .home-page { padding-bottom: 4.75rem; }
 
   /* Hero 移动端：压缩间距与字号 */
-  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 3.8rem; padding-bottom: 0.2rem; }
+  .hp-hero { padding-left: 0.9rem; padding-right: 0.9rem; padding-top: 3.5rem; padding-bottom: 0; }
   .hp-hero-inner {
     grid-template-columns: 1fr;
-    padding: 0.8rem 0.9rem 0.8rem;
+    padding: 0.64rem 0.8rem 0.66rem;
     border-radius: 0;
     margin: 0 0.1rem;
-    gap: 0.55rem;
+    gap: 0.28rem;
     box-shadow:
       0 30px 70px -25px rgba(99, 102, 241, 0.18),
       0 15px 40px -25px rgba(139, 92, 246, 0.22),
@@ -2962,24 +2962,34 @@ function heroOpenDrawerOnly() {
       0 0 0 1px rgba(255, 255, 255, 0.28);
   }
   .hp-hero-badge-row {
-    margin-bottom: 0.5rem;
+    margin-bottom: 0;
     flex-wrap: wrap;
-    gap: 0.4rem;
+    gap: 0.32rem;
   }
   .hp-hero-greeting {
     font-size: 0.65rem;
-    padding: 0.25rem 0.55rem;
-    gap: 0.35rem;
+    padding: 0.18rem 0.48rem;
+    gap: 0.28rem;
   }
   .hp-hero-meta {
     font-size: 0.65rem;
-    padding: 0.2rem 0.45rem;
+    padding: 0.16rem 0.4rem;
   }
-  .hp-hero-title { margin-bottom: 0.35rem; font-size: 1.35rem; line-height: 1.14; }
-  .hp-hero-sub { margin-bottom: 0.7rem; font-size: 0.78rem; line-height: 1.65; max-width: 18rem; }
+  .hp-hero-title { margin-bottom: 0; font-size: 1.26rem; line-height: 1.08; }
+  .hp-hero-sub { margin-bottom: 0.08rem; font-size: 0.74rem; line-height: 1.42; max-width: 18rem; }
   .hp-hero-actions { gap: 0.45rem; margin-bottom: 0.2rem; }
   .hp-btn-primary { padding: 0.52rem 1.05rem; font-size: 0.74rem; }
-  .hp-ai-mobile-bar { display: flex; }
+  .hp-ai-mobile-bar {
+    display: flex;
+    width: min(100%, 25rem);
+    margin-top: 0.06rem;
+    padding: 0.34rem 0.46rem 0.34rem 0.6rem;
+  }
+  .hp-ai-mobile-input { padding: 0.22rem 0.28rem 0.22rem 0.56rem; }
+  .hp-ai-mobile-send { width: 1.38rem; height: 1.38rem; }
+  .hp-hero-chip-row { margin-top: 0.08rem; gap: 0.34rem; justify-content: center; }
+  .hp-hero-primary-mobile { font-size: 0.68rem; padding: 0.38rem 0.78rem; }
+  .hp-hero-chip { padding: 0.3rem 0.52rem; font-size: 0.68rem; }
 
   /* 分类卡片：缩小图标和间距 */
   .hp-categories { padding: 0.6rem 0 0.35rem; }
@@ -3219,21 +3229,23 @@ function heroOpenDrawerOnly() {
 }
 
 @media (max-width: 480px) {
-  .hp-hero-inner { padding: 0.85rem 0.9rem 0.95rem; border-radius: 0; }
-  .hp-hero-title { font-size: 1.05rem; }
-  .hp-hero-sub { font-size: 0.75rem; }
+  .hp-hero { padding-top: 3.35rem; }
+  .hp-hero-inner { padding: 0.6rem 0.72rem 0.62rem; border-radius: 0; gap: 0.26rem; }
+  .hp-hero-title { font-size: 1.02rem; }
+  .hp-hero-sub { font-size: 0.72rem; line-height: 1.38; margin-bottom: 0.04rem; }
 
   /* 移动端 AI 触发条：保持单行显示 */
   .hp-ai-mobile-bar {
-    padding: 0.5rem 0.55rem 0.5rem 0.8rem;
+    width: 100%;
+    padding: 0.32rem 0.44rem 0.32rem 0.56rem;
     border-radius: 9999px;
     flex-direction: row;
     align-items: center;
-    gap: 0.5rem;
+    gap: 0.38rem;
   }
-  .hp-ai-mobile-left { font-size: 0.72rem; }
+  .hp-ai-mobile-left { font-size: 0.7rem; }
   .hp-ai-mobile-input {
-    padding: 0.3rem 0.35rem 0.3rem 0.65rem;
+    padding: 0.2rem 0.26rem 0.2rem 0.5rem;
   }
 
   /* 分类卡片：超窄屏进一步压缩，隐藏描述 */
