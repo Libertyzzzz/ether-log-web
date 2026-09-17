@@ -992,7 +992,7 @@ async function handleProfileUpdate(data: any) {
   try {
     const ok = await updateUserProfile(data)
     if (ok) showAppToast('个人资料已保存', 'success')
-    else showAppToast(loginError.value || '保存失败，请稍后重试', 'error')
+    else showAppToast(authLoginError.value || '保存失败，请稍后重试', 'error')
   } finally {
     isSavingProfile.value = false
   }

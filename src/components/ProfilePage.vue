@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { Github, Twitter, Linkedin, Rss, User, Shield, Globe, Camera, Save, Settings, Lock, Bell, Palette, Loader2 } from 'lucide-vue-next'
+import { Github, Twitter, Linkedin, Rss, User, Shield, Camera, Save, Settings, Lock, Bell, Palette, Loader2 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
 import { ref, watch } from 'vue'
