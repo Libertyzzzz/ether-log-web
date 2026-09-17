@@ -469,7 +469,7 @@ export async function refreshToken(): Promise<RefreshTokenData> {
 }
 
 export async function fetchUserProfile(): Promise<LoginUser | null> {
-  const response = await axios.get<ResultResponse<LoginUser>>('/api/user/info')
+  const response = await axios.get<ResultResponse<LoginUser>>('/api/admin/user/info')
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -477,7 +477,7 @@ export async function fetchUserProfile(): Promise<LoginUser | null> {
 }
 
 export async function updateUserProfile(payload: Record<string, any>): Promise<boolean> {
-  const response = await axios.post<ResultResponse<any>>('/api/user/save', payload)
+  const response = await axios.post<ResultResponse<any>>('/api/admin/user/save', payload)
   return response.data.code === 200
 }
 

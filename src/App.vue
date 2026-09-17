@@ -985,6 +985,19 @@ function openProfile() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+const isSavingProfile = ref(false)
+
+async function handleProfileUpdate(data: any) {
+  isSavingProfile.value = true
+  try {
+    const ok = await updateUserProfile(data)
+    if (ok) showAppToast('个人资料已保存', 'success')
+    else showAppToast(loginError.value || '保存失败，请稍后重试', 'error')
+  } finally {
+    isSavingProfile.value = false
+  }
+}
+
 function openDashboard() {
   closeUserMenu()
   router.push({ name: 'dashboard' })
@@ -1242,8 +1255,9 @@ onUnmounted(() => {
           <ProfilePage
             v-if="currentPage === 'profile'"
             :login-user="loginUser"
+            :is-saving="isSavingProfile"
             @upload-avatar="uploadImage($event, 'avatar')"
-            @update-profile="updateUserProfile"
+            @update-profile="handleProfileUpdate"
           />
 
           <DashboardPage
