@@ -108,11 +108,11 @@ export function useComments() {
     }
   }
 
-  async function fetchPendingComments(): Promise<void> {
+  async function fetchPendingComments(silent = false): Promise<void> {
     isLoadingPending.value = true
     error.value = ''
     try {
-      const data = await apiFetchPendingComments()
+      const data = await apiFetchPendingComments(silent)
       pendingComments.value = mapComments(data)
     } catch (err) {
       error.value =

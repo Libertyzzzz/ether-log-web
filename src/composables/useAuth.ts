@@ -375,10 +375,10 @@ export function useAuth() {
     }
   }
 
-  async function fetchUserProfile(): Promise<void> {
+  async function fetchUserProfile(silent = false): Promise<void> {
     if (!hasAuthToken()) return
     try {
-      const user = await apiFetchUserProfile()
+      const user = await apiFetchUserProfile(silent)
       if (user) {
         loginUser.value = user
         setStoredItem('authUser', JSON.stringify(user))
