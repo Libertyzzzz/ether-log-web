@@ -472,7 +472,7 @@ export async function refreshToken(): Promise<RefreshTokenData> {
 }
 
 export async function fetchUserProfile(silent = false): Promise<LoginUser | null> {
-  const response = await axios.get<ResultResponse<LoginUser>>('/api/admin/user/info', silent ? { _silentForbidden: true } : undefined)
+  const response = await axios.get<ResultResponse<LoginUser>>('/api/admin/user/info', silent ? { _silentForbidden: true } as any : undefined)
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -502,7 +502,7 @@ export async function fetchComments(articleId: number): Promise<BackendCommentVO
 export async function fetchPendingComments(silent = false): Promise<BackendCommentVO[]> {
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(
     '/api/comment/list/guest-book',
-    { params: { status: 0 }, ...(silent ? { _silentForbidden: true } : {}) },
+    { params: { status: 0 }, ...(silent ? { _silentForbidden: true } as any : {}) },
   )
   if (response.data.code === 200) {
     return response.data.data || []
@@ -750,7 +750,7 @@ export async function fetchAIAssistantConversationContext(conversationId: string
 export async function fetchUserPermissions(silent = false): Promise<UserPermissionInfo> {
   const response = await axios.get<ResultResponse<UserPermissionInfo>>(
     '/api/admin/role/user/permissions',
-    silent ? { _silentForbidden: true } : undefined,
+    silent ? { _silentForbidden: true } as any : undefined,
   )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
