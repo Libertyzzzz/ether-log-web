@@ -876,7 +876,7 @@ async function handleLogin() {
     loginForm.password = ''
     showAppToast('登录成功！', 'success')
     showLoginModal.value = false
-    await Promise.all([fetchCategories(), fetchTags(), fetchPendingComments()])
+    await Promise.all([fetchCategories(), fetchTags(), fetchPendingComments(true)])
     await fetchAdminArticles()
     if (currentPage.value === 'publish') {
       const articleId = Number(route.params.articleId)
@@ -1145,12 +1145,12 @@ onMounted(async () => {
 
   await checkGateStatus()
   initFromLocalStorage()
-  fetchUserProfile()
+  fetchUserProfile(true)
   await fetchCategories()
   fetchTags()
   await refreshArticleData()
   try {
-    fetchPendingComments()
+    fetchPendingComments(true)
   } catch { /* 未登录时后端 401，由拦截器处理 */ }
   refreshPublishDraftState()
 

@@ -251,7 +251,7 @@ function removeAuthEventListeners() {
 
 async function loadUserPermissions(): Promise<void> {
   try {
-    const info = await apiFetchUserPermissions()
+    const info = await apiFetchUserPermissions(true)
     if (info) {
       userPermissions.value = info
       setStoredItem(PERMISSIONS_KEY, JSON.stringify(info))

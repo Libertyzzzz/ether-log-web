@@ -130,7 +130,10 @@ axios.interceptors.request.use(
   (error) => Promise.reject(error),
 )
 
-function dispatchForbiddenEvent(message: string | undefined, url: string) {
+function dispatchForbiddenEvent(message: string | undefined, url: string, config?: any) {
+  if (config && (config._silentForbidden === true || config._silent === true)) {
+    return
+  }
   window.dispatchEvent(new CustomEvent('api:forbidden', {
     detail: {
       message: message || '抱歉，你没有该操作的权限',
@@ -174,7 +177,7 @@ axios.interceptors.response.use(
     }
     // 业务码 403：HTTP 200，但 body.code 表示权限不足（真正的角色无权限）
     if (code === 403) {
-      dispatchForbiddenEvent(body?.message, response.config?.url || '')
+      dispatchForbiddenEvent(body?.message, response.config?.url || '', response.config)
       const err = new Error(body?.message || '权限不足，拒绝访问') as Error & { _forbiddenHandled?: boolean }
       err._forbiddenHandled = true
       return Promise.reject(err)
@@ -192,7 +195,7 @@ axios.interceptors.response.use(
           clearAuthState(code)
         } else {
           // HTTP 403：协议层权限不足（已登录但角色无权限）
-          dispatchForbiddenEvent(body?.message, error.config?.url || '')
+          dispatchForbiddenEvent(body?.message, error.config?.url || '', error.config)
           ;(error as any)._forbiddenHandled = true
         }
       }
@@ -468,8 +471,8 @@ export async function refreshToken(): Promise<RefreshTokenData> {
   return data
 }
 
-export async function fetchUserProfile(): Promise<LoginUser | null> {
-  const response = await axios.get<ResultResponse<LoginUser>>('/api/admin/user/info')
+export async function fetchUserProfile(silent = false): Promise<LoginUser | null> {
+  const response = await axios.get<ResultResponse<LoginUser>>('/api/admin/user/info', silent ? { _silentForbidden: true } : undefined)
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }
@@ -496,10 +499,10 @@ export async function fetchComments(articleId: number): Promise<BackendCommentVO
   throw new Error(response.data.message || '评论加载失败')
 }
 
-export async function fetchPendingComments(): Promise<BackendCommentVO[]> {
+export async function fetchPendingComments(silent = false): Promise<BackendCommentVO[]> {
   const response = await axios.get<ResultResponse<BackendCommentVO[]>>(
     '/api/comment/list/guest-book',
-    { params: { status: 0 } },
+    { params: { status: 0 }, ...(silent ? { _silentForbidden: true } : {}) },
   )
   if (response.data.code === 200) {
     return response.data.data || []
@@ -744,8 +747,11 @@ export async function fetchAIAssistantConversationContext(conversationId: string
 /**
  * 获取用户的权限信息 (登录后调用，基于当前 token)
  */
-export async function fetchUserPermissions(): Promise<UserPermissionInfo> {
-  const response = await axios.get<ResultResponse<UserPermissionInfo>>('/api/admin/role/user/permissions')
+export async function fetchUserPermissions(silent = false): Promise<UserPermissionInfo> {
+  const response = await axios.get<ResultResponse<UserPermissionInfo>>(
+    '/api/admin/role/user/permissions',
+    silent ? { _silentForbidden: true } : undefined,
+  )
   if (response.data.code === 200 && response.data.data) {
     return response.data.data
   }

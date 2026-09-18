@@ -252,6 +252,81 @@ function getPermDescendantIds(node: PermissionTreeVO): number[] {
   return ids
 }
 
+function buildParentMap(nodes: PermissionTreeVO[]): Map<number, number> {
+  const map = new Map<number, number>()
+  const walk = (items: PermissionTreeVO[]) => {
+    for (const item of items) {
+      if (item.children && item.children.length > 0) {
+        for (const child of item.children) {
+          map.set(child.id, item.id)
+        }
+        walk(item.children)
+      }
+    }
+  }
+  walk(nodes)
+  return map
+}
+
+function getAncestorIds(id: number, parentMap: Map<number, number>): number[] {
+  const ancestors: number[] = []
+  let current = parentMap.get(id)
+  while (current !== undefined) {
+    ancestors.push(current)
+    current = parentMap.get(current)
+  }
+  return ancestors
+}
+
+function recalcTreeState(activeIds: Set<number>) {
+  const checked = new Set<number>()
+  const halfChecked = new Set<number>()
+
+  const walk = (node: PermissionTreeVO): { isAll: boolean; isAny: boolean } => {
+    if (!node.children || node.children.length === 0) {
+      const isSel = activeIds.has(node.id)
+      if (isSel) {
+        checked.add(node.id)
+      }
+      return { isAll: isSel, isAny: isSel }
+    }
+
+    let allChildrenTrue = true
+    let anyChildrenTrue = false
+
+    for (const child of node.children) {
+      const res = walk(child)
+      if (res.isAll) {
+        anyChildrenTrue = true
+      } else if (res.isAny) {
+        allChildrenTrue = false
+        anyChildrenTrue = true
+      } else {
+        allChildrenTrue = false
+      }
+    }
+
+    const selfActive = activeIds.has(node.id)
+
+    if (allChildrenTrue && node.children.length > 0) {
+      checked.add(node.id)
+      return { isAll: true, isAny: true }
+    } else if (anyChildrenTrue || selfActive) {
+      halfChecked.add(node.id)
+      return { isAll: false, isAny: true }
+    } else {
+      return { isAll: false, isAny: false }
+    }
+  }
+
+  for (const root of permissionTree.value) {
+    walk(root)
+  }
+
+  permData.value.checkedIds = checked
+  permData.value.halfCheckedIds = halfChecked
+}
+
 async function openPermModal(item: SysRole) {
   permData.value = {
     roleId: item.id,
@@ -263,10 +338,10 @@ async function openPermModal(item: SysRole) {
   permissionTree.value.forEach((lv1) => permData.value.expandedIds.add(lv1.id))
   try {
     const ids = await fetchRolePermissionIds(item.id)
-    permData.value.checkedIds = new Set(ids)
-    recalcHalfChecked()
+    recalcTreeState(new Set(ids))
   } catch {
     permData.value.checkedIds = new Set()
+    permData.value.halfCheckedIds = new Set()
   }
   showPermModal.value = true
 }
@@ -275,52 +350,34 @@ function closePermModal() {
   showPermModal.value = false
 }
 
-function recalcHalfChecked() {
-  permData.value.halfCheckedIds = new Set()
-  const walk = (nodes: PermissionTreeVO[]): { total: number; checked: number; hasHalf: boolean } => {
-    let total = 0
-    let checked = 0
-    let hasHalf = false
-    for (const n of nodes) {
-      total++
-      const selfChecked = permData.value.checkedIds.has(n.id)
-      if (n.children && n.children.length > 0) {
-        const sub = walk(n.children)
-        const allChildrenChecked = sub.checked === sub.total && !sub.hasHalf
-        const anyChildrenChecked = sub.checked > 0 || sub.hasHalf
-        if (allChildrenChecked) {
-          checked++
-        } else if (anyChildrenChecked || selfChecked) {
-          permData.value.halfCheckedIds.add(n.id)
-          hasHalf = true
-        }
-        if (sub.hasHalf) hasHalf = true
-      } else {
-        if (selfChecked) checked++
-      }
-    }
-    return { total, checked, hasHalf }
-  }
-  walk(permissionTree.value)
-}
-
 function togglePermCheck(perm: PermissionTreeVO) {
+  const isCurrentlyChecked = permData.value.checkedIds.has(perm.id)
+  const isCurrentlyHalfChecked = permData.value.halfCheckedIds.has(perm.id)
+  const isCurrentlyActive = isCurrentlyChecked || isCurrentlyHalfChecked
+
+  const currentActiveIds = new Set([
+    ...permData.value.checkedIds,
+    ...permData.value.halfCheckedIds,
+  ])
+
   const descendantIds = getPermDescendantIds(perm)
-  const hasChildren = perm.children && perm.children.length > 0
-  const selfChecked = permData.value.checkedIds.has(perm.id)
-  if (!hasChildren) {
-    if (selfChecked) permData.value.checkedIds.delete(perm.id)
-    else permData.value.checkedIds.add(perm.id)
+
+  if (isCurrentlyActive) {
+    // 当前已选（全选或半选），点击则取消勾选自身及所有后代
+    currentActiveIds.delete(perm.id)
+    descendantIds.forEach((id) => currentActiveIds.delete(id))
   } else {
-    if (selfChecked) {
-      permData.value.checkedIds.delete(perm.id)
-      descendantIds.forEach((id) => permData.value.checkedIds.delete(id))
-    } else {
-      permData.value.checkedIds.add(perm.id)
-      descendantIds.forEach((id) => permData.value.checkedIds.add(id))
-    }
+    // 当前未选，点击勾选自身及所有后代
+    currentActiveIds.add(perm.id)
+    descendantIds.forEach((id) => currentActiveIds.add(id))
+
+    // 🌟 方案 A 核心：向上自动联动，自动将所有祖先节点（父菜单、爷爷菜单）加入授权通道！
+    const parentMap = buildParentMap(permissionTree.value)
+    const ancestorIds = getAncestorIds(perm.id, parentMap)
+    ancestorIds.forEach((id) => currentActiveIds.add(id))
   }
-  recalcHalfChecked()
+
+  recalcTreeState(currentActiveIds)
 }
 
 function togglePermExpand(id: number) {
@@ -328,10 +385,21 @@ function togglePermExpand(id: number) {
   else permData.value.expandedIds.add(id)
 }
 
+const totalSelectedCount = computed(() => {
+  return new Set([
+    ...permData.value.checkedIds,
+    ...permData.value.halfCheckedIds,
+  ]).size
+})
+
 async function handleSavePerm() {
-  const ids = Array.from(permData.value.checkedIds)
+  // 🌟 方案 A 核心：合并完全选中的节点和半选的父级菜单节点，保证上层路由与总入口必定保存
+  const allIds = Array.from(new Set([
+    ...permData.value.checkedIds,
+    ...permData.value.halfCheckedIds,
+  ]))
   try {
-    await assignPermissionsToRole(permData.value.roleId, ids)
+    await assignPermissionsToRole(permData.value.roleId, allIds)
     toast('权限分配成功', 'success')
     closePermModal()
   } catch (e) {
@@ -623,7 +691,7 @@ function permTypeClass(t: number | undefined) {
       <div class="sys-form-stack">
         <p class="sys-form-tip">
           为角色 <strong>{{ permData.roleName }}</strong> 分配权限。
-          已选 <span style="color:#4f46e5;font-weight:800">{{ permData.checkedIds.size }}</span> 项
+          已选 <span style="color:#4f46e5;font-weight:800">{{ totalSelectedCount }}</span> 项（含上级路由通道）
         </p>
         <div v-if="!permissionTree.length" class="sys-roles-empty">
           暂无权限数据，请先在权限管理中创建
