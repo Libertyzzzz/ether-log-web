@@ -13,6 +13,7 @@ import {
   updateArticleField,
   auditArticle,
   isForbiddenError,
+  searchArticles,
 } from '../../api'
 import type { ArticleListItem, Category } from '../../types/blog'
 import { toast } from '../../utils/toast'
@@ -26,7 +27,6 @@ const router = useRouter()
 
 const loading = ref(false)
 const allItems = ref<ArticleListItem[]>([])
-const totalRecords = ref(0)
 const currentPage = ref(1)
 const pageSize = 10
 const searchQuery = ref('')
@@ -51,40 +51,66 @@ async function loadCategories() {
 
 async function loadData() {
   loading.value = true
-  const params: any = {
-    pageNum: currentPage.value,
-    pageSize,
-  }
-  const keyword = searchQuery.value.trim()
-  if (keyword) params.keyword = keyword
-  if (categoryFilter.value !== '') params.categoryId = Number(categoryFilter.value)
-  if (statusFilter.value !== '') params.status = Number(statusFilter.value)
-  if (topFilter.value !== '') params.isTop = Number(topFilter.value)
   try {
-    const result = await fetchArticlesAdminPage(params)
-    allItems.value = result.records
-    totalRecords.value = result.total
+    const keyword = searchQuery.value.trim()
+    let records: ArticleListItem[]
+    if (keyword) {
+      records = await searchArticles(keyword, 1, 500)
+    } else {
+      const result = await fetchArticlesAdminPage({
+        pageNum: 1,
+        pageSize: 500,
+        ...(statusFilter.value !== '' ? { status: Number(statusFilter.value) } : {}),
+      })
+      records = result.records
+    }
+    allItems.value = records
+    currentPage.value = 1
   } catch (e) {
     if (!isForbiddenError(e)) {
       allItems.value = []
-      totalRecords.value = 0
     }
   } finally {
     loading.value = false
   }
 }
 
+const filteredItems = computed(() => {
+  let list = allItems.value
+  if (categoryFilter.value !== '') {
+    const cat = categories.value.find((c) => c.id === Number(categoryFilter.value))
+    if (cat) list = list.filter((a) => a.categoryName === cat.name)
+  }
+  if (statusFilter.value !== '') {
+    list = list.filter((a) => a.status === Number(statusFilter.value))
+  }
+  if (topFilter.value !== '') {
+    list = list.filter((a) => a.isTop === Number(topFilter.value))
+  }
+  return list
+})
+
+const totalRecords = computed(() => filteredItems.value.length)
+const pagedItems = computed(() => {
+  const start = (currentPage.value - 1) * pageSize
+  return filteredItems.value.slice(start, start + pageSize)
+})
+
 watch(searchQuery, () => {
   if (searchTimer) clearTimeout(searchTimer)
   searchTimer = setTimeout(() => {
-    currentPage.value = 1
     loadData()
   }, 300)
 })
 
-watch([categoryFilter, statusFilter, topFilter], () => {
+watch(statusFilter, () => {
+  if (!searchQuery.value.trim()) {
+    loadData()
+  }
+})
+
+watch([categoryFilter, topFilter], () => {
   currentPage.value = 1
-  loadData()
 })
 
 const totalPages = computed(() => Math.max(1, Math.ceil(totalRecords.value / pageSize)))
@@ -105,7 +131,6 @@ const visiblePages = computed(() => {
 function goToPage(p: number) {
   if (p >= 1 && p <= totalPages.value) {
     currentPage.value = p
-    loadData()
   }
 }
 
@@ -301,9 +326,9 @@ const totalViews = computed(() => allItems.value.reduce((s, a) => s + (a.viewCou
         </div>
 
         <div v-if="loading" class="sys-empty">加载中...</div>
-        <div v-else-if="!allItems.length" class="sys-empty">暂无文章，点击右上角「发布文章」开始创作</div>
+        <div v-else-if="!pagedItems.length" class="sys-empty">暂无文章，点击右上角「发布文章」开始创作</div>
 
-        <div v-for="item in allItems" :key="item.id" class="sys-table-row article-table-row" style="grid-template-columns: 56px minmax(0,2fr) 90px 100px 90px 70px 90px 180px;">
+        <div v-for="item in pagedItems" :key="item.id" class="sys-table-row article-table-row" style="grid-template-columns: 56px minmax(0,2fr) 90px 100px 90px 70px 90px 180px;">
           <span class="sys-row-text">#{{ item.id }}</span>
           <div class="sys-article-info">
             <div v-if="item.coverImg" class="sys-article-cover">

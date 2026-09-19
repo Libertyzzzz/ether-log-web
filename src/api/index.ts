@@ -479,8 +479,8 @@ export async function fetchUserProfile(silent = false): Promise<LoginUser | null
   return null
 }
 
-export async function updateUserProfile(payload: Record<string, any>): Promise<boolean> {
-  const response = await axios.post<ResultResponse<any>>('/api/admin/user/save', payload)
+export async function updateUserProfile(userId: string | number, payload: Record<string, any>): Promise<boolean> {
+  const response = await axios.put<ResultResponse<any>>(`/api/admin/user/${userId}`, payload)
   return response.data.code === 200
 }
 

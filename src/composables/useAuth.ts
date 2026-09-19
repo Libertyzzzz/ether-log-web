@@ -399,16 +399,14 @@ export function useAuth() {
 
     try {
       const payload = {
-        id: loginUser.value.id,
         nickname: data.nickname !== undefined ? data.nickname : loginUser.value.nickname,
         motto: data.motto !== undefined ? data.motto : loginUser.value.motto,
         email: data.email !== undefined ? data.email : loginUser.value.email,
         avatar: data.avatar !== undefined ? data.avatar : loginUser.value.avatar,
         lastLoginTime: data.lastLoginTime || loginUser.value.lastLoginTime,
-        username: loginUser.value.username,
       }
 
-      const ok = await apiUpdateUserProfile(payload)
+      const ok = await apiUpdateUserProfile(loginUser.value.id!, payload)
       if (ok) {
         await fetchUserProfile()
         return true
