@@ -252,8 +252,43 @@ onMounted(() => {
 
 .comment-error { color: #ef4444; font-size: 14px; margin-top: 8px; }
 
+/* ════════════════════════════════
+   iOS 移动端评论表单
+   ════════════════════════════════ */
 @media (max-width: 720px) {
-  .anonymous-form { grid-template-columns: 1fr; }
+  .anonymous-form { grid-template-columns: 1fr; gap: 0.5rem; }
+  .anonymous-form input {
+    min-height: 44px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+    border-radius: 10px;
+  }
+  .comment-section { padding: 0.75rem; border-radius: 12px; }
+  .comment-section-title { font-size: 1rem; margin-bottom: 0.65rem; }
+  .composer-placeholder {
+    padding: 0.85rem 0.9rem;
+    border-radius: 12px;
+    font-size: 0.92rem;
+    min-height: 44px;
+  }
+  .composer-expanded textarea {
+    min-height: 120px;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
+  .composer-actions button {
+    min-height: 44px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .anonymous-identity-hint {
+    font-size: 0.82rem;
+    padding: 0.6rem 0.75rem;
+    border-radius: 10px;
+  }
 }
 
 </style>

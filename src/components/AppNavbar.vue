@@ -3,7 +3,7 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Settings,
-  Folder, Tag, MessageSquare, Users, Shield, Key, ChevronDown
+  Folder, Tag, MessageSquare, Users, Shield, Key, ChevronDown, Twitter, Instagram, Github
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
@@ -69,11 +69,37 @@ const emit = defineEmits<{
   closeUserMenu: []
 }>()
 
+const isPortfolioHome = computed(() => route.name === 'home')
+const isBlogContext = computed(() => {
+  const name = String(route.name)
+  const blogPageNames = ['blog', 'blog-guestbook', 'blog-post-detail', 'post-detail', 'profile', 'publish', 'publish-edit']
+  return blogPageNames.includes(name) || name.startsWith('dashboard') || name.startsWith('system')
+})
+
+function scrollToTop() {
+  window.scrollTo({ top: 0, behavior: 'smooth' })
+}
+
+function scrollToPosts() {
+  const el = document.getElementById('posts')
+  if (el) {
+    el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  } else {
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+}
 const isMobile = ref(false)
 const showSystemDropdown = ref(false)
+const showPortfolioPatterns = ref(false)
+const showPortfolioTemplates = ref(false)
 const userMenuFromTabbar = ref(false)
 const systemDropdownRef = ref<HTMLElement | null>(null)
 let systemCloseTimer: ReturnType<typeof setTimeout> | null = null
+
+function closePortfolioDropdowns() {
+  showPortfolioPatterns.value = false
+  showPortfolioTemplates.value = false
+}
 
 function clearSystemCloseTimer() {
   if (systemCloseTimer) {
@@ -119,7 +145,7 @@ const checkMobile = () => {
 }
 
 const contentPageNames = new Set([
-  'posts', 'guestbook', 'profile',
+  'blog', 'guestbook', 'profile',
   'publish', 'publish-edit', 'quant-lab',
   'assessment-home', 'assessment-evaluate',
   'assessment-processing', 'assessment-result', 'assessment-share'
@@ -193,6 +219,13 @@ function resetNavState() {
   updateScrollDepth(lastScrollY)
 }
 
+function scrollPortfolioSection(sectionId: string) {
+  const target = document.getElementById(sectionId)
+  if (target) {
+    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+  }
+}
+
 watch(
   () => route.fullPath,
   () => {
@@ -229,21 +262,123 @@ onUnmounted(() => {
 <template>
   <div class="nav-shell">
     <nav
+      v-if="!isBlogContext"
+      class="portfolio-nav"
+      :class="{ 'nav-hidden': !isVisible }"
+      :style="{ '--nav-scroll-depth': scrollDepth }"
+      @mouseleave="closePortfolioDropdowns"
+    >
+      <div class="portfolio-nav-inner">
+        <button class="portfolio-brand" type="button" @click="$emit('navigate', 'home')">
+          <span class="portfolio-brand-mark">N</span>
+          <span class="portfolio-brand-name">NEXTIFY<br><small>个人主页</small></span>
+        </button>
+
+        <div class="portfolio-links">
+          <button
+            type="button"
+            :class="{ active: route.name === 'home' }"
+            @click="$emit('navigate', 'home')"
+          >Home</button>
+          <button
+            type="button"
+            :class="{ active: isBlogContext }"
+            @click="$emit('navigate', 'blog')"
+          >Blog</button>
+          <button
+            type="button"
+            :class="{ active: String(route.name).startsWith('assessment') }"
+            @click="$emit('navigate', 'assessment')"
+          >Aether</button>
+          <button
+            type="button"
+            :class="{ active: route.name === 'quant-lab' }"
+            @click="$emit('navigate', 'quant-lab')"
+          >Quant</button>
+          <button
+            type="button"
+            :class="{ active: route.name === 'blog-guestbook' }"
+            @click="$emit('navigate', 'guestbook')"
+          >Guestbook</button>
+
+          <div
+            v-if="isPortfolioHome"
+            class="portfolio-dropdown-wrap"
+            @mouseenter="showPortfolioPatterns = true; showPortfolioTemplates = false"
+          >
+            <button type="button" class="has-dropdown">
+              Patterns
+              <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showPortfolioPatterns }" />
+            </button>
+            <Transition name="dropdown-fade">
+              <div v-if="showPortfolioPatterns" class="portfolio-dropdown" @click.stop>
+                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('works')">Selected Works</button>
+                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('about')">About</button>
+                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('now')">Now</button>
+                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('writing')">Selected Writing</button>
+              </div>
+            </Transition>
+          </div>
+
+          <div
+            class="portfolio-dropdown-wrap"
+            @mouseenter="showPortfolioTemplates = true; showPortfolioPatterns = false"
+          >
+            <button type="button" class="has-dropdown">
+              Templates
+              <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showPortfolioTemplates }" />
+            </button>
+            <Transition name="dropdown-fade">
+              <div v-if="showPortfolioTemplates" class="portfolio-dropdown" @click.stop>
+                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'home')">Portfolio Home</button>
+                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'blog')">Posts Home</button>
+                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'assessment')">Aether Valuation</button>
+                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'quant-lab')">Quant Lab</button>
+              </div>
+            </Transition>
+          </div>
+        </div>
+
+        <div class="portfolio-actions">
+          <a class="portfolio-social" href="https://x.com/ether" target="_blank" rel="noopener" title="X">
+            <Twitter :size="16" />
+          </a>
+          <a class="portfolio-social" href="https://instagram.com/ether" target="_blank" rel="noopener" title="Instagram">
+            <Instagram :size="16" />
+          </a>
+          <a class="portfolio-social" href="https://github.com/ether" target="_blank" rel="noopener" title="GitHub">
+            <Github :size="16" />
+          </a>
+          <button class="portfolio-main-action" type="button" @click="$emit('navigate', 'downloads')">
+            Download
+          </button>
+        </div>
+      </div>
+    </nav>
+
+    <nav
+      v-else
       class="nav-standard"
       :class="{ 'nav-hidden': !isVisible }"
       :style="{ '--nav-scroll-depth': scrollDepth }"
     >
       <div class="nav-content">
-      <!-- 1. 左侧：Logo (始终靠左) -->
-      <div class="nav-logo" @click="$emit('navigate', 'home')">
+      <!-- 1. 左侧：Logo — 始终回 Portfolio 主站 -->
+      <div class="nav-logo" @click="$emit('navigate', 'home')" title="回到 NEXTIFY 主站">
         <div class="logo-box">E</div>
         <span class="logo-text">NEXTIFY</span>
       </div>
 
-      <!-- 2. 中间：Home / Posts（PC 和移动端都水平显示，移动端缩小字体和间距） -->
+      <!-- 2. 中间导航：Blog 页面时 Home=当前页顶部 / Posts=滚到文章区；其他页面 Home=Portfolio / Posts=/blog -->
       <div class="nav-links">
-        <button type="button" @click="$emit('navigate', 'home')">Home</button>
-        <button type="button" @click="$emit('navigate', 'posts')">Posts</button>
+        <button
+          type="button"
+          @click="isBlogContext ? scrollToTop() : $emit('navigate', 'home')"
+        >Home</button>
+        <button
+          type="button"
+          @click="isBlogContext ? scrollToPosts() : $emit('navigate', 'blog')"
+        >Posts</button>
       </div>
 
       <!-- 搜索作为独立工具位，避免挤压右侧操作按钮 -->
@@ -316,7 +451,6 @@ onUnmounted(() => {
               </div>
             </Transition>
           </div>
-          <button v-if="isLoggedIn && canAccessQuantLab" class="nav-action-button lab" type="button" @click.prevent="$emit('openQuantLab')">Quant Lab</button>
           <button v-if="isLoggedIn && canAccessProfile" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
           <button v-if="isLoggedIn && canAccessDashboard" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
         </div>
@@ -436,6 +570,7 @@ onUnmounted(() => {
     </nav>
 
     <div
+      v-if="!isPortfolioHome"
       class="mobile-tabbar"
       :class="[{ 'tabbar-hidden': !isVisible, 'tabbar-4col': isLoggedIn }]"
       aria-label="移动端主导航"
@@ -467,8 +602,8 @@ onUnmounted(() => {
       <button
         type="button"
         class="mobile-tabbar-item"
-        :class="{ active: route.name === 'home' }"
-        @click="$emit('navigate', 'home')"
+        :class="{ active: route.name === 'home' || isBlogContext }"
+        @click="isBlogContext ? scrollToTop() : $emit('navigate', 'home')"
       >
         <House :size="17" />
         <span>Home</span>
@@ -476,8 +611,8 @@ onUnmounted(() => {
       <button
         type="button"
         class="mobile-tabbar-item"
-        :class="{ active: route.name === 'posts' }"
-        @click="$emit('navigate', 'posts')"
+        :class="{ active: route.name === 'blog' && !isBlogContext }"
+        @click="isBlogContext ? scrollToPosts() : $emit('navigate', 'blog')"
       >
         <FileText :size="17" />
         <span>Posts</span>
@@ -1081,22 +1216,23 @@ kbd {
   }
   .mobile-tabbar-item {
     min-width: 0;
-    height: 2.75rem;
+    height: 3rem;
     border: none;
-    border-radius: 0.9rem;
+    border-radius: 0.95rem;
     background: transparent;
     color: #64748b;
     display: inline-flex;
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 0.12rem;
+    gap: 0.15rem;
     font-family: inherit;
-    font-size: 0.62rem;
+    font-size: 0.65rem;
     font-weight: 850;
-    letter-spacing: 0.02em;
+    letter-spacing: 0.01em;
     cursor: pointer;
     transition: background 0.18s ease, color 0.18s ease, transform 0.18s ease;
+    -webkit-tap-highlight-color: transparent;
   }
   .mobile-tabbar-item.active {
     background: #0f172a;
@@ -1149,14 +1285,362 @@ kbd {
     left: 0.5rem;
     right: 0.5rem;
     max-width: 23.5rem;
-    border-radius: 1rem;
+    border-radius: 1.1rem;
   }
   .mobile-tabbar-item {
-    height: 2.55rem;
-    border-radius: 0.78rem;
-    font-size: 0.58rem;
+    height: 2.8rem;
+    border-radius: 0.82rem;
+    font-size: 0.62rem;
   }
 }
 
 /* 暗色模式 */
+
+/* ===== Portfolio Nav (Light) ===== */
+.portfolio-nav {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(255, 255, 255, calc(var(--nav-scroll-depth, 0) * 0.82));
+  backdrop-filter: blur(calc(var(--nav-scroll-depth, 0) * 12px));
+  -webkit-backdrop-filter: blur(calc(var(--nav-scroll-depth, 0) * 12px));
+  border-bottom: 1px solid rgba(0, 0, 0, calc(var(--nav-scroll-depth, 0) * 0.08));
+  transition: transform 0.35s cubic-bezier(0.16, 1, 0.3, 1),
+    background 0.3s ease, border-color 0.3s ease, backdrop-filter 0.3s ease;
+}
+
+.portfolio-nav.nav-hidden {
+  transform: translateY(-100%);
+}
+
+.portfolio-nav-inner {
+  width: min(1110px, 100%);
+  margin: 0 auto;
+  height: 64px;
+  padding: 0 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1.5rem;
+}
+
+.portfolio-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #111111;
+  font: inherit;
+  cursor: pointer;
+  text-align: left;
+  line-height: 1.1;
+}
+
+.portfolio-brand-name {
+  display: inline-block;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0.02em;
+}
+
+.portfolio-brand-name small {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(0, 0, 0, 0.45);
+  margin-top: 2px;
+}
+
+.portfolio-brand-mark {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  background: #111111;
+  color: #FDF800;
+  font-family: 'Bebas Neue', sans-serif;
+  font-size: 1.4rem;
+  font-weight: 400;
+  flex-shrink: 0;
+  border-radius: 8px;
+}
+
+.portfolio-brand-mark::after {
+  content: '';
+  position: absolute;
+  bottom: 5px;
+  right: 5px;
+  width: 6px;
+  height: 6px;
+  background: #FDF800;
+}
+
+.portfolio-links {
+  display: flex;
+  align-items: center;
+  gap: 0.1rem;
+}
+
+.portfolio-links > button,
+.portfolio-dropdown-wrap > button {
+  padding: 0.5rem 0.85rem;
+  background: transparent;
+  border: 0;
+  color: #111111;
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  white-space: nowrap;
+}
+
+.portfolio-links > button:hover,
+.portfolio-dropdown-wrap > button:hover {
+  color: #666666;
+}
+
+.portfolio-links > button.active {
+  color: #111111;
+  font-weight: 700;
+}
+
+.portfolio-links > button.active::after {
+  content: '';
+  position: absolute;
+  bottom: 0.35rem;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 18px;
+  height: 2px;
+  background: #111111;
+  border-radius: 2px;
+}
+
+.portfolio-links > button {
+  position: relative;
+}
+
+.portfolio-chevron {
+  transition: transform 0.2s ease;
+}
+
+.portfolio-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+.portfolio-dropdown-wrap {
+  position: relative;
+}
+
+.portfolio-dropdown {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  min-width: 200px;
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgba(0, 0, 0, 0.12);
+  padding: 0.4rem;
+  z-index: 1001;
+}
+
+.portfolio-dropdown-item {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 0.55rem 0.75rem;
+  background: transparent;
+  border: 0;
+  color: #111111;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 500;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.portfolio-dropdown-item:hover {
+  background: #FDF800;
+  color: #111111;
+}
+
+.portfolio-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.portfolio-social {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  color: #111111;
+  text-decoration: none;
+  border-radius: 6px;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.portfolio-social:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #111111;
+}
+
+.portfolio-main-action {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.6rem 1.25rem;
+  background: #FDF800;
+  color: #111111;
+  border: 0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+  box-shadow: 0 2px 8px rgba(253, 248, 0, 0.4);
+}
+
+.portfolio-main-action:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(253, 248, 0, 0.55);
+  background: #f5f000;
+}
+
+@media (max-width: 1024px) {
+  .portfolio-dropdown-wrap {
+    display: none;
+  }
+}
+
+/* ════════════════════════════════
+   iOS 移动端 Portfolio 导航重设计
+   ════════════════════════════════ */
+@media (max-width: 768px) {
+  .portfolio-nav-inner {
+    flex-wrap: nowrap;
+    height: 52px;
+    padding: 0 0.6rem;
+    gap: 0.35rem;
+  }
+
+  .portfolio-brand {
+    gap: 0.35rem;
+    flex-shrink: 0;
+  }
+  .portfolio-brand-mark {
+    width: 28px;
+    height: 28px;
+    font-size: 1.1rem;
+    border-radius: 6px;
+  }
+  .portfolio-brand-name {
+    font-size: 0.82rem;
+    line-height: 1.1;
+  }
+  .portfolio-brand-name small {
+    display: none;
+  }
+
+  .portfolio-social {
+    display: none !important;
+  }
+
+  .portfolio-main-action {
+    padding: 0.35rem 0.7rem;
+    font-size: 0.72rem;
+    min-height: 28px;
+    flex-shrink: 0;
+    border-radius: 8px;
+  }
+
+  .portfolio-links {
+    order: initial;
+    width: auto;
+    flex: 1 1 auto;
+    min-width: 0;
+    display: flex;
+    gap: 0.25rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+    justify-content: flex-start;
+  }
+  .portfolio-links::-webkit-scrollbar {
+    display: none;
+  }
+
+  .portfolio-links > button {
+    flex-shrink: 0;
+    padding: 0.3rem 0.65rem;
+    font-size: 0.72rem;
+    font-weight: 600;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.05);
+    color: #111111;
+    min-height: 28px;
+    transition: background 0.2s ease, color 0.2s ease;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .portfolio-links > button:active {
+    background: rgba(0, 0, 0, 0.12);
+  }
+  .portfolio-links > button.active {
+    background: #111111;
+    color: #FDF800;
+    font-weight: 700;
+  }
+  .portfolio-links > button.active::after {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .portfolio-nav-inner {
+    padding: 0 0.45rem;
+    gap: 0.25rem;
+    height: 48px;
+  }
+  .portfolio-brand-mark {
+    width: 26px;
+    height: 26px;
+    font-size: 1rem;
+    border-radius: 5px;
+  }
+  .portfolio-brand-name {
+    font-size: 0.76rem;
+  }
+  .portfolio-main-action {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.68rem;
+    min-height: 26px;
+  }
+  .portfolio-links {
+    gap: 0.18rem;
+  }
+  .portfolio-links > button {
+    padding: 0.25rem 0.55rem;
+    font-size: 0.68rem;
+    min-height: 26px;
+  }
+}
+
 </style>

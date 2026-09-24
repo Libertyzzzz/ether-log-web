@@ -167,7 +167,7 @@ function openEditArticle(item: ArticleListItem) {
 
 function openViewArticle(item: ArticleListItem) {
   emit('back')
-  router.push({ name: 'post-detail', params: { articleSlug: String(item.id) } })
+  router.push({ name: 'blog-post-detail', params: { articleSlug: String(item.id) } })
 }
 
 function confirmDelete(item: ArticleListItem) {

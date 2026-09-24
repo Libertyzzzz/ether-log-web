@@ -10,7 +10,6 @@ import AIAssistant from './components/AIAssistant.vue'
 import { useAIAssistant } from './composables/useAIAssistantGlobal'
 import SidebarNav from './components/SidebarNav.vue'
 import ArticleDetailView from './components/ArticleDetailView.vue'
-import ContactSection from './components/ContactSection.vue'
 import DashboardPage from './components/DashboardPage.vue'
 import MediaHubPage from './components/MediaHubPage.vue'
 import SensitiveWordPage from './components/SensitiveWordPage.vue'
@@ -23,6 +22,7 @@ import RolePage from './components/system/RolePage.vue'
 import PermissionPage from './components/system/PermissionPage.vue'
 import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
+import BlogHomePage from './components/BlogHomePage.vue'
 import LoginModal from './components/LoginModal.vue'
 import AppToast from './components/AppToast.vue'
 import AppConfirmDialog from './components/AppConfirmDialog.vue'
@@ -30,6 +30,7 @@ import SearchModal from './components/SearchModal.vue'
 import ProfilePage from './components/ProfilePage.vue'
 import PublishModal from './components/PublishModal.vue'
 import QuantLabPage from './components/QuantLabPage.vue'
+import DownloadsPage from './components/DownloadsPage.vue'
 import type {
   ArticleDetail,
   ArticleListItem,
@@ -114,14 +115,14 @@ const { open: openAIAssistant } = useAIAssistant()
 watch(
   [() => route.name, () => route.params.articleSlug ?? null],
   async ([newRouteName, newSlug], [oldRouteName, oldSlug]) => {
-    if (newRouteName === 'post-detail') {
+    if (newRouteName === 'post-detail' || newRouteName === 'blog-post-detail') {
       const slugChanged = newSlug !== oldSlug
       const routeEntered = newRouteName !== oldRouteName
       if (slugChanged || routeEntered) {
         await loadArticleFromRoute()
       }
     } else {
-      if (oldRouteName === 'post-detail') {
+      if (oldRouteName === 'post-detail' || oldRouteName === 'blog-post-detail') {
         closeArticleDetail()
       }
     }
@@ -952,28 +953,40 @@ function handleClickOutside(event: MouseEvent) {
 
 function navigateToSection(sectionId: string) {
   closeUserMenu()
-  router.push({ name: sectionId })
+  const targetSection =
+    sectionId === 'posts' ? 'blog'
+    : sectionId === 'assessment' ? 'assessment-home'
+    : sectionId === 'guestbook' ? 'blog-guestbook'
+    : sectionId
+
+  const isSamePage = route.name === targetSection
+
+  if (!isSamePage) {
+    router.push({ name: targetSection })
+  }
   selectedArticle.value = null
   selectedArticlePreview.value = null
-  if (sectionId === 'dashboard') {
+  if (targetSection === 'dashboard') {
     fetchAdminArticles()
   }
 
-  if (sectionId === 'home') {
+  if (targetSection === 'home') {
     window.scrollTo({ top: 0, behavior: 'smooth' })
     return
   }
-  if (['guestbook', 'quant-lab', 'profile', 'dashboard'].includes(sectionId)) {
+
+  if (isSamePage) {
+    requestAnimationFrame(() => {
+      const target = document.getElementById(targetSection === 'blog' ? 'posts' : targetSection)
+      if (target) {
+        target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      } else {
+        window.scrollTo({ top: 0, behavior: 'smooth' })
+      }
+    })
+  } else {
     window.scrollTo({ top: 0, behavior: 'instant' })
   }
-  requestAnimationFrame(() => {
-    const target = document.getElementById(sectionId)
-    if (target) {
-      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else {
-      window.scrollTo({ top: 0, behavior: 'smooth' })
-    }
-  })
 }
 
 
@@ -1204,8 +1217,8 @@ onUnmounted(() => {
         @open-ai-assistant="openAIAssistant"
       />
 
-      <!-- Global sidebar (hover from left edge) - only on home, posts, about, and article detail -->
-      <SidebarNav v-if="currentPage === 'home' || currentPage === 'posts' || isArticleDetailOpen" :articles="allArticles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
+      <!-- Global sidebar belongs to the Blog reading system, not the Portfolio landing page. -->
+      <SidebarNav v-if="currentPage === 'blog' || isArticleDetailOpen" :articles="allArticles" :categories="categories" @navigate="navigateToSection" @open-article="openArticleDetail" @filter-category="handleFilterCategory" />
 
       <Transition name="page-fade" mode="out-in">
         <ArticleDetailView
@@ -1225,7 +1238,7 @@ onUnmounted(() => {
         />
         <div v-else-if="!showPublishModal" class="main-content-wrapper">
           <HomePage
-            v-if="currentPage === 'home' || currentPage === 'posts'"
+            v-if="currentPage === 'home'"
             :categories="categories"
             :tags="tags"
             :active-category-id="activeCategoryId"
@@ -1242,7 +1255,35 @@ onUnmounted(() => {
             @open-article="openArticleDetail"
             @edit-article="openPublishModal"
             @delete-article="deleteArticle"
-            @scroll-to-posts="navigateToSection('posts')"
+            @scroll-to-posts="navigateToSection('blog')"
+
+            @toggle-featured="showFeaturedOnly = $event"
+            @open-assessment="openAssessment"
+            @open-donate="openDonate"
+            @navigate="navigateToSection"
+            @load-more="loadMoreArticles"
+            @open-search="openSearchWithQuery"
+          />
+
+          <BlogHomePage
+            v-if="currentPage === 'blog'"
+            :categories="categories"
+            :tags="tags"
+            :active-category-id="activeCategoryId"
+            :articles="articles"
+            :filtered-articles="filteredArticles"
+            :total-articles="totalArticles"
+            :article-error="articleError"
+            :is-loading-articles="isLoadingArticles"
+            :is-loading-more="isLoadingMore"
+            :show-actions="showActionsOnPage"
+            :show-featured-only="showFeaturedOnly"
+            :login-user="loginUser"
+            @toggle-category="toggleCategory"
+            @open-article="openArticleDetail"
+            @edit-article="openPublishModal"
+            @delete-article="deleteArticle"
+            @scroll-to-posts="navigateToSection('blog')"
 
             @toggle-featured="showFeaturedOnly = $event"
             @open-assessment="openAssessment"
@@ -1340,9 +1381,11 @@ onUnmounted(() => {
             :is-logged-in="isLoggedIn"
             @open-login="openLoginModal"
           />
-
-          <ContactSection v-if="currentPage === 'home'" />
-          <AppFooter v-if="['home', 'posts', 'guestbook', 'quant-lab'].includes(currentPage)" />
+          <DownloadsPage
+            v-if="currentPage === 'downloads'"
+          />
+          <ContactSection v-if="false" />
+          <AppFooter v-if="['home', 'blog', 'guestbook', 'quant-lab', 'downloads'].includes(currentPage)" />
         </div>
       </Transition>
 

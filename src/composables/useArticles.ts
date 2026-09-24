@@ -111,7 +111,7 @@ export function useArticles() {
   }
 
   async function loadArticleFromRoute(): Promise<boolean> {
-    if (route.name !== 'post-detail') return false
+    if (route.name !== 'post-detail' && route.name !== 'blog-post-detail') return false
     const articleSlug = route.params.articleSlug
     const slugStr = Array.isArray(articleSlug) ? articleSlug[0] : articleSlug
     
@@ -149,8 +149,8 @@ export function useArticles() {
   function closeArticleDetail(): void {
     selectedArticle.value = null
     selectedArticlePreview.value = null
-    if (route.name === 'post-detail') {
-      router.push({ name: 'posts' })
+    if (route.name === 'post-detail' || route.name === 'blog-post-detail') {
+      router.push({ name: 'blog' })
     }
   }
 

@@ -57,7 +57,7 @@ export function slugifyTitle(title: string | null | undefined): string {
 export function buildArticleUrl(id: number, title: string | null | undefined): string {
   const encodedId = encodeId(id)
   const slug = slugifyTitle(title)
-  return slug ? `/post/${encodedId}-${slug}` : `/post/${encodedId}`
+  return slug ? `/blog/post/${encodedId}-${slug}` : `/blog/post/${encodedId}`
 }
 
 export function parseArticleIdFromSlug(articleSlug: string | number | null | undefined): number | null {

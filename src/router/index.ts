@@ -1,4 +1,3 @@
-// src/router/index.ts
 import { createRouter, createWebHistory } from 'vue-router'
 import App from '../App.vue'
 import Assessment from '../views/Assessment.vue'
@@ -15,17 +14,30 @@ const router = createRouter({
       meta: { page: 'home' }
     },
     {
-      path: '/posts',
-      name: 'posts',
+      path: '/blog',
+      name: 'blog',
       component: App,
-      meta: { page: 'posts' }
+      meta: { page: 'blog' }
     },
-
     {
-      path: '/guestbook',
-      name: 'guestbook',
+      path: '/blog/guestbook',
+      name: 'blog-guestbook',
       component: App,
       meta: { page: 'guestbook' }
+    },
+    {
+      path: '/downloads',
+      name: 'downloads',
+      component: App,
+      meta: { page: 'downloads' }
+    },
+    {
+      path: '/posts',
+      redirect: '/blog'
+    },
+    {
+      path: '/guestbook',
+      redirect: '/blog/guestbook'
     },
     {
       path: '/profile',
@@ -162,6 +174,12 @@ const router = createRouter({
       meta: { page: 'post-detail' }
     },
     {
+      path: '/blog/post/:articleSlug',
+      name: 'blog-post-detail',
+      component: App,
+      meta: { page: 'post-detail' }
+    },
+    {
       path: '/quant-lab',
       name: 'quant-lab',
       component: App,
@@ -206,7 +224,6 @@ router.beforeEach((to, _from, next) => {
     return next({ path: '/' })
   }
 
-  // 校验指定角色
   if (requiredRole && !hasRole(requiredRole)) {
     return next({ path: '/' })
   }
@@ -214,7 +231,6 @@ router.beforeEach((to, _from, next) => {
     return next({ path: '/' })
   }
 
-  // 校验指定权限编码
   if (requiredPermission && !hasPermission(requiredPermission)) {
     return next({ path: '/' })
   }

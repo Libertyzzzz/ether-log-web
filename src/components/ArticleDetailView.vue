@@ -833,56 +833,78 @@ onMounted(() => {
   pointer-events: none;
 }
 
-/* ── 响应式 ── */
+/* ════════════════════════════════
+   iOS 移动端响应式 - 阅读优先
+   ════════════════════════════════ */
 @media (max-width: 768px) {
-  .article-layout { padding-top: 4.25rem; }
-  .article-layout-inner { padding: 0 0.75rem; }
-  /* 侧边栏移动端隐藏 */
-  .article-sidebar {
-    display: none;
-  }
-  .article-main { padding: 1.25rem 0 3.5rem; }
+  .article-layout { padding-top: 4rem; }
+  .article-layout-inner { padding: 0 1rem; }
 
-  /* 面包屑 */
-  .article-neighbors { grid-template-columns: 1fr; }
+  .article-sidebar { display: none; }
+  .article-main { padding: 1.25rem 0 4rem; }
+
+  /* ── 表格：允许水平滚动 ── */
+  :deep(.markdown-body) table {
+    display: block;
+    overflow-x: auto;
+    white-space: nowrap;
+    -webkit-overflow-scrolling: touch;
+    border-radius: 10px;
+  }
+  :deep(.markdown-body) table th,
+  :deep(.markdown-body) table td {
+    min-width: 60px;
+    padding: 0.5rem 0.65rem;
+    font-size: 0.85rem;
+  }
+
+  /* ── 面包屑：紧凑但可点击 ── */
+  .article-neighbors { grid-template-columns: 1fr; gap: 0.65rem; }
   .neighbor-card.placeholder { display: none; }
+  .neighbor-card { min-height: 5rem; padding: 0.85rem; border-radius: 12px; }
   .breadcrumb-site,
   .breadcrumb-sep { display: none; }
   .breadcrumb-back span { display: none; }
-  .breadcrumb-back { padding: 0.3rem; min-width: 2.25rem; }
-  .breadcrumb-actions { gap: 0.25rem; }
+  .breadcrumb-back { padding: 0.35rem; min-width: 2.5rem; min-height: 2.5rem; border-radius: 10px; }
+  .breadcrumb-actions { gap: 0.35rem; }
   .breadcrumb-action-btn span { display: none; }
-  .breadcrumb-action-btn { padding: 0.3rem; min-width: 2.25rem; }
+  .breadcrumb-action-btn { padding: 0.35rem; min-width: 2.5rem; min-height: 2.5rem; border-radius: 10px; }
 
-  /* 文章标题区：紧凑 */
-  .article-main-title { font-size: 1.35rem; margin-bottom: 0.5rem; line-height: 1.2; }
-  .article-main-subtitle { font-size: 0.85rem; margin-bottom: 0.75rem; line-height: 1.55; }
-  .article-main-meta { flex-wrap: wrap; gap: 0.4rem; margin-bottom: 0.6rem; }
-  .article-main-category { font-size: 0.62rem; letter-spacing: 0.12em; }
-  .article-main-date, .article-main-views { font-size: 0.72rem; }
-  .article-main-date::before, .article-main-views::before { margin-right: 0.4rem; }
-  .article-main-tags { gap: 0.25rem; }
-  .article-main-tag { padding: 0.15rem 0.5rem; font-size: 0.68rem; }
+  /* ── 文章标题区：iOS 舒适阅读尺寸 ── */
+  .article-main-title { font-size: 1.55rem; margin-bottom: 0.6rem; line-height: 1.2; }
+  .article-main-subtitle { font-size: 0.95rem; margin-bottom: 0.85rem; line-height: 1.55; color: #64748b; }
+  .article-main-meta { flex-wrap: wrap; gap: 0.5rem; margin-bottom: 0.75rem; }
+  .article-main-category { font-size: 0.7rem; letter-spacing: 0.1em; padding: 0.2rem 0.6rem; }
+  .article-main-date, .article-main-views { font-size: 0.8rem; }
+  .article-main-tags { gap: 0.35rem; }
+  .article-main-tag { padding: 0.22rem 0.6rem; font-size: 0.74rem; border-radius: 8px; }
 
-  /* 分割线 */
-  .article-divider { margin: 1.25rem 0 1.5rem; }
+  /* ── 分割线 ── */
+  .article-divider { margin: 1.5rem 0 1.75rem; }
 
-  /* 骨架屏 */
-  .loading-skeleton.title { height: 1.8rem; width: 90%; margin-bottom: 0.75rem; }
-  .loading-skeleton.subtitle { height: 1rem; width: 75%; margin-bottom: 0.75rem; }
-  .loading-skeleton.meta { height: 0.85rem; width: 45%; margin-bottom: 0.4rem; }
-  .loading-skeleton.tags { height: 0.85rem; width: 35%; margin-bottom: 1.5rem; }
+  /* ── 正文：iOS 正文字号 ── */
+  .article-body {
+    font-size: 1rem;
+    line-height: 1.75;
+  }
+
+  /* ── 骨架屏 ── */
+  .loading-skeleton.title { height: 2rem; width: 90%; margin-bottom: 0.85rem; }
+  .loading-skeleton.subtitle { height: 1.1rem; width: 75%; margin-bottom: 0.85rem; }
+  .loading-skeleton.meta { height: 0.95rem; width: 45%; margin-bottom: 0.5rem; }
+  .loading-skeleton.tags { height: 0.95rem; width: 35%; margin-bottom: 1.75rem; }
 }
 
-/* 超窄屏文章优化 */
 @media (max-width: 480px) {
-  .article-layout-inner { padding: 0 0.65rem; }
-  .article-main { padding: 1rem 0 3rem; }
-  .article-main-title { font-size: 1.2rem; line-height: 1.25; }
-  .article-main-subtitle { font-size: 0.82rem; }
-  .article-main-meta { gap: 0.3rem; }
-  .article-main-category { font-size: 0.6rem; }
-  .article-main-date, .article-main-views { font-size: 0.7rem; }
+  .article-layout-inner { padding: 0 0.85rem; }
+  .article-layout { padding-top: 3.75rem; }
+  .article-main { padding: 1rem 0 3.5rem; }
+  .article-main-title { font-size: 1.4rem; line-height: 1.22; }
+  .article-main-subtitle { font-size: 0.9rem; }
+  .article-main-meta { gap: 0.4rem; }
+  .article-main-category { font-size: 0.65rem; }
+  .article-main-date, .article-main-views { font-size: 0.76rem; }
+  .article-body { font-size: 0.95rem; }
 }
 
 /* ─ 表格样式（与编辑器保持一致）── */

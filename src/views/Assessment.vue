@@ -10,6 +10,9 @@ import { toast } from '../utils/toast'
 import QRCode from 'qrcode'
 import { uploadImage, fetchAssessmentShare, evaluateAssessment } from '../api'
 import { useAssessmentChat } from '../composables/useAssessmentChat'
+import AppNavbar from '../components/AppNavbar.vue'
+import { loginUser } from '../composables/useAuth'
+import { hasAuthToken } from '../api'
 
 const route = useRoute()
 
@@ -1119,34 +1122,59 @@ onUnmounted(() => {
   window.removeEventListener('resize', resizeChart)
   chart?.dispose()
 })
+
+const navShowUserMenu = ref(false)
+const navIsDark = ref(false)
+
+function handleNavigate(sectionId: string) {
+  const target =
+    sectionId === 'posts' ? 'blog'
+    : sectionId === 'assessment' ? 'assessment-home'
+    : sectionId === 'guestbook' ? 'blog-guestbook'
+    : sectionId
+  router.push({ name: target })
+}
+
+function handleNavOpenLogin() {
+  router.push({ name: 'home' })
+}
+
+function handleNavOpenProfile() { router.push({ name: 'profile' }) }
+function handleNavOpenDashboard() { router.push({ name: 'dashboard' }) }
+function handleNavOpenQuantLab() { router.push({ name: 'quant-lab' }) }
+function handleNavOpenSystem() { router.push({ name: 'system-user' }) }
+function handleNavOpenSearch() {}
+function handleNavOpenAiAssistant() {}
+function handleNavLogout() {
+  localStorage.removeItem('authToken')
+  location.reload()
+}
+function handleNavToggleDark() { navIsDark.value = !navIsDark.value }
+function handleNavCloseUserMenu() { navShowUserMenu.value = false }
+function handleNavToggleStatus() {}
 </script>
 
 <template>
   <main class="assessment-root" :class="{ 'is-chat-root': step === 'chat' }">
-    <nav v-if="step !== 'chat'" class="assessment-nav animate-fade-in">
-      <div class="nav-left">
-        <button class="brand-button" type="button" @click="router.push({ name: 'assessment-home' })">
-          <div class="brand-mark-wrapper">
-            <span class="brand-mark">V</span>
-            <div class="mark-glow"></div>
-          </div>
-          <div class="brand-text">
-            <span class="brand-main">Aether Valuation</span>
-            <span class="brand-sub">人间估值</span>
-          </div>
-        </button>
-      </div>
-      <div class="nav-right">
-        <div class="status-indicator">
-          <span class="status-dot"></span>
-          <span class="status-text">SYSTEM ACTIVE</span>
-        </div>
-        <div class="nav-divider"></div>
-        <div class="nav-meta">
-          <span>PLAYFUL DIAGNOSTIC / v2.5</span>
-        </div>
-      </div>
-    </nav>
+    <AppNavbar
+      v-if="step !== 'chat'"
+      :is-logged-in="hasAuthToken()"
+      :login-user="loginUser"
+      :show-user-menu="navShowUserMenu"
+      :is-dark="navIsDark"
+      @navigate="handleNavigate"
+      @open-profile="handleNavOpenProfile"
+      @open-dashboard="handleNavOpenDashboard"
+      @open-system="handleNavOpenSystem"
+      @open-quant-lab="handleNavOpenQuantLab"
+      @open-login="handleNavOpenLogin"
+      @toggle-status="handleNavToggleStatus"
+      @open-search="handleNavOpenSearch"
+      @logout="handleNavLogout"
+      @toggle-dark="handleNavToggleDark"
+      @close-user-menu="handleNavCloseUserMenu"
+      @open-ai-assistant="handleNavOpenAiAssistant"
+    />
 
     <section v-if="step === 'intro'" class="intro-stage animate-fade-in">
       <!-- 文案放在左侧 -->
@@ -2003,11 +2031,7 @@ onUnmounted(() => {
 
 .assessment-root {
   min-height: 100vh;
-  background:
-    linear-gradient(180deg, rgba(248, 250, 252, 0.96) 0%, rgba(243, 246, 251, 0.94) 48%, rgba(238, 244, 248, 0.96) 100%),
-    linear-gradient(rgba(148, 163, 184, 0.12) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(148, 163, 184, 0.1) 1px, transparent 1px);
-  background-size: auto, 42px 42px, 42px 42px;
+  background: #ffffff;
   color: #111827;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
   padding: 5.5rem 20px 20px;
@@ -2038,6 +2062,30 @@ onUnmounted(() => {
   align-items: center;
   justify-content: space-between;
   
+}
+
+.nav-home-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.4rem 0.9rem;
+  background: rgba(15, 23, 42, 0.06);
+  color: #475569;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 8px;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 700;
+  letter-spacing: 0.03em;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  text-transform: uppercase;
+}
+
+.nav-home-btn:hover {
+  background: rgba(15, 23, 42, 0.1);
+  color: #0f172a;
+  transform: translateY(-1px);
 }
 
 .brand-button,

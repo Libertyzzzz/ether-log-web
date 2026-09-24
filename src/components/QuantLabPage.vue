@@ -428,11 +428,133 @@ onUnmounted(() => {
 <style scoped>
 .quant-page {
   min-height: 100vh;
-  padding: 6.5rem 0 3.5rem;
-  background:
-    radial-gradient(circle at 12% 4%, rgba(37,99,235,0.16), transparent 30rem),
-    radial-gradient(circle at 92% 2%, rgba(240,171,252,0.14), transparent 26rem),
-    linear-gradient(180deg, #edf3ff 0%, #f8fbff 48%, #eef3fb 100%);
+  padding: 5.5rem 0 3.5rem;
+  background: #ffffff;
+}
+
+/* QuantLab 专属 Header */
+.ql-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(15, 23, 42, 0.92);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  box-shadow: 0 1px 0 rgba(37, 99, 235, 0.15);
+}
+
+.ql-header-inner {
+  max-width: var(--nav-content-max-width);
+  margin: 0 auto;
+  height: 56px;
+  padding: 0 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.ql-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #f1f5f9;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.ql-logo:hover { opacity: 0.8; }
+
+.ql-logo-icon {
+  font-size: 1.25rem;
+  line-height: 1;
+}
+
+.ql-logo-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  color: #f1f5f9;
+}
+
+.ql-badge {
+  display: inline-block;
+  padding: 0.15rem 0.5rem;
+  background: rgba(37, 99, 235, 0.25);
+  color: #93c5fd;
+  border: 1px solid rgba(37, 99, 235, 0.35);
+  border-radius: 4px;
+  font-size: 0.6rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ql-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.ql-nav > button {
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 0;
+  color: rgba(148, 163, 184, 0.85);
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.ql-nav > button:hover {
+  background: rgba(255, 255, 255, 0.06);
+  color: #f1f5f9;
+}
+
+.ql-nav > button.active {
+  background: rgba(37, 99, 235, 0.2);
+  color: #93c5fd;
+}
+
+.ql-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.ql-login-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.45rem 1rem;
+  background: rgba(37, 99, 235, 0.85);
+  color: #ffffff;
+  border: 0;
+  border-radius: 6px;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.ql-login-btn:hover {
+  background: #2563eb;
+  transform: translateY(-1px);
+}
+
+@media (max-width: 768px) {
+  .ql-header-inner { padding: 0 1rem; height: 52px; }
+  .ql-nav > button { font-size: 0.8rem; padding: 0.35rem 0.7rem; }
 }
 .quant-inner { max-width: var(--nav-content-max-width); margin: 0 auto; padding: 0 0.9rem; display: grid; gap: 1.25rem; }
 .quant-hero {
@@ -594,17 +716,71 @@ onUnmounted(() => {
 .side-buy { background: rgba(16,185,129,0.1); color: #059669; }
 .side-sell { background: rgba(239,68,68,0.1); color: #dc2626; }
 
+/* ════════════════════════════════
+   iOS 移动端响应式
+   ════════════════════════════════ */
 @media (max-width: 900px) {
   .quant-overview { grid-template-columns: repeat(2, 1fr); }
   .quant-workbench { grid-template-columns: 1fr; }
   .summary-grid { grid-template-columns: repeat(2, 1fr); }
 }
+
 @media (max-width: 640px) {
-  .quant-page { padding: 5.75rem 0 2.5rem; }
-  .quant-hero { flex-direction: column; padding: 1.6rem; border-radius: 1.25rem; }
-  .quant-overview, .config-grid { grid-template-columns: 1fr; }
-  .config-actions, .chart-toolbar { flex-direction: column; align-items: stretch; }
-  .chart-tabs { display: grid; grid-template-columns: 1fr 1fr; }
+  .quant-page { padding: 5rem 0 3rem; }
+  .quant-inner { padding: 0 0.75rem; gap: 1rem; }
+
+  .quant-hero {
+    flex-direction: column;
+    padding: 1.5rem;
+    border-radius: 14px;
+    min-height: auto;
+    gap: 0.75rem;
+  }
+  .quant-hero h1 {
+    font-size: 1.8rem;
+    margin: 0.5rem 0;
+  }
+  .quant-hero p {
+    font-size: 0.88rem;
+    line-height: 1.6;
+  }
+  .quant-kicker { font-size: 0.7rem; }
+  .quant-status { font-size: 0.7rem; padding: 0.45rem 0.75rem; }
+
+  .quant-overview { grid-template-columns: 1fr; gap: 0.65rem; }
+  .quant-metric {
+    min-height: auto;
+    padding: 1rem 1.1rem;
+    border-radius: 14px;
+  }
+  .quant-metric strong { font-size: 1.5rem; }
+  .quant-metric span { font-size: 0.74rem; }
+
+  .quant-panel { border-radius: 14px; }
+  .config-panel, .result-panel, .chart-panel, .trades-panel { padding: 1rem 1.1rem; }
+  .config-grid { grid-template-columns: 1fr; gap: 0.65rem; }
+  .config-grid input, .config-grid select { min-height: 2.75rem; font-size: 0.9rem; border-radius: 10px; }
+  .config-grid label { font-size: 0.74rem; }
+
+  .config-actions, .chart-toolbar { flex-direction: column; align-items: stretch; gap: 0.5rem; }
+  .chart-tabs { display: grid; grid-template-columns: 1fr 1fr; gap: 0.45rem; }
+  .chart-tabs button, .strategy-tabs button {
+    min-height: 2.5rem;
+    font-size: 0.8rem;
+    border-radius: 10px;
+  }
+  .strategy-desc { font-size: 0.84rem; min-height: auto; }
+  .panel-title h2 { font-size: 0.95rem; }
+  .locked-callout { padding: 0.85rem; border-radius: 12px; }
+  .locked-callout strong { font-size: 0.85rem; }
+  .locked-callout button { min-height: 2.4rem; font-size: 0.8rem; }
 }
 
+@media (max-width: 420px) {
+  .quant-page { padding: 4.5rem 0 2.5rem; }
+  .quant-inner { padding: 0 0.5rem; }
+  .quant-hero { padding: 1.2rem; border-radius: 12px; }
+  .quant-hero h1 { font-size: 1.55rem; }
+  .quant-hero p { font-size: 0.82rem; }
+}
 </style>

@@ -537,7 +537,7 @@ export function useAIAssistant() {
     let key: AIAssistantContextKey = 'generic'
 
     if (path === '/' || path.startsWith('/#')) key = 'home'
-    else if (path.includes('/posts/') && !path.includes('/publish')) key = 'post-detail'
+    else if ((path.includes('/blog/post/') || path.includes('/blog/posts/')) && !path.includes('/publish')) key = 'post-detail'
     else if (path.includes('/post') || path.includes('/category') || path.includes('/tag'))
       key = 'post-list'
     else if (path.includes('/publish')) key = 'publish'

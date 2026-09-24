@@ -42,7 +42,7 @@ const allowSidebar = computed(() => {
 
 const navItems = [
   { id: 'home', label: '首页', icon: Home, filled: true },
-  { id: 'posts', label: '文章', icon: FileText, filled: true },
+  { id: 'blog', label: '文章', icon: FileText, filled: true },
 ]
 
 const directories = computed<ArticleDirectory[]>(() => {

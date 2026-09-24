@@ -253,8 +253,30 @@ async function submitReply(): Promise<boolean> {
 
 .comment-error { color: #ef4444; font-size: 13px; margin-top: 8px; }
 
+/* ════════════════════════════════
+   iOS 移动端评论项
+   ════════════════════════════════ */
 @media (max-width: 720px) {
-  .anonymous-form { grid-template-columns: 1fr; }
-  .comment-children-wrapper { margin-left: 8px; padding-left: 8px; }
+  .anonymous-form { grid-template-columns: 1fr; gap: 0.5rem; }
+  .anonymous-form input {
+    min-height: 44px;
+    padding: 0.55rem 0.75rem;
+    font-size: 0.95rem;
+    border-radius: 10px;
+  }
+  .comment-children-wrapper { margin-left: 0.5rem; padding-left: 0.5rem; }
+  .composer-actions button {
+    min-height: 44px;
+    padding: 0.55rem 1.1rem;
+    font-size: 0.9rem;
+    border-radius: 12px;
+    font-weight: 600;
+  }
+  .composer-expanded textarea {
+    min-height: 100px;
+    padding: 0.75rem;
+    font-size: 0.95rem;
+    border-radius: 12px;
+  }
 }
 </style>

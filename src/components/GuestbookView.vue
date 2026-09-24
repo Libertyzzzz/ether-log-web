@@ -14,8 +14,6 @@ defineProps<{
   <div class="gb-page">
     <div class="gb-shell">
       <div class="gb-container">
-        <!-- header removed per request; comments start immediately -->
-
         <!-- content area: comments + sidebar -->
         <main class="gb-main-card">
           <section class="gb-comments-area">
@@ -45,7 +43,111 @@ defineProps<{
 </template>
 
 <style scoped>
-.gb-page { min-height: 100vh; background: linear-gradient(180deg, #f3f6ff 0%, #ffffff 40%); padding-top: 5.5rem; }
+/* Guestbook Header */
+.gb-header {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 1000;
+  background: rgba(255, 255, 255, 0.75);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(226, 232, 240, 0.6);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.gb-header-inner {
+  max-width: var(--nav-content-max-width);
+  margin: 0 auto;
+  height: 56px;
+  padding: 0 1.25rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.gb-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0;
+  background: transparent;
+  border: 0;
+  color: #0f172a;
+  font: inherit;
+  cursor: pointer;
+  transition: opacity 0.2s ease;
+}
+
+.gb-logo:hover {
+  opacity: 0.7;
+}
+
+.gb-logo-icon {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.gb-logo-text {
+  font-size: 0.95rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.gb-nav {
+  display: flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.gb-nav > button {
+  padding: 0.4rem 0.9rem;
+  background: transparent;
+  border: 0;
+  color: #64748b;
+  font: inherit;
+  font-size: 0.85rem;
+  font-weight: 600;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease, color 0.2s ease;
+}
+
+.gb-nav > button:hover {
+  background: rgba(0, 0, 0, 0.04);
+  color: #0f172a;
+}
+
+.gb-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+}
+
+.gb-action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  background: rgba(255, 255, 255, 0.5);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 8px;
+  color: #475569;
+  cursor: pointer;
+  transition: background 0.2s ease, border-color 0.2s ease, color 0.2s ease;
+}
+
+.gb-action-btn:hover {
+  background: rgba(255, 255, 255, 0.8);
+  border-color: rgba(0, 0, 0, 0.12);
+  color: #0f172a;
+}
+
+.gb-page { min-height: 100vh; background: #ffffff; padding-top: 5.5rem; }
 
 .gb-shell { display: flex; justify-content: center; padding: 1.5rem 0; }
 .gb-container { width: 100%; max-width: var(--nav-content-max-width); margin: 0 auto; padding: 0 0.9rem; }
@@ -81,17 +183,41 @@ defineProps<{
 
 @keyframes pulse { 0%,100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.6; transform: scale(1.03); } }
 
+/* ════════════════════════════════
+   iOS 移动端响应式
+   ════════════════════════════════ */
 @media (max-width: 980px) {
   .gb-main-card { grid-template-columns: 1fr; }
   .gb-hero-right { display: none; }
 }
 
 @media (max-width: 768px) {
-  .gb-page { padding-top: 4.5rem; }
-  .gb-shell { padding: 1rem 0.9rem; }
+  .gb-page { padding-top: 4rem; }
+  .gb-shell { padding: 1rem 0.75rem; }
+  .gb-container { padding: 0; }
+  .gb-title { font-size: 1.55rem; margin-bottom: 0.35rem; }
+  .gb-subtitle { font-size: 0.95rem; line-height: 1.55; }
+  .gb-stats { flex-wrap: wrap; gap: 0.75rem; }
+  .gb-stat-item { font-size: 0.82rem; }
+  .gb-main-card { margin-top: 0.5rem; gap: 1rem; }
+  .gb-sidebar-card { margin-top: 0; gap: 0.75rem; }
+  .gb-sidebar-card > .gb-card:first-child { margin-top: 0; min-height: auto; }
+  .gb-card { border-radius: 14px; padding: 1rem 1.1rem; }
+  .gb-card-title { font-size: 0.9rem; }
+  .gb-rules li { font-size: 0.82rem; }
+  .gb-card-text { font-size: 0.85rem; }
+  .gb-action-btn {
+    width: 40px;
+    height: 40px;
+    border-radius: 12px;
+  }
+}
+
+@media (max-width: 480px) {
+  .gb-page { padding-top: 3.6rem; }
+  .gb-shell { padding: 0.75rem 0.5rem; }
   .gb-title { font-size: 1.4rem; }
   .gb-subtitle { font-size: 0.9rem; }
-  .gb-stats { flex-wrap: wrap; gap: 0.75rem; }
 }
 
 </style>
