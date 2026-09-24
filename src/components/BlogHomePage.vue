@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Lightbulb, Sparkles, Star, Coffee, Clock, Send, FlaskConical, Bot, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
+import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Sparkles, Star, Coffee, Clock, Send, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
 import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
 import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
