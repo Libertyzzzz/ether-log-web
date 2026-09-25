@@ -99,10 +99,6 @@ function setFilter(val: string) {
   }, 200)
 }
 
-function formatDate(dateStr: string) {
-  return dateStr ? dateStr.slice(0, 10) : ''
-}
-
 function setupReveal() {
   if (typeof IntersectionObserver === 'undefined' || !portfolioRoot.value) return
   revealObserver?.disconnect()
