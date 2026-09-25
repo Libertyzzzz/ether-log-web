@@ -2,50 +2,33 @@
 import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
-  User, LayoutDashboard, LogOut, Search, FlaskConical, Sparkles, House, FileText, Settings,
-  Folder, Tag, MessageSquare, Users, Shield, Key, ChevronDown, Twitter, Instagram, Github
+  User, LogOut, FlaskConical, House, FileText,
+  Folder, Tag, MessageSquare, ChevronDown, Twitter, Instagram, Github,
+  Settings, Users, Shield, KeyRound, Search
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
-import { hasPermission, hasRole, isSuperAdmin } from '../composables/useAuth'
+import { hasPermission, hasRole } from '../composables/useAuth'
 
 const route = useRoute()
 const router = useRouter()
-
-const canAccessQuantLab = computed(() => {
-  return isSuperAdmin.value || hasPermission('quant-lab') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])
-})
-
-const canAccessDashboard = computed(() => {
-  return (
-    isSuperAdmin.value ||
-    hasPermission('dashboard') ||
-    hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR'])
-  )
-})
 
 const canAccessDashboardArticle = computed(() => hasPermission('dashboard:article') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 const canAccessDashboardCategory = computed(() => hasPermission('dashboard:category') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 const canAccessDashboardTag = computed(() => hasPermission('dashboard:tag') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 const canAccessDashboardComment = computed(() => hasPermission('dashboard:comment') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 
-const canAccessProfile = computed(() => {
-  return isSuperAdmin.value || hasPermission('profile') || props.isLoggedIn
-})
+const canAccessDashboard = computed(() =>
+  canAccessDashboardArticle.value || canAccessDashboardCategory.value || canAccessDashboardTag.value || canAccessDashboardComment.value
+)
 
-const canAccessSystem = computed(() => {
-  return (
-    isSuperAdmin.value ||
-    hasPermission('system') ||
-    hasPermission('system:role') ||
-    hasPermission('system:permission') ||
-    hasPermission('system:user') ||
-    hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN'])
-  )
-})
-const canAccessSystemUser = computed(() => isSuperAdmin.value || hasPermission('system:user') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
-const canAccessSystemRole = computed(() => isSuperAdmin.value || hasPermission('system:role') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
-const canAccessSystemPermission = computed(() => isSuperAdmin.value || hasPermission('system:permission') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystemUser = computed(() => hasPermission('system:user') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystemRole = computed(() => hasPermission('system:role') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystemPermission = computed(() => hasPermission('system:permission') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
+const canAccessSystem = computed(() => canAccessSystemUser.value || canAccessSystemRole.value || canAccessSystemPermission.value)
+
+const showAdminEntries = computed(() => isBlogContext.value && props.isLoggedIn)
+const showSystemDropdown = ref(false)
 
 const props = defineProps<{
   isLoggedIn: boolean
@@ -80,6 +63,26 @@ function scrollToTop() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function goTo(page: string) {
+  showSystemDropdown.value = false
+  const routeMap: Record<string, string> = {
+    'profile': '/profile',
+    'dashboard': '/dashboard',
+    'dashboard-article': '/dashboard/article',
+    'dashboard-category': '/dashboard/category',
+    'dashboard-tag': '/dashboard/tag',
+    'dashboard-comment': '/dashboard/comment',
+    'dashboard-media': '/dashboard/media',
+    'dashboard-sensitive-words': '/dashboard/sensitive-words',
+    'system-user': '/system/user',
+    'system-role': '/system/role',
+    'system-permission': '/system/permission',
+    'system': '/system/user',
+  }
+  const path = routeMap[page]
+  if (path) router.push(path)
+}
+
 function scrollToPosts() {
   const el = document.getElementById('posts')
   if (el) {
@@ -89,59 +92,23 @@ function scrollToPosts() {
   }
 }
 const isMobile = ref(false)
-const showSystemDropdown = ref(false)
 const showPortfolioPatterns = ref(false)
 const showPortfolioTemplates = ref(false)
 const userMenuFromTabbar = ref(false)
-const systemDropdownRef = ref<HTMLElement | null>(null)
-let systemCloseTimer: ReturnType<typeof setTimeout> | null = null
 
 function closePortfolioDropdowns() {
   showPortfolioPatterns.value = false
   showPortfolioTemplates.value = false
 }
 
-function clearSystemCloseTimer() {
-  if (systemCloseTimer) {
-    clearTimeout(systemCloseTimer)
-    systemCloseTimer = null
-  }
-}
-
-function toggleSystemDropdown(e?: Event) {
-  if (e) e.stopPropagation()
-  showSystemDropdown.value = !showSystemDropdown.value
-  if (showSystemDropdown.value) {
-    emit('closeUserMenu')
-  }
-}
-function openSystemDropdown(e?: Event) {
-  if (e) e.stopPropagation()
-  if (!isMobile.value) {
-    clearSystemCloseTimer()
-    showSystemDropdown.value = true
-    emit('closeUserMenu')
-  }
-}
-function closeSystemDropdown() { clearSystemCloseTimer(); showSystemDropdown.value = false }
-function handleSystemMouseLeave() {
-  if (!isMobile.value) {
-    clearSystemCloseTimer()
-    systemCloseTimer = setTimeout(() => {
-      closeSystemDropdown()
-    }, 160)
-  }
-}
-
-function handleDocumentClick(e: MouseEvent) {
-  if (systemDropdownRef.value && !systemDropdownRef.value.contains(e.target as Node)) {
-    closeSystemDropdown()
-  }
+function closeAllDropdowns() {
+  closePortfolioDropdowns()
+  showSystemDropdown.value = false
+  emit('closeUserMenu')
 }
 
 const checkMobile = () => {
   isMobile.value = window.innerWidth <= 768
-  if (isMobile.value) closeSystemDropdown()
 }
 
 const contentPageNames = new Set([
@@ -230,7 +197,6 @@ watch(
   () => route.fullPath,
   () => {
     setTimeout(resetNavState, 50)
-    closeSystemDropdown()
   }
 )
 
@@ -238,35 +204,27 @@ watch(isMobile, () => {
   setTimeout(resetNavState, 50)
 })
 
-watch(
-  () => props.showUserMenu,
-  (v) => { if (v) closeSystemDropdown() }
-)
-
 onMounted(() => {
   checkMobile()
   lastScrollY = getScrollY()
   updateScrollDepth(lastScrollY)
   window.addEventListener('resize', checkMobile)
   window.addEventListener('scroll', handleScroll, { passive: true })
-  document.addEventListener('click', handleDocumentClick)
 })
 
 onUnmounted(() => {
   window.removeEventListener('resize', checkMobile)
   window.removeEventListener('scroll', handleScroll)
-  document.removeEventListener('click', handleDocumentClick)
 })
 </script>
 
 <template>
   <div class="nav-shell">
     <nav
-      v-if="!isBlogContext"
       class="portfolio-nav"
       :class="{ 'nav-hidden': !isVisible }"
       :style="{ '--nav-scroll-depth': scrollDepth }"
-      @mouseleave="closePortfolioDropdowns"
+      @mouseleave="closeAllDropdowns"
     >
       <div class="portfolio-nav-inner">
         <button class="portfolio-brand" type="button" @click="$emit('navigate', 'home')">
@@ -301,6 +259,11 @@ onUnmounted(() => {
             @click="$emit('navigate', 'guestbook')"
           >Guestbook</button>
 
+          <button v-if="isBlogContext" class="portfolio-search-btn" type="button" title="搜索" @click="$emit('openSearch')">
+            <Search :size="15" />
+            <span class="portfolio-search-placeholder">搜索文章...</span>
+          </button>
+
           <div
             v-if="isPortfolioHome"
             class="portfolio-dropdown-wrap"
@@ -321,6 +284,7 @@ onUnmounted(() => {
           </div>
 
           <div
+            v-if="!isBlogContext"
             class="portfolio-dropdown-wrap"
             @mouseenter="showPortfolioTemplates = true; showPortfolioPatterns = false"
           >
@@ -340,234 +304,91 @@ onUnmounted(() => {
         </div>
 
         <div class="portfolio-actions">
-          <a class="portfolio-social" href="https://x.com/ether" target="_blank" rel="noopener" title="X">
-            <Twitter :size="16" />
-          </a>
-          <a class="portfolio-social" href="https://instagram.com/ether" target="_blank" rel="noopener" title="Instagram">
-            <Instagram :size="16" />
-          </a>
-          <a class="portfolio-social" href="https://github.com/ether" target="_blank" rel="noopener" title="GitHub">
-            <Github :size="16" />
-          </a>
+          <!-- 博客页面：管理入口（取代社交图标位置） -->
+          <template v-if="showAdminEntries">
+            <button class="portfolio-admin-entry" type="button" @click="goTo('profile')">
+              <User :size="15" />
+              个人主页
+            </button>
+            <button v-if="canAccessDashboard" class="portfolio-admin-entry" type="button" @click="goTo('dashboard')">
+              <FileText :size="15" />
+              数据面板
+            </button>
+            <div v-if="canAccessSystem" class="portfolio-system-wrap" @click.stop>
+              <button
+                class="portfolio-admin-entry has-chevron"
+                type="button"
+                @click="showSystemDropdown = !showSystemDropdown; emit('closeUserMenu')"
+              >
+                <Settings :size="15" />
+                系统管理
+                <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showSystemDropdown }" />
+              </button>
+              <Transition name="dropdown-fade">
+                <div v-if="showSystemDropdown" class="portfolio-system-menu">
+                  <button v-if="canAccessSystemUser" class="portfolio-system-item" type="button" @click="goTo('system-user')">
+                    <Users :size="14" /> 用户管理
+                  </button>
+                  <button v-if="canAccessSystemRole" class="portfolio-system-item" type="button" @click="goTo('system-role')">
+                    <Shield :size="14" /> 角色管理
+                  </button>
+                  <button v-if="canAccessSystemPermission" class="portfolio-system-item" type="button" @click="goTo('system-permission')">
+                    <KeyRound :size="14" /> 权限管理
+                  </button>
+                </div>
+              </Transition>
+            </div>
+          </template>
+
+          <!-- 非博客页面：社交图标 -->
+          <template v-else>
+            <a class="portfolio-social" href="https://x.com/ether" target="_blank" rel="noopener" title="X">
+              <Twitter :size="16" />
+            </a>
+            <a class="portfolio-social" href="https://instagram.com/ether" target="_blank" rel="noopener" title="Instagram">
+              <Instagram :size="16" />
+            </a>
+            <a class="portfolio-social" href="https://github.com/ether" target="_blank" rel="noopener" title="GitHub">
+              <Github :size="16" />
+            </a>
+          </template>
+
           <button class="portfolio-main-action" type="button" @click="$emit('navigate', 'downloads')">
             Download
           </button>
-        </div>
-      </div>
-    </nav>
 
-    <nav
-      v-else
-      class="nav-standard"
-      :class="{ 'nav-hidden': !isVisible }"
-      :style="{ '--nav-scroll-depth': scrollDepth }"
-    >
-      <div class="nav-content">
-      <!-- 1. 左侧：Logo — 始终回 Portfolio 主站 -->
-      <div class="nav-logo" @click="$emit('navigate', 'home')" title="回到 NEXTIFY 主站">
-        <div class="logo-box">E</div>
-        <span class="logo-text">NEXTIFY</span>
-      </div>
-
-      <!-- 2. 中间导航：Blog 页面时 Home=当前页顶部 / Posts=滚到文章区；其他页面 Home=Portfolio / Posts=/blog -->
-      <div class="nav-links">
-        <button
-          type="button"
-          @click="isBlogContext ? scrollToTop() : $emit('navigate', 'home')"
-        >Home</button>
-        <button
-          type="button"
-          @click="isBlogContext ? scrollToPosts() : $emit('navigate', 'blog')"
-        >Posts</button>
-      </div>
-
-      <!-- 搜索作为独立工具位，避免挤压右侧操作按钮 -->
-      <div class="nav-search-slot desktop-only">
-        <button class="nav-search-trigger" type="button" @click="$emit('openSearch')" title="搜索 (⌘K)">
-          <Search :size="16" />
-          <span>Search...</span>
-          <kbd>⌘K</kbd>
-        </button>
-      </div>
-
-      <!-- 3. 右侧：PC 操作按钮 + 状态标签 (始终靠右) -->
-      <div class="nav-right">
-        <button
-          v-if="isLoggedIn"
-          class="nav-ai-toggle desktop-only"
-          type="button"
-          @click.prevent="$emit('openAiAssistant')"
-          title="AI 助手"
-        >
-          <span class="nav-ai-glow"></span>
-          <span class="nav-ai-logo">
-            <span class="nav-ai-logo-inner">✦</span>
-          </span>
-          <span class="nav-ai-label">ETHER</span>
-        </button>
-
-        <div class="nav-actions desktop-only">
-          <div
-            v-if="isLoggedIn && canAccessSystem"
-            class="nav-action-wrapper system-dropdown-wrap"
-            ref="systemDropdownRef"
-            @mouseenter="openSystemDropdown"
-            @mouseleave="handleSystemMouseLeave"
-          >
+          <div class="portfolio-status-wrap">
             <button
-              class="nav-action-button secondary has-dropdown"
-              :class="{ active: showSystemDropdown }"
+              class="portfolio-status-dot"
               type="button"
-              @click.prevent="toggleSystemDropdown"
+              :class="{ logged: isLoggedIn }"
+              :title="isLoggedIn ? `已登录 · ${getLoginUserName(loginUser)}` : '点击登录'"
+              @click="isLoggedIn ? $emit('toggleStatus') : $emit('openLogin')"
             >
-              <Settings :size="12" style="margin-right:4px" />
-              系统管理
-              <ChevronDown :size="12" class="nav-action-chevron" :class="{ 'is-open': showSystemDropdown }" />
+              <span class="portfolio-dot-inner"></span>
             </button>
             <Transition name="dropdown-fade">
-              <div
-                v-if="showSystemDropdown"
-                class="nav-dropdown system-dropdown right-menu"
-                @click.stop
-                @mouseenter="clearSystemCloseTimer"
-                @mouseleave="handleSystemMouseLeave"
-              >
-                <div class="dropdown-submenu-title" style="padding: 0.5rem 0.85rem 0.3rem">系统管理</div>
-                <div v-if="canAccessSystemUser" style="padding:0 0.4rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-user' })">
-                    <Users :size="13" /> 用户管理
-                  </button>
+              <div v-if="isLoggedIn && showUserMenu && !isMobile" class="portfolio-user-menu" @click.stop>
+                <div class="dropdown-header">
+                  <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
+                  <div class="dropdown-user-info">
+                    <strong>{{ getLoginUserName(loginUser) }}</strong>
+                    <span>{{ loginUser.email || 'Admin' }}</span>
+                  </div>
                 </div>
-                <div v-if="canAccessSystemRole" style="padding:0 0.4rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-role' })">
-                    <Shield :size="13" /> 角色管理
-                  </button>
-                </div>
-                <div v-if="canAccessSystemPermission" style="padding:0 0.4rem 0.3rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-permission' })">
-                    <Key :size="13" /> 权限管理
-                  </button>
-                </div>
-              </div>
-            </Transition>
-          </div>
-          <button v-if="isLoggedIn && canAccessProfile" class="nav-action-button secondary" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
-          <button v-if="isLoggedIn && canAccessDashboard" class="nav-action-button secondary" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
-        </div>
-
-        <!-- 移动端：AI 助手图标 -->
-        <button
-          class="nav-icon-btn nav-icon-ai mobile-only"
-          type="button"
-          @click.prevent="$emit('openAiAssistant')"
-          title="AI 助手"
-        >
-          <Sparkles :size="16" />
-        </button>
-
-        <!-- 移动端：搜索图标按钮 -->
-        <button
-          class="nav-icon-btn mobile-only"
-          type="button"
-          @click.prevent="$emit('openSearch')"
-          title="搜索"
-        >
-          <Search :size="18" />
-        </button>
-
-        <div v-if="isLoggedIn && (canAccessSystem || canAccessProfile || canAccessDashboard)" class="nav-mobile-tools mobile-only">
-          <div v-if="canAccessSystem" class="nav-action-wrapper system-dropdown-wrap" ref="systemDropdownRef" @mouseleave="handleSystemMouseLeave">
-            <button
-              class="nav-mobile-slot system has-dropdown"
-              :class="{ active: showSystemDropdown }"
-              type="button"
-              @click.prevent="toggleSystemDropdown"
-            >
-              <span class="nav-mobile-slot-label">系统管理</span>
-              <ChevronDown :size="12" class="nav-mobile-slot-chevron" :class="{ 'is-open': showSystemDropdown }" />
-            </button>
-            <Transition name="dropdown-fade">
-              <div v-if="showSystemDropdown" class="nav-dropdown system-dropdown right-menu mobile-system-dropdown" @click.stop>
-                <div class="dropdown-submenu-title" style="padding: 0.5rem 0.85rem 0.3rem">系统管理</div>
-                <div v-if="canAccessSystemUser" style="padding:0 0.4rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-user' })">
-                    <Users :size="13" /> 用户管理
-                  </button>
-                </div>
-                <div v-if="canAccessSystemRole" style="padding:0 0.4rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-role' })">
-                    <Shield :size="13" /> 角色管理
-                  </button>
-                </div>
-                <div v-if="canAccessSystemPermission" style="padding:0 0.4rem 0.3rem">
-                  <button class="dropdown-item sub" type="button" @click="closeSystemDropdown(); router.push({ name: 'system-permission' })">
-                    <Key :size="13" /> 权限管理
-                  </button>
-                </div>
-              </div>
-            </Transition>
-          </div>
-          <button v-if="canAccessProfile" class="nav-mobile-slot" type="button" @click.prevent="$emit('openProfile')">个人主页</button>
-          <button v-if="canAccessDashboard" class="nav-mobile-slot" type="button" @click.prevent="$emit('openDashboard')">数据面板</button>
-        </div>
-
-        <div class="status-badge-wrapper">
-          <!-- PC 端：带文字的 status badge -->
-          <div class="status-badge clickable desktop-only" :class="{ active: showUserMenu }" @click="$emit('toggleStatus')">
-            <div class="dot"></div>
-            <span>{{ isLoggedIn ? 'IN' : 'SYSTEM READY' }}</span>
-          </div>
-          <!-- 移动端：仅小圆点（点击区域放大到 44px）- 登录后隐藏，由底部 My 替代 -->
-          <button
-            v-if="!isLoggedIn"
-            class="status-dot-btn mobile-only"
-            :class="{ active: showUserMenu, logged: isLoggedIn }"
-            type="button"
-            @click.stop="userMenuFromTabbar = false; $emit('toggleStatus')"
-            :title="isLoggedIn ? '账户' : '登录'"
-          >
-            <span class="status-dot-inner"></span>
-          </button>
-
-          <Transition name="dropdown-fade">
-            <div
-              v-if="showUserMenu && !(isMobile && isLoggedIn && userMenuFromTabbar)"
-              class="user-dropdown-menu right-menu"
-              @click.stop
-            >
-              <div v-if="isLoggedIn" class="dropdown-header">
-                <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
-                <div class="dropdown-user-info">
-                  <strong>{{ getLoginUserName(loginUser) }}</strong>
-                  <span>{{ loginUser.email || 'Admin' }}</span>
-                </div>
-              </div>
-              <div class="dropdown-divider" v-if="isLoggedIn"></div>
-
-              <template v-if="isLoggedIn">
-                <template v-if="isMobile">
-                  <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openAiAssistant')"><Sparkles :size="14" /> AI 助手</button>
-                  <button v-if="canAccessQuantLab" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
-                  <div class="dropdown-divider"></div>
-                  <button v-if="canAccessProfile" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
-                  <button v-if="canAccessDashboard" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><LayoutDashboard :size="14" /> 数据面板</button>
-                </template>
-                <div v-if="!isMobile" class="dropdown-submenu-group">
-                  <div class="dropdown-submenu-title">数据面板</div>
-                  <button v-if="canAccessDashboardArticle" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-article' })"><FileText :size="12" /> 文章管理</button>
-                  <button v-if="canAccessDashboardCategory" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-category' })"><Folder :size="12" /> 分类管理</button>
-                  <button v-if="canAccessDashboardTag" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-tag' })"><Tag :size="12" /> 标签管理</button>
-                  <button v-if="canAccessDashboardComment" class="dropdown-item sub" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-comment' })"><MessageSquare :size="12" /> 评论管理</button>
-                </div>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
+                <button v-if="canAccessDashboardArticle || canAccessDashboardCategory || canAccessDashboardTag || canAccessDashboardComment" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><FileText :size="14" /> 数据面板</button>
+                <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
+                <div class="dropdown-divider"></div>
                 <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
-              </template>
-              <button v-else class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openLogin')">登录账户</button>
-            </div>
-          </Transition>
+              </div>
+            </Transition>
+          </div>
         </div>
       </div>
-      </div>
     </nav>
+
 
     <div
       v-if="!isPortfolioHome"
@@ -1390,12 +1211,12 @@ kbd {
 
 .portfolio-links > button,
 .portfolio-dropdown-wrap > button {
-  padding: 0.5rem 0.85rem;
+  padding: 0.5rem 0.65rem;
   background: transparent;
   border: 0;
   color: #111111;
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 0.88rem;
   font-weight: 500;
   letter-spacing: 0.01em;
   cursor: pointer;
@@ -1430,6 +1251,32 @@ kbd {
 
 .portfolio-links > button {
   position: relative;
+}
+
+/* 搜索按钮 */
+.portfolio-search-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.7rem;
+  background: rgba(0, 0, 0, 0.04);
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 999px;
+  color: #94a3b8;
+  font: inherit;
+  font-size: 0.8rem;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.portfolio-search-btn:hover {
+  background: rgba(0, 0, 0, 0.07);
+  border-color: rgba(0, 0, 0, 0.15);
+  color: #475569;
+}
+.portfolio-search-placeholder {
+  font-size: 0.76rem;
 }
 
 .portfolio-chevron {
@@ -1481,7 +1328,7 @@ kbd {
 .portfolio-actions {
   display: flex;
   align-items: center;
-  gap: 0.4rem;
+  gap: 0.3rem;
 }
 
 .portfolio-social {
@@ -1525,6 +1372,138 @@ kbd {
   background: #f5f000;
 }
 
+/* 博客页面管理入口按钮 */
+.portfolio-admin-entry {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+  padding: 0.4rem 0.65rem;
+  background: #ffffff;
+  color: #111827;
+  border: 1px solid #e2e8f0;
+  border-radius: 999px;
+  font: inherit;
+  font-size: 0.76rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  white-space: nowrap;
+}
+.portfolio-admin-entry:hover {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
+}
+.portfolio-admin-entry.has-chevron {
+  padding-right: 0.6rem;
+}
+.portfolio-admin-entry .portfolio-chevron {
+  margin-left: 0.1rem;
+  transition: transform 0.2s ease;
+}
+.portfolio-admin-entry .portfolio-chevron.is-open {
+  transform: rotate(180deg);
+}
+
+/* 系统管理下拉 */
+.portfolio-system-wrap {
+  position: relative;
+}
+.portfolio-system-menu {
+  position: absolute;
+  top: calc(100% + 8px);
+  right: 0;
+  min-width: 150px;
+  padding: 0.4rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  box-shadow: 0 12px 32px rgba(15, 23, 42, 0.12);
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+}
+.portfolio-system-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0.7rem;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: #334155;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  text-align: left;
+}
+.portfolio-system-item:hover {
+  background: #f1f5f9;
+  color: #111827;
+}
+
+/* 半隐藏登录状态图标 */
+.portfolio-status-dot {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  margin-left: 2px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+}
+
+.portfolio-dot-inner {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: #d1d5db;
+  transition: all 0.2s ease;
+}
+
+.portfolio-status-dot:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.portfolio-status-dot:hover .portfolio-dot-inner {
+  width: 10px;
+  height: 10px;
+  background: #111111;
+}
+
+.portfolio-status-dot.logged .portfolio-dot-inner {
+  background: #10b981;
+  box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+}
+
+.portfolio-status-dot.logged:hover .portfolio-dot-inner {
+  background: #059669;
+  box-shadow: 0 0 0 3px rgba(16, 185, 129, 0.2);
+}
+
+.portfolio-status-dot.logged::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 50%;
+  border: 1px solid rgba(16, 185, 129, 0.25);
+  animation: dotPulse 2.4s ease-in-out infinite;
+}
+
+@keyframes dotPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0; transform: scale(1.4); }
+}
+
 @media (max-width: 1024px) {
   .portfolio-dropdown-wrap {
     display: none;
@@ -1540,6 +1519,12 @@ kbd {
     height: 52px;
     padding: 0 0.6rem;
     gap: 0.35rem;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none;
+  }
+  .portfolio-nav-inner::-webkit-scrollbar {
+    display: none;
   }
 
   .portfolio-brand {
@@ -1572,14 +1557,42 @@ kbd {
     border-radius: 8px;
   }
 
+  .portfolio-admin-entry {
+    padding: 0.3rem 0.55rem;
+    font-size: 0.68rem;
+    gap: 0.25rem;
+    flex-shrink: 0;
+    min-height: 28px;
+  }
+  .portfolio-admin-entry.has-chevron {
+    padding-right: 0.4rem;
+  }
+  .portfolio-admin-entry svg:first-child {
+    width: 13px;
+    height: 13px;
+  }
+  .portfolio-admin-entry .portfolio-chevron {
+    width: 10px;
+    height: 10px;
+  }
+  .portfolio-system-menu {
+    right: 0;
+    left: auto;
+    min-width: 130px;
+  }
+
+  .portfolio-actions {
+    flex-shrink: 0;
+  }
+
   .portfolio-links {
     order: initial;
     width: auto;
-    flex: 1 1 auto;
+    flex: 0 0 auto;
     min-width: 0;
     display: flex;
     gap: 0.25rem;
-    overflow-x: auto;
+    overflow: visible;
     -webkit-overflow-scrolling: touch;
     scrollbar-width: none;
     justify-content: flex-start;
