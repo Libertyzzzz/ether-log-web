@@ -2,7 +2,7 @@ import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import axios from 'axios'
 import type { ArticleDetail, ArticleListItem } from '../types/blog'
-import { fetchPublicArticles, fetchArticleDetail } from '../api'
+import { fetchPublicArticles, fetchArticleDetail, fetchTrendingArticles, fetchFeaturedArticles } from '../api'
 import { buildArticleUrl, parseArticleIdFromSlug, slugifyTitle } from '../utils/format'
 
 export function useArticles() {
@@ -10,6 +10,8 @@ export function useArticles() {
   const route = useRoute()
   const articles = ref<ArticleListItem[]>([])
   const allArticles = ref<ArticleListItem[]>([])
+  const trendingArticles = ref<ArticleListItem[]>([])
+  const featuredArticles = ref<ArticleListItem[]>([])
   const totalArticles = ref(0)
   const currentPage = ref(1)
   const pageSize = ref(9)
@@ -58,6 +60,22 @@ export function useArticles() {
   async function loadMoreArticles(): Promise<void> {
     const nextPage = currentPage.value + 1
     await fetchArticles(nextPage, pageSize.value)
+  }
+
+  async function fetchTrending(): Promise<void> {
+    try {
+      trendingArticles.value = await fetchTrendingArticles(6)
+    } catch {
+      trendingArticles.value = []
+    }
+  }
+
+  async function fetchFeatured(): Promise<void> {
+    try {
+      featuredArticles.value = await fetchFeaturedArticles(5, 0)
+    } catch {
+      featuredArticles.value = []
+    }
   }
 
   async function openArticleDetail(article: ArticleListItem): Promise<void> {
@@ -147,6 +165,8 @@ export function useArticles() {
   return {
     articles,
     allArticles,
+    trendingArticles,
+    featuredArticles,
     totalArticles,
     currentPage,
     pageSize,
@@ -158,6 +178,8 @@ export function useArticles() {
     isLoadingArticleDetail,
     fetchArticles,
     fetchAllArticlesForSidebar,
+    fetchTrending,
+    fetchFeatured,
     loadMoreArticles,
     openArticleDetail,
     closeArticleDetail,

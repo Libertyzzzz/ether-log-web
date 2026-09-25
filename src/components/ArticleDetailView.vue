@@ -6,6 +6,7 @@ import { getArticleCategory } from '../utils/article'
 import { getReadingTime } from '../utils/format'
 import { renderMarkdown } from '../utils/markdown'
 import { useAIAssistant } from '../composables/useAIAssistantGlobal'
+import CommentSection from './CommentSection.vue'
 
 const ai = useAIAssistant()
 
@@ -285,6 +286,16 @@ onMounted(() => {
         <div v-else class="article-body article-plain">
           {{ selectedArticle?.content || '文章正文为空。' }}
         </div>
+
+        <!-- 评论区 -->
+        <CommentSection
+          v-if="article.id"
+          :article-id="article.id"
+          :is-logged-in="isLoggedIn ?? false"
+          :login-user="loginUser || {}"
+          :allow-anonymous="true"
+          variant="inline"
+        />
 
         <nav v-if="previousArticle || nextArticle" class="article-neighbors" aria-label="文章前后导航">
           <button

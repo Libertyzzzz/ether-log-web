@@ -312,6 +312,26 @@ export async function fetchPublicArticles(pageNum = 1, pageSize = 9): Promise<{ 
   return { records: [], total: 0 }
 }
 
+export async function fetchTrendingArticles(limit = 6): Promise<ArticleListItem[]> {
+  const response = await axios.get<ResultResponse<ArticleListItem[]>>('/api/articles/trending', {
+    params: { limit },
+  })
+  if (response.data.code === 200) {
+    return (response.data.data || []).map(mapArticleRecord)
+  }
+  return []
+}
+
+export async function fetchFeaturedArticles(limit = 5, offset = 0): Promise<ArticleListItem[]> {
+  const response = await axios.get<ResultResponse<ArticleListItem[]>>('/api/articles/featured', {
+    params: { limit, offset },
+  })
+  if (response.data.code === 200) {
+    return (response.data.data || []).map(mapArticleRecord)
+  }
+  return []
+}
+
 function mapArticleRecord(record: any): ArticleListItem {
   return {
     id: record.id,

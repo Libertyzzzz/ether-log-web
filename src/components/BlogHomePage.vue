@@ -10,6 +10,8 @@ const props = defineProps<{
   activeCategoryId: number | null
   articles: ArticleListItem[]
   filteredArticles: ArticleListItem[]
+  trendingArticles?: ArticleListItem[]
+  featuredArticles?: ArticleListItem[]
   totalArticles: number
   articleError: string
   isLoadingArticles: boolean
@@ -75,13 +77,9 @@ const stockImages = [
   'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&q=80',
 ]
 
-const heroThumbnails = computed(() => props.filteredArticles.slice(0, 5))
+const heroThumbnails = computed(() => props.featuredArticles?.slice(0, 5) ?? [])
 
-const trendingArticles = computed(() => {
-  return [...props.filteredArticles]
-    .sort((a, b) => (b.viewCount || 0) - (a.viewCount || 0))
-    .slice(0, 6)
-})
+const trendingList = computed(() => props.trendingArticles ?? [])
 
 const recentArticles = computed(() => {
   return [...props.filteredArticles]
@@ -90,7 +88,7 @@ const recentArticles = computed(() => {
 })
 
 const featuredCarouselPosts = computed(() => {
-  return props.filteredArticles.slice(1, 7).map((a, i) => ({
+  return (props.featuredArticles?.slice(1, 7) ?? []).map((a, i) => ({
     article: a,
     image: a.coverImg || stockImages[(i + 2) % stockImages.length],
     title: a.title,
@@ -210,7 +208,7 @@ function formatDate(dateStr: string) {
             </div>
             <ol class="bm-trending-list">
               <li
-                v-for="(post, i) in trendingArticles"
+                v-for="(post, i) in trendingList"
                 :key="post.id"
                 class="bm-trending-item"
                 @click="$emit('openArticle', post)"
@@ -418,12 +416,12 @@ function formatDate(dateStr: string) {
             </div>
             <ul class="bm-recent-list">
               <li
-                v-for="post in trendingArticles.slice(0, 5)"
+                v-for="post in trendingList.slice(0, 5)"
                 :key="post.id"
                 class="bm-recent-item"
                 @click="$emit('openArticle', post)"
               >
-                <img class="bm-recent-thumb" :src="post.coverImg || stockImages[trendingArticles.indexOf(post) % stockImages.length]" :alt="post.title" />
+                <img class="bm-recent-thumb" :src="post.coverImg || stockImages[trendingList.indexOf(post) % stockImages.length]" :alt="post.title" />
                 <div class="bm-recent-info">
                   <h4 class="bm-recent-title">{{ post.title }}</h4>
                   <span class="bm-recent-date"><Calendar :size="10" /> {{ formatDate(post.createTime) }}</span>

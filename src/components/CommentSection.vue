@@ -11,6 +11,7 @@ const props = defineProps<{
   isLoggedIn: boolean
   loginUser: Partial<LoginUser>
   allowAnonymous?: boolean
+  variant?: 'card' | 'inline'
 }>()
 const emit = defineEmits<{ (e: 'require-login'): void }>()
 
@@ -146,16 +147,16 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="comment-section">
+  <div :class="['comment-section', `variant-${variant || 'card'}`]">
     <div class="comment-header-line">
-      <h2 class="comment-section-title">留言 ({{ totalComments }})</h2>
+      <h2 class="comment-section-title">{{ variant === 'inline' ? '评论' : '留言' }} ({{ totalComments }})</h2>
       <div v-if="!isLoggedIn" class="comment-login-inline">游客可直接留言</div>
     </div>
 
     <div class="comment-list-container">
       <p v-if="isLoadingComments" class="loading-message">加载评论中...</p>
       <p v-else-if="commentError && !comments.length" class="error-message">{{ commentError }}</p>
-      <p v-else-if="!comments.length" class="no-comments-message">暂无评论，快来发表第一条评论吧！</p>
+      <p v-else-if="!comments.length" class="no-comments-message">{{ variant === 'inline' ? '还没有评论，来抢沙发吧 ☕' : '暂无评论，快来发表第一条评论吧！' }}</p>
       <div v-else class="comment-tree">
         <CommentItemComponent
           v-for="comment in comments"
@@ -165,13 +166,14 @@ onMounted(() => {
           :is-logged-in="isLoggedIn"
           :login-user="loginUser"
           :allow-anonymous="allowAnonymous"
+          :variant="variant || 'card'"
           @comment-posted="handleChildPosted"
         />
       </div>
     </div>
 
     <div class="inline-composer">
-      <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">写下你的留言...</div>
+      <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">{{ variant === 'inline' ? '写下你的评论...' : '写下你的留言...' }}</div>
       <div v-else class="composer-expanded">
         <div v-if="!isLoggedIn && anonymousChecked && anonymousHasCommented === false" class="anonymous-form">
           <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
@@ -289,6 +291,64 @@ onMounted(() => {
     padding: 0.6rem 0.75rem;
     border-radius: 10px;
   }
+}
+
+/* ════════════════════════════════
+   inline 极简内嵌样式（文章详情页）
+   ════════════════════════════════ */
+.variant-inline.comment-section {
+  margin-top: 2.5rem;
+  padding: 0;
+  background: transparent;
+  border-radius: 0;
+  border-top: 1px solid #f1f5f9;
+  padding-top: 2rem;
+}
+
+.variant-inline .comment-header-line {
+  margin-bottom: 1.5rem;
+}
+
+.variant-inline .comment-section-title {
+  font-size: 1.25rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0;
+}
+
+.variant-inline .comment-login-inline {
+  font-size: 0.82rem;
+  color: #94a3b8;
+}
+
+.variant-inline .comment-list-container {
+  margin-bottom: 1.5rem;
+}
+
+.variant-inline .no-comments-message,
+.variant-inline .loading-message {
+  text-align: left;
+  padding: 2rem 0;
+  color: #94a3b8;
+  font-size: 0.9rem;
+}
+
+.variant-inline .inline-composer {
+  margin-top: 0;
+}
+
+.variant-inline .composer-placeholder {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
+  border-radius: 8px;
+  padding: 0.85rem 1rem;
+  font-size: 0.9rem;
+  color: #94a3b8;
+}
+
+.variant-inline .composer-expanded textarea {
+  border-radius: 8px;
+  border-color: #f1f5f9;
 }
 
 </style>

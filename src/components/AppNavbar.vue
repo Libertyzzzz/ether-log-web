@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   User, LogOut, FlaskConical, House, FileText,
   Folder, Tag, MessageSquare, ChevronDown, Twitter, Instagram, Github,
-  Settings, Users, Shield, KeyRound, Search
+  Settings, Users, Shield, KeyRound, Search, Coffee
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
@@ -47,6 +47,7 @@ const emit = defineEmits<{
   toggleStatus: []
   openSearch: []
   openAiAssistant: []
+  openDonate: []
   logout: []
   toggleDark: []
   closeUserMenu: []
@@ -93,12 +94,10 @@ function scrollToPosts() {
 }
 const isMobile = ref(false)
 const showPortfolioPatterns = ref(false)
-const showPortfolioTemplates = ref(false)
 const userMenuFromTabbar = ref(false)
 
 function closePortfolioDropdowns() {
   showPortfolioPatterns.value = false
-  showPortfolioTemplates.value = false
 }
 
 function closeAllDropdowns() {
@@ -267,7 +266,7 @@ onUnmounted(() => {
           <div
             v-if="isPortfolioHome"
             class="portfolio-dropdown-wrap"
-            @mouseenter="showPortfolioPatterns = true; showPortfolioTemplates = false"
+            @mouseenter="showPortfolioPatterns = true"
           >
             <button type="button" class="has-dropdown">
               Patterns
@@ -283,24 +282,15 @@ onUnmounted(() => {
             </Transition>
           </div>
 
-          <div
+          <button
             v-if="!isBlogContext"
-            class="portfolio-dropdown-wrap"
-            @mouseenter="showPortfolioTemplates = true; showPortfolioPatterns = false"
+            type="button"
+            class="portfolio-coffee-btn"
+            title="请我喝杯咖啡"
+            @click="emit('openDonate')"
           >
-            <button type="button" class="has-dropdown">
-              Templates
-              <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showPortfolioTemplates }" />
-            </button>
-            <Transition name="dropdown-fade">
-              <div v-if="showPortfolioTemplates" class="portfolio-dropdown" @click.stop>
-                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'home')">Portfolio Home</button>
-                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'blog')">Posts Home</button>
-                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'assessment')">Aether Valuation</button>
-                <button class="portfolio-dropdown-item" type="button" @click="$emit('navigate', 'quant-lab')">Quant Lab</button>
-              </div>
-            </Transition>
-          </div>
+            <Coffee :size="17" />
+          </button>
         </div>
 
         <div class="portfolio-actions">
@@ -369,6 +359,14 @@ onUnmounted(() => {
             </button>
             <Transition name="dropdown-fade">
               <div v-if="isLoggedIn && showUserMenu && !isMobile" class="portfolio-user-menu portfolio-user-menu-simple" @click.stop>
+                <div class="dropdown-header">
+                  <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
+                  <div class="dropdown-user-info">
+                    <strong>{{ loginUser.nickname || loginUser.username || '用户' }}</strong>
+                    <span>{{ loginUser.username || loginUser.email || '成员' }}</span>
+                  </div>
+                </div>
+                <div class="dropdown-divider"></div>
                 <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
               </div>
             </Transition>
@@ -1267,6 +1265,26 @@ kbd {
   font-size: 0.76rem;
 }
 
+.portfolio-coffee-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.4rem;
+  background: transparent;
+  border: 0;
+  color: #111111;
+  cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.2s ease, color 0.2s ease, transform 0.2s ease;
+  flex-shrink: 0;
+}
+
+.portfolio-coffee-btn:hover {
+  background: rgba(0, 0, 0, 0.06);
+  color: #6F4E37;
+  transform: translateY(-1px);
+}
+
 .portfolio-chevron {
   transition: transform 0.2s ease;
 }
@@ -1501,7 +1519,7 @@ kbd {
   position: absolute;
   top: calc(100% + 0.5rem);
   right: 0;
-  min-width: 8rem;
+  min-width: 12rem;
   background: #ffffff;
   border: 1px solid #e2e8f0;
   border-radius: 0.75rem;

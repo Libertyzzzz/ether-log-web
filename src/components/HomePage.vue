@@ -1,8 +1,7 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, nextTick, ref } from 'vue'
-import { ArrowRight, BookOpen, FlaskConical, MessageSquare, Search, Sparkles } from 'lucide-vue-next'
+import { BookOpen, FlaskConical, MessageSquare, Search, Sparkles } from 'lucide-vue-next'
 import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
-import { getArticleCategory, getArticleReadingTime, getArticleSummary } from '../utils/article'
 
 const props = defineProps<{
   categories: Category[]
@@ -36,11 +35,6 @@ const emit = defineEmits<{
 const portfolioRoot = ref<HTMLElement | null>(null)
 let revealObserver: IntersectionObserver | null = null
 const activeFilter = ref('All')
-
-const selectedWriting = computed(() => {
-  const featured = props.articles.filter((article) => article.isTop === 1)
-  return (featured.length ? featured : props.articles).slice(0, 4)
-})
 
 const works = computed(() => [
   {
@@ -333,41 +327,6 @@ onUnmounted(() => revealObserver?.disconnect())
       </div>
     </section>
 
-    <!-- ===== SELECTED WRITING ===== -->
-    <section id="writing" class="pf-section pf-writing">
-      <div class="pf-section-inner">
-        <div class="pf-section-intro pf-row pf-reveal">
-          <div>
-            <span class="pf-badge">Selected Writing</span>
-            <h2>Words that stay.</h2>
-          </div>
-          <button class="pf-text-link" type="button" @click="$emit('navigate', 'blog')">
-            Open Blog <ArrowRight :size="14" />
-          </button>
-        </div>
-
-        <div v-if="articleError" class="pf-state">{{ articleError }}</div>
-        <div v-else-if="isLoadingArticles" class="pf-state">Loading writing...</div>
-        <div v-else class="pf-writing-list">
-          <article
-            v-for="article in selectedWriting"
-            :key="article.id"
-            class="pf-writing-item pf-reveal"
-            @click="$emit('openArticle', article)"
-          >
-            <div class="pf-writing-meta">
-              <span>{{ getArticleCategory(article) }}</span>
-              <span class="pf-writing-sep"></span>
-              <span>{{ formatDate(article.createTime) }}</span>
-            </div>
-            <h3 class="pf-writing-title">{{ article.title }}</h3>
-            <p class="pf-writing-summary">{{ getArticleSummary(article) }}</p>
-            <small class="pf-writing-read">{{ getArticleReadingTime(article) }} min read</small>
-          </article>
-        </div>
-      </div>
-    </section>
-
     <!-- ===== CASE STUDY / DARK SECTION ===== -->
     <section class="pf-section pf-section-dark pf-case">
       <div class="pf-section-inner">
@@ -557,26 +516,28 @@ onUnmounted(() => revealObserver?.disconnect())
   position: relative;
   z-index: 1;
   max-width: 820px;
-  margin: 0 auto;
+  margin: -3rem auto 0;
 }
 
 .pf-hero-greeting {
-  margin: 0 0 1.5rem;
+  margin: 0 0 2.8rem;
   color: rgba(0, 0, 0, 0.45);
   font-size: clamp(0.85rem, 1.2vw, 1rem);
   line-height: 1.7;
   font-weight: 400;
   letter-spacing: 0.01em;
+  text-align: center;
 }
 
 .pf-hero-heading {
-  margin: 0 0 2.2rem;
+  margin: 0 0 3rem;
   font-size: clamp(2.6rem, 7vw, 5.5rem);
   font-weight: 600;
   line-height: 1.05;
   letter-spacing: -0.025em;
   color: #111111;
   white-space: nowrap;
+  text-align: center;
 }
 
 .pf-underline {
@@ -605,10 +566,11 @@ onUnmounted(() => revealObserver?.disconnect())
 
 .pf-hero-desc {
   max-width: 480px;
-  margin: 0 auto 2.8rem;
+  margin: 0 auto 3rem;
   color: rgba(0, 0, 0, 0.4);
   font-size: clamp(0.95rem, 1.3vw, 1.05rem);
   line-height: 1.75;
+  text-align: center;
 }
 
 .pf-hero-actions {

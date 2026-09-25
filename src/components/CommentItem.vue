@@ -8,6 +8,7 @@ const props = defineProps<{
   articleId: number
   isLoggedIn: boolean
   loginUser: Partial<LoginUser>
+  variant?: 'card' | 'inline'
 }>()
 const emit = defineEmits<{ (e: 'comment-posted'): void }>()
 
@@ -108,7 +109,7 @@ async function submitReply(): Promise<boolean> {
 </script>
 
 <template>
-  <div class="comment-tree-item">
+  <div :class="['comment-tree-item', `variant-${variant || 'card'}`]">
     <div class="comment-main">
       <div class="comment-header">
         <img
@@ -175,6 +176,7 @@ async function submitReply(): Promise<boolean> {
           :article-id="articleId"
           :is-logged-in="isLoggedIn"
           :login-user="loginUser"
+          :variant="variant || 'card'"
           @comment-posted="emit('comment-posted')"
         />
       </div>
@@ -278,5 +280,41 @@ async function submitReply(): Promise<boolean> {
     font-size: 0.95rem;
     border-radius: 12px;
   }
+}
+
+/* ════════════════════════════════
+   inline 极简内嵌样式（文章详情页）
+   ════════════════════════════════ */
+.variant-inline.comment-tree-item {
+  margin-bottom: 0;
+}
+
+.variant-inline .comment-main {
+  background: transparent;
+  border: none;
+  border-radius: 0;
+  padding: 1.1rem 0;
+  border-bottom: 1px solid #f1f5f9;
+}
+
+.variant-inline .comment-children-wrapper {
+  margin-top: 0.6rem;
+  margin-left: 2.8rem;
+  padding-left: 1rem;
+  border-left: 2px solid #f1f5f9;
+}
+
+.variant-inline .comment-collapse-bar {
+  background: transparent;
+  padding: 4px 0;
+}
+
+.variant-inline .comment-children {
+  gap: 0;
+}
+
+.variant-inline .reply-box {
+  background: #f8fafc;
+  border: 1px solid #f1f5f9;
 }
 </style>

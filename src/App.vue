@@ -64,6 +64,8 @@ const router = useRouter()
 const {
   articles,
   allArticles,
+  trendingArticles,
+  featuredArticles,
   totalArticles,
   articleError,
   isLoadingArticles,
@@ -75,6 +77,8 @@ const {
   pageSize: articlePageSize,
   fetchArticles,
   fetchAllArticlesForSidebar,
+  fetchTrending,
+  fetchFeatured,
   loadMoreArticles,
   openArticleDetail,
   closeArticleDetail,
@@ -208,6 +212,8 @@ async function refreshArticleData() {
   await Promise.all([
     fetchArticles(),
     fetchAllArticlesForSidebar(),
+    fetchTrending(),
+    fetchFeatured(),
   ])
   try {
     await fetchAdminArticles()
@@ -1248,6 +1254,7 @@ onUnmounted(() => {
         @toggle-dark="toggleDark"
         @close-user-menu="closeUserMenu"
         @open-ai-assistant="openAIAssistant"
+        @open-donate="openDonate"
       />
 
       <!-- Global sidebar belongs to the Blog reading system, not the Portfolio landing page. -->
@@ -1305,6 +1312,8 @@ onUnmounted(() => {
             :active-category-id="activeCategoryId"
             :articles="articles"
             :filtered-articles="filteredArticles"
+            :trending-articles="trendingArticles"
+            :featured-articles="featuredArticles"
             :total-articles="totalArticles"
             :article-error="articleError"
             :is-loading-articles="isLoadingArticles"
