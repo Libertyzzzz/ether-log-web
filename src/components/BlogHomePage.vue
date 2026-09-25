@@ -1,11 +1,6 @@
 <script setup lang="ts">
-<<<<<<< HEAD
-import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
-import { FileText, BookOpen, Heart, ArrowRight, ArrowUpRight, ArrowDown, Sparkles, Star, Coffee, Clock, Send, Search, Folder, Tag, CalendarDays, Eye } from 'lucide-vue-next'
-=======
 import { ref, computed, watch } from 'vue'
 import { Clock, ChevronLeft, ChevronRight, Calendar, Instagram } from 'lucide-vue-next'
->>>>>>> feature_new_home
 import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
 import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
 

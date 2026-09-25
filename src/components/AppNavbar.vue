@@ -368,19 +368,7 @@ onUnmounted(() => {
               <span class="portfolio-dot-inner"></span>
             </button>
             <Transition name="dropdown-fade">
-              <div v-if="isLoggedIn && showUserMenu && !isMobile" class="portfolio-user-menu" @click.stop>
-                <div class="dropdown-header">
-                  <img class="dropdown-avatar" :src="loginUser.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=Scribe'" alt="avatar" />
-                  <div class="dropdown-user-info">
-                    <strong>{{ getLoginUserName(loginUser) }}</strong>
-                    <span>{{ loginUser.email || 'Admin' }}</span>
-                  </div>
-                </div>
-                <div class="dropdown-divider"></div>
-                <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openProfile')"><User :size="14" /> 个人主页</button>
-                <button v-if="canAccessDashboardArticle || canAccessDashboardCategory || canAccessDashboardTag || canAccessDashboardComment" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openDashboard')"><FileText :size="14" /> 数据面板</button>
-                <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); $emit('openQuantLab')"><FlaskConical :size="14" /> Quant Lab</button>
-                <div class="dropdown-divider"></div>
+              <div v-if="isLoggedIn && showUserMenu && !isMobile" class="portfolio-user-menu portfolio-user-menu-simple" @click.stop>
                 <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
               </div>
             </Transition>
@@ -1446,6 +1434,11 @@ kbd {
 }
 
 /* 半隐藏登录状态图标 */
+.portfolio-status-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
 .portfolio-status-dot {
   position: relative;
   width: 18px;
@@ -1502,6 +1495,42 @@ kbd {
 @keyframes dotPulse {
   0%, 100% { opacity: 0.4; transform: scale(1); }
   50% { opacity: 0; transform: scale(1.4); }
+}
+
+.portfolio-user-menu {
+  position: absolute;
+  top: calc(100% + 0.5rem);
+  right: 0;
+  min-width: 8rem;
+  background: #ffffff;
+  border: 1px solid #e2e8f0;
+  border-radius: 0.75rem;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.12);
+  padding: 0.4rem;
+  z-index: 100;
+}
+
+.portfolio-user-menu-simple .dropdown-item {
+  width: 100%;
+  text-align: left;
+  padding: 0.5rem 0.65rem;
+  border: none;
+  background: none;
+  border-radius: 0.5rem;
+  font-size: 0.78rem;
+  font-weight: 600;
+  color: #ef4444;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 0.55rem;
+  transition: all 0.15s;
+  font-family: inherit;
+}
+
+.portfolio-user-menu-simple .dropdown-item:hover {
+  background: #fef2f2;
+  color: #dc2626;
 }
 
 @media (max-width: 1024px) {
