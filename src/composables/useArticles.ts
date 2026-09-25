@@ -12,6 +12,7 @@ export function useArticles() {
   const allArticles = ref<ArticleListItem[]>([])
   const totalArticles = ref(0)
   const currentPage = ref(1)
+  const pageSize = ref(9)
   const articleError = ref('')
   const isLoadingArticles = ref(false)
   const isLoadingMore = ref(false)
@@ -19,7 +20,6 @@ export function useArticles() {
   const selectedArticlePreview = ref<ArticleListItem | null>(null)
   const isLoadingArticleDetail = ref(false)
 
-  const PAGE_SIZE = 9
   const SIDEBAR_PAGE_SIZE = 1000
 
   async function fetchAllArticlesForSidebar(): Promise<void> {
@@ -31,15 +31,17 @@ export function useArticles() {
     }
   }
 
-  async function fetchArticles(): Promise<void> {
+  async function fetchArticles(page?: number, size?: number): Promise<void> {
     articleError.value = ''
     isLoadingArticles.value = true
-    currentPage.value = 1
+    const targetPage = page ?? currentPage.value
+    const targetSize = size ?? pageSize.value
+    currentPage.value = targetPage
+    pageSize.value = targetSize
     try {
-      const result = await fetchPublicArticles(1, PAGE_SIZE)
+      const result = await fetchPublicArticles(targetPage, targetSize)
       articles.value = result.records
       totalArticles.value = result.total
-      // 如果 allArticles 还没数据，顺便用当前结果填充，避免首屏空
       if (!allArticles.value.length) {
         allArticles.value = result.records
       }
@@ -54,20 +56,8 @@ export function useArticles() {
   }
 
   async function loadMoreArticles(): Promise<void> {
-    if (isLoadingMore.value) return
-    if (articles.value.length >= totalArticles.value) return
-    isLoadingMore.value = true
-    try {
-      const nextPage = currentPage.value + 1
-      const result = await fetchPublicArticles(nextPage, PAGE_SIZE)
-      articles.value = [...articles.value, ...result.records]
-      totalArticles.value = result.total
-      currentPage.value = nextPage
-    } catch (error) {
-      // silently fail, user can retry
-    } finally {
-      isLoadingMore.value = false
-    }
+    const nextPage = currentPage.value + 1
+    await fetchArticles(nextPage, pageSize.value)
   }
 
   async function openArticleDetail(article: ArticleListItem): Promise<void> {
@@ -158,6 +148,8 @@ export function useArticles() {
     articles,
     allArticles,
     totalArticles,
+    currentPage,
+    pageSize,
     articleError,
     isLoadingArticles,
     isLoadingMore,

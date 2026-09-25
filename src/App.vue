@@ -71,6 +71,8 @@ const {
   selectedArticle,
   selectedArticlePreview,
   isLoadingArticleDetail,
+  currentPage: articleCurrentPage,
+  pageSize: articlePageSize,
   fetchArticles,
   fetchAllArticlesForSidebar,
   loadMoreArticles,
@@ -98,7 +100,16 @@ const {
   logout: authLogout,
   fetchUserProfile,
   updateUserProfile,
+  hasRole,
+  hasPermission,
 } = useAuth()
+
+const canAccessDashboard = computed(() =>
+  hasPermission('dashboard:article') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR'])
+)
+const canAccessSystem = computed(() =>
+  hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'])
+)
 
 const {
   pendingComments,
@@ -218,6 +229,15 @@ const filteredArticles = computed(() => {
 
 function toggleCategory(categoryId: number) {
   activeCategoryId.value = activeCategoryId.value === categoryId ? null : categoryId
+  fetchArticles(1, articlePageSize.value)
+}
+
+function handlePageChange(page: number) {
+  fetchArticles(page, articlePageSize.value)
+}
+
+function handlePageSizeChange(size: number) {
+  fetchArticles(1, size)
 }
 
 function handleFilterCategory(label: string) {
@@ -998,6 +1018,19 @@ function openProfile() {
   window.scrollTo({ top: 0, behavior: 'smooth' })
 }
 
+function handleBlogNavigate(target: string) {
+  closeArticleDetail()
+  if (target === 'profile') {
+    openProfile()
+  } else if (target === 'dashboard') {
+    openDashboard()
+  } else if (target === 'system') {
+    openSystem()
+  } else {
+    navigateToSection(target)
+  }
+}
+
 const isSavingProfile = ref(false)
 
 async function handleProfileUpdate(data: any) {
@@ -1275,10 +1308,14 @@ onUnmounted(() => {
             :total-articles="totalArticles"
             :article-error="articleError"
             :is-loading-articles="isLoadingArticles"
-            :is-loading-more="isLoadingMore"
             :show-actions="showActionsOnPage"
             :show-featured-only="showFeaturedOnly"
             :login-user="loginUser"
+            :current-page="articleCurrentPage"
+            :page-size="articlePageSize"
+            :is-logged-in="isLoggedIn"
+            :can-access-dashboard="canAccessDashboard"
+            :can-access-system="canAccessSystem"
             @toggle-category="toggleCategory"
             @open-article="openArticleDetail"
             @edit-article="openPublishModal"
@@ -1288,8 +1325,10 @@ onUnmounted(() => {
             @toggle-featured="showFeaturedOnly = $event"
             @open-assessment="openAssessment"
             @open-donate="openDonate"
-            @navigate="navigateToSection"
-            @load-more="loadMoreArticles"
+            @navigate="handleBlogNavigate"
+            @page-change="handlePageChange"
+            @page-size-change="handlePageSizeChange"
+            @open-login="openLoginModal"
             @open-search="openSearchWithQuery"
           />
 
