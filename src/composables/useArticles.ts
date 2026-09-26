@@ -16,7 +16,7 @@ export function useArticles() {
   const currentPage = ref(1)
   const pageSize = ref(9)
   const articleError = ref('')
-  const isLoadingArticles = ref(false)
+  const isLoadingArticles = ref(true)
   const isLoadingMore = ref(false)
   const selectedArticle = ref<ArticleDetail | null>(null)
   const selectedArticlePreview = ref<ArticleListItem | null>(null)

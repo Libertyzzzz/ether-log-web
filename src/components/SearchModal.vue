@@ -28,7 +28,8 @@ const performSearch = async (query: string) => {
     return
   }
 
-  // 1. 开启加载状态
+  // 1. 清空旧结果并开启加载状态，确保显示骨架屏而非旧数据
+  results.value = []
   isLoading.value = true
 
   try {
@@ -44,8 +45,18 @@ const performSearch = async (query: string) => {
 }
 
 watch(searchQuery, (newQuery) => {
-  // 3. 实现防抖逻辑：用户停止输入 300ms 后才执行搜索
   if (searchTimer) clearTimeout(searchTimer)
+
+  if (!newQuery.trim()) {
+    results.value = []
+    isLoading.value = false
+    return
+  }
+
+  // 输入立即进入加载态，避免防抖等待期间误显示"没有结果"
+  results.value = []
+  isLoading.value = true
+
   searchTimer = window.setTimeout(() => {
     performSearch(newQuery)
   }, 300)
@@ -108,6 +119,17 @@ function handleKeyDown(e: KeyboardEvent) {
             </div>
             <CornerDownLeft :size="14" class="enter-icon" />
           </div>
+        </div>
+
+        <div v-else-if="isLoading" class="search-loading">
+          <div v-for="i in 4" :key="i" class="loading-skeleton-item">
+            <div class="skeleton-icon"></div>
+            <div class="skeleton-info">
+              <div class="skeleton-line w70"></div>
+              <div class="skeleton-line w40"></div>
+            </div>
+          </div>
+          <p class="loading-tip">正在搜索 "{{ searchQuery }}" ...</p>
         </div>
 
         <div v-else-if="searchQuery" class="search-empty">
@@ -178,6 +200,64 @@ function handleKeyDown(e: KeyboardEvent) {
 .enter-icon { color: #cbd5e1; opacity: 0; transition: opacity 0.2s; }
 
 .search-empty { padding: 3rem 1.5rem; text-align: center; color: #64748b; font-size: 0.9rem; }
+
+.search-loading {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0.75rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.loading-skeleton-item {
+  display: flex;
+  align-items: center;
+  padding: 0.85rem 1rem;
+  border-radius: 0.75rem;
+  gap: 1rem;
+}
+
+.skeleton-icon {
+  width: 18px;
+  height: 18px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: search-shimmer 1.5s infinite;
+  flex-shrink: 0;
+}
+
+.skeleton-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.skeleton-line {
+  height: 14px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, #f1f5f9 25%, #e2e8f0 50%, #f1f5f9 75%);
+  background-size: 200% 100%;
+  animation: search-shimmer 1.5s infinite;
+}
+
+.w40 { width: 40%; }
+.w70 { width: 70%; }
+
+.loading-tip {
+  text-align: center;
+  color: #94a3b8;
+  font-size: 0.82rem;
+  margin: 0.5rem 0 0.25rem;
+  font-weight: 500;
+}
+
+@keyframes search-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
 
 .search-footer {
   padding: 0.75rem 1.5rem; background: #f8fafc;
