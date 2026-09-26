@@ -4,7 +4,7 @@ import { useRoute, useRouter } from 'vue-router'
 import {
   User, LogOut, FlaskConical, House, FileText,
   Folder, Tag, MessageSquare, ChevronDown, Twitter, Instagram, Github,
-  Settings, Users, Shield, KeyRound, Search, Coffee
+  Settings, Users, Shield, KeyRound, Search, Coffee, Sparkles
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
@@ -93,15 +93,9 @@ function scrollToPosts() {
   }
 }
 const isMobile = ref(false)
-const showPortfolioPatterns = ref(false)
 const userMenuFromTabbar = ref(false)
 
-function closePortfolioDropdowns() {
-  showPortfolioPatterns.value = false
-}
-
 function closeAllDropdowns() {
-  closePortfolioDropdowns()
   showSystemDropdown.value = false
   emit('closeUserMenu')
 }
@@ -185,13 +179,6 @@ function resetNavState() {
   updateScrollDepth(lastScrollY)
 }
 
-function scrollPortfolioSection(sectionId: string) {
-  const target = document.getElementById(sectionId)
-  if (target) {
-    target.scrollIntoView({ behavior: 'smooth', block: 'start' })
-  }
-}
-
 watch(
   () => route.fullPath,
   () => {
@@ -221,7 +208,11 @@ onUnmounted(() => {
   <div class="nav-shell">
     <nav
       class="portfolio-nav"
-      :class="{ 'nav-hidden': !isVisible }"
+      :class="{
+        'nav-hidden': !isVisible,
+        'has-admin-entries': showAdminEntries,
+        'is-blog-context': isBlogContext
+      }"
       :style="{ '--nav-scroll-depth': scrollDepth }"
       @mouseleave="closeAllDropdowns"
     >
@@ -263,24 +254,15 @@ onUnmounted(() => {
             <span class="portfolio-search-placeholder">搜索文章...</span>
           </button>
 
-          <div
-            v-if="isPortfolioHome"
-            class="portfolio-dropdown-wrap"
-            @mouseenter="showPortfolioPatterns = true"
+          <button
+            type="button"
+            class="nav-ai-toggle"
+            title="AI 助手"
+            @click="$emit('openAiAssistant')"
           >
-            <button type="button" class="has-dropdown">
-              Patterns
-              <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showPortfolioPatterns }" />
-            </button>
-            <Transition name="dropdown-fade">
-              <div v-if="showPortfolioPatterns" class="portfolio-dropdown" @click.stop>
-                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('works')">Selected Works</button>
-                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('about')">About</button>
-                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('now')">Now</button>
-                <button class="portfolio-dropdown-item" type="button" @click="scrollPortfolioSection('writing')">Selected Writing</button>
-              </div>
-            </Transition>
-          </div>
+            <Sparkles :size="14" class="nav-ai-icon" />
+            <span class="nav-ai-label">AI 助手</span>
+          </button>
 
           <button
             v-if="!isBlogContext"
@@ -633,83 +615,50 @@ kbd {
   opacity: 0.6;
 }
 
-/* AI 助手按钮 — 胶囊渐变风格 */
+/* AI 助手按钮 — 精致微渐变与淡紫色霜玻璃风格 */
 .nav-ai-toggle {
-  position: relative;
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  gap: 0.12rem;
-  height: 2rem;
-  padding: 0 0.45rem 0 0.2rem;
-  border: none;
+  gap: 0.28rem;
+  padding: 0.34rem 0.65rem;
+  background: rgba(245, 243, 255, 0.85);
+  border: 1px solid rgba(196, 181, 253, 0.55);
   border-radius: 9999px;
-  background: linear-gradient(135deg, #8b5cf6 0%, #6366f1 55%, #4f46e5 100%);
-  box-shadow:
-    0 1px 3px rgba(79, 70, 229, 0.25),
-    0 2px 10px rgba(139, 92, 246, 0.35),
-    0 0 0 1px rgba(255, 255, 255, 0.18) inset;
-  color: white;
+  color: #4f46e5;
+  font: inherit;
+  font-size: 0.78rem;
+  font-weight: 650;
   cursor: pointer;
-  transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: all 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: nowrap;
   flex-shrink: 0;
-  overflow: hidden;
-  font-family: inherit;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  box-shadow: 0 1px 2px rgba(99, 102, 241, 0.06);
 }
-.nav-ai-glow {
-  position: absolute;
-  inset: -4px;
-  border-radius: 9999px;
-  background: radial-gradient(circle, rgba(196, 181, 253, 0.6) 0%, transparent 70%);
-  filter: blur(6px);
-  opacity: 0;
-  transition: opacity 0.3s ease;
-  animation: navAiBreath 2.8s ease-in-out infinite;
-  pointer-events: none;
-  z-index: 0;
-}
-.nav-ai-logo {
-  position: relative;
-  z-index: 1;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 1.45rem;
-  height: 1.45rem;
-  border-radius: 9999px;
-  background: rgba(255, 255, 255, 0.22);
-  backdrop-filter: blur(4px);
+.nav-ai-icon {
+  color: #6366f1;
   flex-shrink: 0;
-}
-.nav-ai-logo-inner {
-  font-size: 0.72rem;
-  line-height: 1;
-  color: white;
-  text-shadow: 0 0 6px rgba(224, 231, 255, 0.6);
-  transform: translateY(-0.5px);
+  transition: transform 0.25s ease;
 }
 .nav-ai-label {
-  position: relative;
-  z-index: 1;
-  font-size: 0.68rem;
-  font-weight: 800;
-  letter-spacing: 0.14em;
   line-height: 1;
-  color: white;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.15);
-  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.03em;
+  font-weight: 700;
 }
 .nav-ai-toggle:hover {
-  transform: translateY(-1.5px) scale(1.03);
-  box-shadow:
-    0 4px 14px rgba(139, 92, 246, 0.55),
-    0 0 0 1px rgba(255, 255, 255, 0.3) inset;
+  background: linear-gradient(135deg, rgba(238, 242, 255, 0.95) 0%, rgba(245, 243, 255, 0.98) 100%);
+  border-color: rgba(129, 140, 248, 0.75);
+  color: #3730a3;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(99, 102, 241, 0.16);
 }
-.nav-ai-toggle:hover .nav-ai-glow { opacity: 0.55; }
-.nav-ai-toggle:active { transform: translateY(0) scale(0.97); }
-
-@keyframes navAiBreath {
-  0%, 100% { opacity: 0; transform: scale(0.85); }
-  50% { opacity: 0.3; transform: scale(1.05); }
+.nav-ai-toggle:hover .nav-ai-icon {
+  transform: scale(1.12) rotate(8deg);
+  color: #4f46e5;
+}
+.nav-ai-toggle:active {
+  transform: translateY(0) scale(0.97);
 }
 
 /* 系统状态栏 (Badge) */
@@ -1123,14 +1072,16 @@ kbd {
 }
 
 .portfolio-nav-inner {
-  width: min(1110px, 100%);
+  max-width: 1110px;
+  width: 100%;
   margin: 0 auto;
   height: 64px;
   padding: 0 1.25rem;
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 1.5rem;
+  box-sizing: border-box;
+  gap: 0.5rem;
 }
 
 .portfolio-brand {
@@ -1145,6 +1096,7 @@ kbd {
   cursor: pointer;
   text-align: left;
   line-height: 1.1;
+  flex-shrink: 0;
 }
 
 .portfolio-brand-name {
@@ -1192,12 +1144,13 @@ kbd {
 .portfolio-links {
   display: flex;
   align-items: center;
-  gap: 0.1rem;
+  gap: 0.65rem;
+  min-width: 0;
 }
 
 .portfolio-links > button,
 .portfolio-dropdown-wrap > button {
-  padding: 0.5rem 0.65rem;
+  padding: 0.5rem 0.75rem;
   background: transparent;
   border: 0;
   color: #111111;
@@ -1211,6 +1164,8 @@ kbd {
   align-items: center;
   gap: 0.25rem;
   white-space: nowrap;
+  flex-shrink: 0;
+  position: relative;
 }
 
 .portfolio-links > button:hover,
@@ -1243,14 +1198,14 @@ kbd {
 .portfolio-search-btn {
   display: inline-flex;
   align-items: center;
-  gap: 0.35rem;
-  padding: 0.35rem 0.7rem;
+  gap: 0.3rem;
+  padding: 0.32rem 0.65rem;
   background: rgba(0, 0, 0, 0.04);
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 999px;
   color: #94a3b8;
   font: inherit;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   cursor: pointer;
   transition: all 0.18s ease;
   white-space: nowrap;
@@ -1262,7 +1217,7 @@ kbd {
   color: #475569;
 }
 .portfolio-search-placeholder {
-  font-size: 0.76rem;
+  font-size: 0.74rem;
 }
 
 .portfolio-coffee-btn {
@@ -1334,7 +1289,8 @@ kbd {
 .portfolio-actions {
   display: flex;
   align-items: center;
-  gap: 0.3rem;
+  gap: 0.35rem;
+  flex-shrink: 0;
 }
 
 .portfolio-social {
@@ -1358,7 +1314,7 @@ kbd {
   display: inline-flex;
   align-items: center;
   gap: 0.4rem;
-  padding: 0.6rem 1.25rem;
+  padding: 0.55rem 1.15rem;
   background: #FDF800;
   color: #111111;
   border: 0;
@@ -1370,6 +1326,8 @@ kbd {
   cursor: pointer;
   transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
   box-shadow: 0 2px 8px rgba(253, 248, 0, 0.4);
+  white-space: nowrap;
+  flex-shrink: 0;
 }
 
 .portfolio-main-action:hover {
@@ -1382,18 +1340,19 @@ kbd {
 .portfolio-admin-entry {
   display: inline-flex;
   align-items: center;
-  gap: 0.3rem;
-  padding: 0.4rem 0.65rem;
+  gap: 0.28rem;
+  padding: 0.38rem 0.6rem;
   background: #ffffff;
   color: #111827;
   border: 1px solid #e2e8f0;
   border-radius: 999px;
   font: inherit;
-  font-size: 0.76rem;
+  font-size: 0.75rem;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.18s ease;
   white-space: nowrap;
+  flex-shrink: 0;
 }
 .portfolio-admin-entry:hover {
   background: #111827;
@@ -1401,14 +1360,63 @@ kbd {
   border-color: #111827;
 }
 .portfolio-admin-entry.has-chevron {
-  padding-right: 0.6rem;
+  padding-right: 0.55rem;
 }
 .portfolio-admin-entry .portfolio-chevron {
-  margin-left: 0.1rem;
+  margin-left: 0.08rem;
   transition: transform 0.2s ease;
 }
 .portfolio-admin-entry .portfolio-chevron.is-open {
   transform: rotate(180deg);
+}
+
+/* ══════════════════════════════════════════════════
+   博客页面且具备管理权限时（按钮多）：自适应紧凑排版
+   ══════════════════════════════════════════════════ */
+.portfolio-nav.has-admin-entries .portfolio-links {
+  gap: 0.15rem;
+}
+.portfolio-nav.has-admin-entries .portfolio-links > button {
+  padding: 0.35rem 0.52rem;
+  font-size: 0.82rem;
+}
+.portfolio-nav.has-admin-entries .portfolio-search-btn {
+  padding: 0.28rem 0.55rem;
+  font-size: 0.74rem;
+}
+.portfolio-nav.has-admin-entries .nav-ai-toggle {
+  padding: 0.28rem 0.52rem;
+  font-size: 0.74rem;
+}
+.portfolio-nav.has-admin-entries .portfolio-actions {
+  gap: 0.25rem;
+}
+.portfolio-nav.has-admin-entries .portfolio-admin-entry {
+  padding: 0.32rem 0.5rem;
+  font-size: 0.73rem;
+  gap: 0.22rem;
+}
+.portfolio-nav.has-admin-entries .portfolio-main-action {
+  padding: 0.35rem 0.75rem;
+  font-size: 0.75rem;
+}
+
+/* 中等桌面宽度自适应微调 */
+@media (min-width: 769px) and (max-width: 1080px) {
+  .portfolio-links {
+    gap: 0.3rem;
+  }
+  .portfolio-links > button {
+    padding: 0.4rem 0.55rem;
+    font-size: 0.82rem;
+  }
+  .portfolio-actions {
+    gap: 0.25rem;
+  }
+  .portfolio-main-action {
+    padding: 0.45rem 0.85rem;
+    font-size: 0.78rem;
+  }
 }
 
 /* 系统管理下拉 */

@@ -2034,7 +2034,8 @@ function handleNavToggleStatus() {}
   background: #ffffff;
   color: #111827;
   font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  padding: 5.5rem 20px 20px;
+  padding: 5.5rem 1.25rem 2rem;
+  box-sizing: border-box;
 }
 
 .assessment-root.is-chat-root {
@@ -2155,10 +2156,11 @@ function handleNavToggleStatus() {}
 .assessment-layout,
 .result-stage,
 .loading-panel {
-  width: min(1140px, 100%);
-  max-width: 1240px;
+  width: 100%;
+  max-width: 1070px;
   margin-left: auto;
   margin-right: auto;
+  box-sizing: border-box;
 }
 
 .intro-stage {
@@ -2649,8 +2651,9 @@ function handleNavToggleStatus() {}
   overflow: hidden;
   width: 100%;
   padding: 48px 48px; /* 增加内边距 */
-  max-width: 1140px;
+  max-width: 1070px;
   margin: 0 auto;
+  box-sizing: border-box;
   border-radius: 24px;
   background:
     radial-gradient(circle at 100% 0%, rgba(37, 99, 235, 0.08), transparent 34%),
@@ -4570,8 +4573,10 @@ function handleNavToggleStatus() {}
 }
 
 .shared-report-actions {
-  width: min(1140px, 100%);
+  width: 100%;
+  max-width: 1070px;
   margin: 32px auto 0;
+  box-sizing: border-box;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   gap: 24px;

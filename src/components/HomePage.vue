@@ -398,8 +398,9 @@ onUnmounted(() => revealObserver?.disconnect())
 
 /* ===== SECTION SHARED ===== */
 .pf-section {
-  padding: 5.5rem 1.5rem;
+  padding: 5.5rem 1.25rem;
   border-bottom: 1px solid rgba(0, 0, 0, 0.06);
+  box-sizing: border-box;
 }
 
 .pf-section-light {
@@ -413,8 +414,10 @@ onUnmounted(() => revealObserver?.disconnect())
 }
 
 .pf-section-inner {
-  width: min(1140px, 100%);
+  max-width: 1110px;
+  width: 100%;
   margin: 0 auto;
+  box-sizing: border-box;
 }
 
 .pf-section-intro {

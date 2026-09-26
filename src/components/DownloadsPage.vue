@@ -167,9 +167,10 @@ const filteredItems = computed(() => {
 
 <style scoped>
 .dl-page {
-  max-width: 1180px;
+  max-width: 1110px;
   margin: 0 auto;
-  padding: 6rem 2rem 4rem;
+  padding: 6rem 1.25rem 4rem;
+  box-sizing: border-box;
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
   color: #111111;
 }

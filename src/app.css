@@ -18,8 +18,8 @@ body {
 :root {
   --nav-top-offset: 0.75rem;
   --hero-top-offset: 6.1rem;
-  --content-max-width: 69rem;
-  --nav-content-max-width: 69rem;
+  --content-max-width: 1110px;
+  --nav-content-max-width: 1110px;
 }
 
 @media (max-width: 768px) {
