@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { Clock, ChevronLeft, ChevronRight, Calendar, Instagram } from 'lucide-vue-next'
 import type { ArticleListItem, Category, Tag as BlogTag, LoginUser } from '../types/blog'
 import { getArticleCategory, getArticleSummary, getArticleReadingTime } from '../utils/article'
@@ -123,19 +123,60 @@ const highlightIndex = ref(0)
 
 const featuredIndex = ref(0)
 const FEATURED_VISIBLE = 3
+const FEATURED_AUTOPLAY_INTERVAL = 4000
 const featuredBound = computed(() => Math.max(0, featuredCarouselPosts.value.length - FEATURED_VISIBLE))
 
 function nextFeatured() {
-  if (featuredIndex.value < featuredBound.value) featuredIndex.value++
+  if (featuredIndex.value >= featuredBound.value) {
+    featuredIndex.value = 0
+  } else {
+    featuredIndex.value++
+  }
 }
 function prevFeatured() {
-  if (featuredIndex.value > 0) featuredIndex.value--
+  if (featuredIndex.value <= 0) {
+    featuredIndex.value = featuredBound.value
+  } else {
+    featuredIndex.value--
+  }
+}
+
+const featuredHovered = ref(false)
+let featuredTimer: ReturnType<typeof setInterval> | null = null
+
+function startFeaturedAutoplay() {
+  stopFeaturedAutoplay()
+  if (featuredBound.value <= 0) return
+  featuredTimer = setInterval(() => {
+    if (featuredHovered.value) return
+    nextFeatured()
+  }, FEATURED_AUTOPLAY_INTERVAL)
+}
+
+function stopFeaturedAutoplay() {
+  if (featuredTimer) {
+    clearInterval(featuredTimer)
+    featuredTimer = null
+  }
 }
 
 watch(
   () => featuredCarouselPosts.value.length,
-  () => { if (featuredIndex.value > featuredBound.value) featuredIndex.value = featuredBound.value }
+  () => {
+    if (featuredIndex.value > featuredBound.value) featuredIndex.value = featuredBound.value
+    if (featuredBound.value > 0) {
+      startFeaturedAutoplay()
+    } else {
+      stopFeaturedAutoplay()
+    }
+  }
 )
+
+onMounted(() => {
+  if (featuredBound.value > 0) startFeaturedAutoplay()
+})
+
+onUnmounted(stopFeaturedAutoplay)
 
 const coverGradients = [
   'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
@@ -228,8 +269,8 @@ function formatDate(dateStr: string) {
 
     <!-- ── 2. 特色文章 3 列轮播 ── -->
     <section v-if="featuredCarouselPosts.length >= 3" class="bm-featured-section">
-      <div class="bm-featured-carousel">
-        <button class="bm-feat-arrow prev" type="button" @click="prevFeatured" :disabled="featuredIndex === 0">
+      <div class="bm-featured-carousel" @mouseenter="featuredHovered = true" @mouseleave="featuredHovered = false">
+        <button class="bm-feat-arrow prev" type="button" @click="prevFeatured" :disabled="featuredBound === 0">
           <ChevronLeft :size="22" />
         </button>
         <div class="bm-feat-track-wrap">
@@ -253,7 +294,7 @@ function formatDate(dateStr: string) {
             </div>
           </div>
         </div>
-        <button class="bm-feat-arrow next" type="button" @click="nextFeatured" :disabled="featuredIndex >= featuredBound">
+        <button class="bm-feat-arrow next" type="button" @click="nextFeatured" :disabled="featuredBound === 0">
           <ChevronRight :size="22" />
         </button>
       </div>
