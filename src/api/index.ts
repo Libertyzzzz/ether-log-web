@@ -221,17 +221,17 @@ export async function fetchCategories(): Promise<Category[]> {
 }
 
 export async function createCategory(payload: { name: string; sort?: number }): Promise<Category> {
-  const resp = await axios.post('/api/categories', payload)
+  const resp = await axios.post('/api/admin/categories', payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || Date.now(), name: payload.name, sort: payload.sort }
 }
 
 export async function deleteCategory(id: number): Promise<void> {
-  await axios.delete(`/api/categories/${id}`)
+  await axios.delete(`/api/admin/categories/${id}`)
 }
 
 export async function updateCategory(id: number, payload: { name: string; sort?: number }): Promise<Category> {
-  const resp = await axios.put(`/api/categories/${id}`, payload)
+  const resp = await axios.put(`/api/admin/categories/${id}`, payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, sort: payload.sort }
 }
@@ -250,17 +250,17 @@ export async function fetchTags(): Promise<Tag[]> {
 }
 
 export async function createTag(payload: { name: string; color?: string }): Promise<Tag> {
-  const resp = await axios.post('/api/tags', payload)
+  const resp = await axios.post('/api/admin/tags', payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || Date.now(), name: payload.name, color: payload.color }
 }
 
 export async function deleteTag(id: number): Promise<void> {
-  await axios.delete(`/api/tags/${id}`)
+  await axios.delete(`/api/admin/tags/${id}`)
 }
 
 export async function updateTag(id: number, payload: { name: string; color?: string }): Promise<Tag> {
-  const resp = await axios.put(`/api/tags/${id}`, payload)
+  const resp = await axios.put(`/api/admin/tags/${id}`, payload)
   const p = resp.data && resp.data.data ? resp.data.data : resp.data
   return { id: p?.id || id, name: payload.name, color: payload.color }
 }
@@ -532,7 +532,7 @@ export async function fetchPendingComments(silent = false): Promise<BackendComme
 
 export async function reviewComment(commentId: number, status: number): Promise<boolean> {
   const response = await axios.put<ResultResponse<boolean>>(
-    '/api/comment/review',
+    '/api/admin/comment/review',
     null,
     { params: { commentId, status } },
   )
@@ -540,7 +540,7 @@ export async function reviewComment(commentId: number, status: number): Promise<
 }
 
 export async function deleteComment(commentId: number): Promise<boolean> {
-  const response = await axios.delete<ResultResponse<boolean>>('/api/comment/delete', {
+  const response = await axios.delete<ResultResponse<boolean>>('/api/admin/comment/delete', {
     params: { commentId },
   })
   return response.data.code === 200 && response.data.data === true
@@ -1132,4 +1132,299 @@ export async function batchReviewComments(ids: number[], status: number): Promis
 
 export async function batchDeleteComments(ids: number[]): Promise<void> {
   await Promise.all(ids.map((id) => deleteComment(id)))
+}
+
+/* =========================================================================
+   RAG 向量知识库管理接口
+   ========================================================================= */
+
+/**
+ * 将指定文章切块向量化并加入知识库
+ */
+export async function indexArticleKnowledge(articleId: number): Promise<{ articleId: number; status: string }> {
+  const res = await axios.post<ResultResponse<{ articleId: number; status: string }>>(
+    `/api/admin/knowledge/index?articleId=${articleId}`
+  )
+  return res.data.data
+}
+
+/**
+ * 全量重新索引所有已发布文章
+ */
+export async function indexAllArticlesKnowledge(): Promise<{ status: string }> {
+  const res = await axios.post<ResultResponse<{ status: string }>>(
+    '/api/admin/knowledge/index-all'
+  )
+  return res.data.data
+}
+
+/**
+ * 从知识库中移除指定文章
+ */
+export async function removeArticleFromKnowledge(articleId: number): Promise<{ articleId: number; status: string }> {
+  const res = await axios.delete<ResultResponse<{ articleId: number; status: string }>>(
+    `/api/admin/knowledge/remove?articleId=${articleId}`
+  )
+  return res.data.data
+}
+
+/**
+ * 刷新内存中的向量检索缓存
+ */
+export async function refreshKnowledgeCache(): Promise<{ status: string }> {
+  const res = await axios.post<ResultResponse<{ status: string }>>(
+    '/api/admin/knowledge/refresh'
+  )
+  return res.data.data
+}
+
+export interface KnowledgeStatsVo {
+  chunkCounts: Record<string, number>
+  totalChunks: number
+  indexedArticleCount: number
+}
+
+/**
+ * 获取知识库切片统计与每篇文章分块数
+ */
+export async function fetchKnowledgeStats(): Promise<KnowledgeStatsVo> {
+  const res = await axios.get<ResultResponse<KnowledgeStatsVo>>(
+    '/api/admin/knowledge/stats'
+  )
+  return res.data.data
+}
+
+/* =========================================================================
+   量化实验室 (Quant Lab) 接口
+   ========================================================================= */
+
+export type StrategyType = 'ma-cross' | 'momentum' | 'rsi' | 'custom'
+
+export interface QuantStrategy {
+  id: number
+  name: string
+  type: StrategyType
+  description: string
+}
+
+export interface BacktestRequest {
+  symbol: string
+  timeframe: string
+  strategyType: StrategyType
+  initialCapital: number
+  positionRatio: number
+  takeProfit: number
+  stopLoss: number
+  startDate: string
+  endDate: string
+}
+
+export interface BacktestSummary {
+  totalReturn: number
+  annualReturn: number
+  maxDrawdown: number
+  sharpe: number
+  winRate: number
+  trades: number
+  profitFactor: number
+  lastRunAt: string
+}
+
+export interface CurvePoint {
+  date: string
+  value: number
+}
+
+export interface TradeRecord {
+  id: number
+  time: string
+  side: 'BUY' | 'SELL'
+  symbol: string
+  price: number
+  quantity: number
+  pnl: number
+  note: string
+}
+
+export interface BacktestResponse {
+  summary: BacktestSummary
+  equityCurve: CurvePoint[]
+  drawdownCurve: CurvePoint[]
+  trades: TradeRecord[]
+}
+
+/**
+ * 获取系统支持的量化策略列表
+ */
+export async function fetchQuantStrategies(): Promise<QuantStrategy[]> {
+  const res = await axios.get<ResultResponse<QuantStrategy[]>>('/api/quant/strategies')
+  return res.data.data || []
+}
+
+/**
+ * 运行策略回测并获取净值与回撤曲线及成交记录
+ */
+export async function runQuantBacktest(payload: BacktestRequest): Promise<BacktestResponse> {
+  const res = await axios.post<ResultResponse<BacktestResponse>>('/api/quant/backtest/run', payload)
+  if (res.data.code === 200 && res.data.data) {
+    return res.data.data
+  }
+  throw new Error(res.data.message || '回测计算失败')
+}
+
+/**
+ * 保存/收藏当前策略配置
+ */
+export async function saveQuantStrategy(payload: BacktestRequest & { name?: string }): Promise<any> {
+  const res = await axios.post<ResultResponse<any>>('/api/quant/strategy', payload)
+  return res.data.data
+}
+
+/**
+ * 获取可用标的与周期选项
+ */
+export async function fetchQuantSymbols(): Promise<{ symbols: string[]; timeframes: string[] }> {
+  const res = await axios.get<ResultResponse<{ symbols: string[]; timeframes: string[] }>>('/api/quant/symbols')
+  return res.data.data || { symbols: ['BTC-USDT', 'ETH-USDT'], timeframes: ['15m', '1H', '4H', '1D'] }
+}
+// ═══ SWCS 安睡复利系统接口 ═══
+
+export interface PoolItem {
+  symbol: string
+  name: string
+  market: 'SH' | 'SZ' | 'HK'
+}
+
+export interface CandidatePool {
+  coreStocks: PoolItem[]
+  etfPool: PoolItem[]
+  hkStocks?: PoolItem[]
+}
+
+export interface SWCSBacktestRequest {
+  initialCapital: number
+  startDate: string
+  endDate: string
+  rebalanceFreq: 'monthly' | 'quarterly'
+  stockPool: string[]
+  etfPool: string[]
+  hkPool: string[]
+  maxSinglePosition: number
+  maxSectorPosition: number
+  cooldownDays: number
+}
+
+export interface SWCSSummary {
+  totalReturn: number
+  annualReturn: number
+  maxDrawdown: number
+  sharpe: number
+  calmar: number
+  winRate: number
+  currentERP: number
+  currentAllocation: Record<string, number>
+  vsCsi300: number
+  totalRebalances: number
+  guardrailTriggers: number
+  lastRunAt: string
+}
+
+export interface AllocationSnapshot {
+  date: string
+  erp: number
+  stockRatio: number
+  bondRatio: number
+  cashRatio: number
+  action: string
+}
+
+export interface FactorScoreResult {
+  symbol: string
+  name: string
+  market: string
+  totalScore: number
+  roeScore: number
+  fcfScore: number
+  valuationScore: number
+  dividendScore: number
+  pegScore: number
+  recommendation: string
+  details: Record<string, any>
+}
+
+export interface SWCSTradeRecord {
+  id: number
+  date: string
+  action: string
+  symbol: string
+  name: string
+  price: number
+  amount: number
+  shares: number
+  reason: string
+}
+
+export interface GuardrailEvent {
+  date: string
+  type: string
+  level: 'info' | 'warning' | 'critical'
+  message: string
+  action: string
+}
+
+export interface SWCSBacktestResponse {
+  summary: SWCSSummary
+  equityCurve: CurvePoint[]
+  drawdownCurve: CurvePoint[]
+  benchmarkCurve: CurvePoint[]
+  allocationHistory: AllocationSnapshot[]
+  factorScores: FactorScoreResult[]
+  trades: SWCSTradeRecord[]
+  guardrailEvents: GuardrailEvent[]
+}
+
+export interface MarketOverview {
+  csi300PE: number
+  csi300PEPercentile: number
+  csi300PB: number
+  csi300PBPercentile: number
+  treasuryYield10Y: number
+  erp: number
+  erpSignal: string
+  marketTemp: string
+  updatedAt: string
+}
+
+export async function fetchSWCSPool(): Promise<CandidatePool> {
+  const res = await axios.get<ResultResponse<CandidatePool>>('/api/quant/swcs/pool')
+  return res.data.data
+}
+
+export async function fetchSWCSMarketOverview(): Promise<MarketOverview> {
+  const res = await axios.get<ResultResponse<MarketOverview>>('/api/quant/swcs/market-overview')
+  return res.data.data
+}
+
+export async function fetchSWCSFactorScore(symbol: string): Promise<FactorScoreResult> {
+  const res = await axios.get<ResultResponse<FactorScoreResult>>(`/api/quant/swcs/factor/${symbol}`)
+  return res.data.data
+}
+
+export async function runSWCSBacktest(payload: SWCSBacktestRequest): Promise<SWCSBacktestResponse> {
+  const res = await axios.post<ResultResponse<SWCSBacktestResponse>>('/api/quant/swcs/backtest', payload)
+  return res.data.data
+}
+
+export interface KLineResponse {
+  dates: string[];
+  kline: [number, number, number, number][]; // [open, close, low, high]
+  volumes: number[];
+  benchPct: number[];
+  drawdowns: number[];
+}
+
+export async function fetchAssetKLine(symbol: string, startDate: string, endDate: string): Promise<KLineResponse> {
+  const res = await axios.get<ResultResponse<KLineResponse> | KLineResponse>(`/api/quant/swcs/kline/${symbol}?start_date=${startDate}&end_date=${endDate}`)
+  const payload = (res.data as any)?.data ?? res.data
+  return payload
 }

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ArrowRight, Image, ShieldAlert } from 'lucide-vue-next'
+import { FileText, MessageSquare, Eye, BookOpen, Edit3, Trash2, ArrowUpRight, Plus, LayoutDashboard, Check, Folder, ArrowRight, Image, ShieldAlert, Sparkles } from 'lucide-vue-next'
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { hasAuthToken, hasPermission, hasRole, isSuperAdmin } from '../composables/useAuth'
@@ -99,17 +99,22 @@ onMounted(() => {
   // categories / tags 由 App.vue 通过 props 提供，无需单独拉取
 })
 
-const coverGradients = [
-  'linear-gradient(135deg,#1e1b4b,#4338ca)',
-  'linear-gradient(135deg,#0f172a,#1d4ed8)',
-  'linear-gradient(135deg,#1a1a2e,#0f3460)',
-  'linear-gradient(135deg,#0d1117,#21262d)',
-  'linear-gradient(135deg,#1e293b,#334155)',
+const stockImages = [
+  'https://images.unsplash.com/photo-1488161628813-04466f872be2?w=1600&q=80',
+  'https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=1600&q=80',
+  'https://images.unsplash.com/photo-1469854523086-cc02fe5d8800?w=1600&q=80',
+  'https://images.unsplash.com/photo-1493246507139-91e8fad9978e?w=1600&q=80',
+  'https://images.unsplash.com/photo-1501785888041-af3ef285b470?w=1600&q=80',
+  'https://images.unsplash.com/photo-1507608616759-54f48f0af0ee?w=1600&q=80',
+  'https://images.unsplash.com/photo-1519681393784-d120267933ba?w=1600&q=80',
+  'https://images.unsplash.com/photo-1506905925346-21bda4d32df4?w=1600&q=80',
 ]
+
 function getCover(post: ArticleListItem, i: number) {
-  return post.coverImg
-    ? `background-image:url('${post.coverImg}')`
-    : `background:${coverGradients[i % coverGradients.length]}`
+  const url = post.coverImg && post.coverImg.trim()
+    ? post.coverImg
+    : stockImages[Math.abs(Number(post.id) || i) % stockImages.length]
+  return `background-image:url('${url}')`
 }
 
 function scrollToSection(id: string) {
@@ -163,6 +168,7 @@ const canManageTags = computed(() => isSuperAdmin.value || hasPermission('dashbo
 const canManageComments = computed(() => isSuperAdmin.value || hasPermission('dashboard:comment') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 const canManageMedia = computed(() => isSuperAdmin.value || hasPermission('dashboard:media') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 const canManageSensitiveWords = computed(() => isSuperAdmin.value || hasPermission('dashboard:sensitive') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
+const canManageKnowledge = computed(() => isSuperAdmin.value || hasPermission('dashboard:knowledge') || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 const canAccessSystem = computed(() => isSuperAdmin.value || hasRole(['ROLE_ADMIN', 'ROLE_SUPER_ADMIN']))
 </script>
 
@@ -257,6 +263,22 @@ const canAccessSystem = computed(() => isSuperAdmin.value || hasRole(['ROLE_ADMI
           </div>
           <div class="db-media-banner-right">
             <span class="db-media-banner-action">进入管理</span>
+            <ArrowRight :size="16" class="db-media-banner-arrow" />
+          </div>
+        </div>
+
+        <div v-if="canManageKnowledge" class="db-media-banner db-media-banner--ai" @click="router.push('/dashboard/knowledge')">
+          <div class="db-media-banner-left">
+            <div class="db-media-banner-icon" style="background:rgba(99,102,241,0.15);color:#818cf8">
+              <Sparkles :size="22" />
+            </div>
+            <div class="db-media-banner-info">
+              <strong class="db-media-banner-title">RAG 向量知识库</strong>
+              <span class="db-media-banner-desc">文章切片向量化与热检索缓存管理</span>
+            </div>
+          </div>
+          <div class="db-media-banner-right">
+            <span class="db-media-banner-action">进入知识库</span>
             <ArrowRight :size="16" class="db-media-banner-arrow" />
           </div>
         </div>

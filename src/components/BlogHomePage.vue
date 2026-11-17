@@ -178,15 +178,17 @@ onMounted(() => {
 
 onUnmounted(stopFeaturedAutoplay)
 
-const coverGradients = [
-  'linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #4338ca 100%)',
-  'linear-gradient(135deg, #0f172a 0%, #1e3a5f 50%, #1d4ed8 100%)',
-  'linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%)',
-  'linear-gradient(135deg, #0d1117 0%, #161b22 50%, #21262d 100%)',
-]
-
-function getCoverGradient(index: number) {
-  return coverGradients[index % coverGradients.length]
+function getPostCover(post: ArticleListItem, index: number = 0): string {
+  if (post.coverImg && post.coverImg.trim()) {
+    return post.coverImg
+  }
+  // 优先对齐 trending 中的封面索引，确保同一篇文章在首页各区域（如 Trending 与 Post 区域）展示完全一致的 ins 风封面
+  const trendIdx = trendingList.value.findIndex((p) => p.id === post.id)
+  if (trendIdx !== -1) {
+    return stockImages[trendIdx % stockImages.length]
+  }
+  const key = typeof post.id === 'number' ? post.id : index
+  return stockImages[Math.abs(key) % stockImages.length]
 }
 
 function formatDate(dateStr: string) {
@@ -362,7 +364,7 @@ function formatDate(dateStr: string) {
               :style="{ '--i': String(index) }"
               @click="$emit('openArticle', post)"
             >
-              <div class="bm-article-cover" :style="post.coverImg ? `background-image: url('${post.coverImg}')` : `background: ${getCoverGradient(index)}`">
+              <div class="bm-article-cover" :style="`background-image: url('${getPostCover(post, index)}')`">
                 <span class="bm-category-badge">{{ getArticleCategory(post) }}</span>
               </div>
               <div class="bm-article-body">
@@ -1139,6 +1141,29 @@ function formatDate(dateStr: string) {
   background-size: cover;
   background-position: center;
   position: relative;
+  overflow: hidden;
+}
+
+.bm-category-badge {
+  position: absolute;
+  top: 0.85rem;
+  left: 0.85rem;
+  display: inline-block;
+  background: rgba(255, 255, 255, 0.92);
+  backdrop-filter: blur(8px);
+  color: #18181b;
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  padding: 0.25rem 0.65rem;
+  border-radius: 4px;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  z-index: 2;
+  transition: transform 0.2s ease;
+}
+
+.bm-article-card:hover .bm-category-badge {
+  transform: translateY(-1px);
 }
 
 .bm-article-body {

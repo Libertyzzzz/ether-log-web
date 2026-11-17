@@ -116,11 +116,13 @@ function selectDirectory(directoryId: number) {
     expandedDirectoryIds.value.add(directoryId)
   }
   // 2. 记录当前高亮选中的目录（用于筛选和 active 样式）
-  // 只有在展开时才触发筛选
+  // 只有在列表页展开目录时才触发分类筛选；在文章详情页只展开目录树，避免跳回首页/列表页
   if (expandedDirectoryIds.value.has(directoryId)) {
     activeDirectoryId.value = directoryId
-    const dir = directories.value.find((d) => d.id === directoryId)
-    if (dir) emit('filter-category', dir.name)
+    if (activeNavId.value !== 'post-detail') {
+      const dir = directories.value.find((d) => d.id === directoryId)
+      if (dir) emit('filter-category', dir.name)
+    }
   } else {
     // 如果闭合了当前高亮的目录，取消高亮
     if (activeDirectoryId.value === directoryId) {

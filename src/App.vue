@@ -20,6 +20,7 @@ import CommentPage from './components/dashboard/CommentPage.vue'
 import UserPage from './components/system/UserPage.vue'
 import RolePage from './components/system/RolePage.vue'
 import PermissionPage from './components/system/PermissionPage.vue'
+import KnowledgeBasePage from './components/dashboard/KnowledgeBasePage.vue'
 import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
 import BlogHomePage from './components/BlogHomePage.vue'
@@ -1380,6 +1381,11 @@ onUnmounted(() => {
 
           <SensitiveWordPage
             v-if="currentPage === 'dashboard-sensitive-words'"
+            @back="router.push('/dashboard')"
+          />
+
+          <KnowledgeBasePage
+            v-if="currentPage === 'dashboard-knowledge'"
             @back="router.push('/dashboard')"
           />
 

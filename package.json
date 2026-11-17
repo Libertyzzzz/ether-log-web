@@ -19,6 +19,7 @@
     "@tiptap/starter-kit": "^3.24.0",
     "@tiptap/vue-3": "^3.24.0",
     "@types/turndown": "^5.0.6",
+    "@unhead/vue": "^3.4.2",
     "axios": "^1.15.2",
     "canvas-confetti": "^1.9.4",
     "echarts": "^6.0.0",

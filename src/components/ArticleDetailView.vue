@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, ref, nextTick, watch } from 'vue'
+import { useHead } from '@unhead/vue'
 import { ArrowLeft, ArrowRight, Edit3, Trash2, Clock, Eye, Tag, BookOpen, Sparkles, User } from 'lucide-vue-next'
 import type { ArticleDetail, ArticleListItem, LoginUser } from '../types/blog'
 import { getArticleCategory } from '../utils/article'
@@ -28,20 +29,52 @@ defineEmits<{
   openArticle: [article: ArticleListItem]
 }>()
 
+// --- SEO Meta Tags ---
+useHead({
+  title: computed(() => props.article.title ? `${props.article.title} - Nextify Blog` : 'Loading... - Nextify Blog'),
+  meta: [
+    {
+      name: 'description',
+      content: computed(() => props.article.summary || props.article.subtitle || 'Read more about this article on Nextify Blog.')
+    },
+    {
+      property: 'og:title',
+      content: computed(() => props.article.title || 'Nextify Blog')
+    },
+    {
+      property: 'og:description',
+      content: computed(() => props.article.summary || props.article.subtitle || 'Read more about this article on Nextify Blog.')
+    },
+    {
+      property: 'og:image',
+      content: computed(() => props.article.coverImg || '')
+    }
+  ]
+})
+// ---------------------
+
 const resolvedAuthor = computed<string | null>(() => {
   const direct = props.article.author?.trim()
   return direct ? direct : null
 })
 
-// 从正文中提取标题生成目录
+const rawArticleHtml = computed(() => {
+  let html = props.selectedArticle?.contentHtml || props.selectedArticle?.renderContent || ''
+  if (!html && props.selectedArticle?.content) {
+    html = renderMarkdown(props.selectedArticle.content)
+  }
+  return html
+})
+
+// 从正文中提取标题生成目录（与 processedContent 共用同一份 HTML，确保 id 严格一致）
 const headings = computed(() => {
-  const content = props.selectedArticle?.renderContent || ''
-  if (!content) return []
-  const matches = [...content.matchAll(/<h([123])[^>]*>(.*?)<\/h[123]>/gi)]
+  const html = rawArticleHtml.value
+  if (!html) return []
+  const matches = [...html.matchAll(/<h([123])[^>]*>(.*?)<\/h[123]>/gi)]
   return matches.map((m, i) => ({
     id: `heading-${i}`,
     level: Number(m[1]),
-    text: m[2].replace(/<[^>]+>/g, ''),
+    text: m[2].replace(/<[^>]+>/g, '').trim(),
   }))
 })
 
@@ -52,10 +85,7 @@ const readingMinutes = computed(() => {
 })
 
 const processedContent = computed(() => {
-  let html = props.selectedArticle?.contentHtml || props.selectedArticle?.renderContent || ''
-  if (!html && props.selectedArticle?.content) {
-    html = renderMarkdown(props.selectedArticle.content)
-  }
+  const html = rawArticleHtml.value
   if (!html) return ''
   let idx = 0
   return html.replace(
@@ -64,52 +94,65 @@ const processedContent = computed(() => {
   )
 })
 
-// 滚动监听，高亮当前目录项
-let observer: IntersectionObserver | null = null
-
-function setupObserver() {
-  observer?.disconnect()
-  const targets = document.querySelectorAll('.article-body h1, .article-body h2, .article-body h3')
-  if (!targets.length) return
-  observer = new IntersectionObserver(
-    (entries) => {
-      for (const entry of entries) {
-        if (entry.isIntersecting) {
-          activeHeadingId.value = entry.target.id
-          break
-        }
-      }
-    },
-    { rootMargin: '-10% 0px -80% 0px' }
+function updateActiveHeading() {
+  const targets = Array.from(
+    document.querySelectorAll<HTMLElement>('.article-body h1, .article-body h2, .article-body h3')
   )
-  targets.forEach(el => observer!.observe(el))
+  if (!targets.length) {
+    activeHeadingId.value = ''
+    return
+  }
+
+  // 页面滚动到底部时高亮最后一个标题
+  if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 24) {
+    activeHeadingId.value = targets[targets.length - 1].id
+    return
+  }
+
+  // 找到最后一个已经越过顶部触发线（考虑固定导航栏高度）的标题
+  const offset = 120
+  let current = targets[0].id
+  for (const el of targets) {
+    if (el.getBoundingClientRect().top <= offset) {
+      current = el.id
+    } else {
+      break
+    }
+  }
+  activeHeadingId.value = current
 }
 
-watch(() => props.selectedArticle?.id, () => {
-  nextTick(setupObserver)
-})
+watch(
+  () => processedContent.value,
+  () => {
+    nextTick(updateActiveHeading)
+  },
+  { immediate: true }
+)
 
 function scrollToHeading(id: string) {
+  activeHeadingId.value = id
   const el = document.getElementById(id)
   if (el) el.scrollIntoView({ behavior: 'smooth', block: 'start' })
 }
 
 onUnmounted(() => {
-  observer?.disconnect()
   window.removeEventListener('scroll', onWindowScroll)
 })
 
-// 阅读进度（监听 window 滚动）
+// 阅读进度（监听 window 滚动，同步更新当前高亮目录）
 const readProgress = ref(0)
 function onWindowScroll() {
   const { scrollTop, scrollHeight, clientHeight } = document.documentElement
   readProgress.value = scrollHeight <= clientHeight
     ? 100
     : Math.round((scrollTop / (scrollHeight - clientHeight)) * 100)
+  updateActiveHeading()
 }
 
 onMounted(() => {
   window.addEventListener('scroll', onWindowScroll, { passive: true })
+  nextTick(updateActiveHeading)
 })
 </script>
 
@@ -550,25 +593,35 @@ onMounted(() => {
   gap: 0.05rem;
 }
 .toc-item {
-  padding: 0.3rem 0.6rem;
+  padding: 0.36rem 0.65rem;
   border-radius: 0.45rem;
   font-size: 0.78rem;
   color: #64748b;
   cursor: pointer;
-  line-height: 1.4;
-  transition: background 0.15s, color 0.15s;
-  border-left: 2px solid transparent;
+  line-height: 1.45;
+  transition: background 0.15s ease, color 0.15s ease, border-color 0.15s ease, transform 0.15s ease;
+  border-left: 3px solid transparent;
   overflow-wrap: break-word;
 }
-.toc-item:hover { background: rgba(37, 99, 235, 0.06); color: #2563eb; }
+.toc-item:hover {
+  background: rgba(17, 17, 17, 0.04);
+  color: #111111;
+}
 .toc-item.active {
-  background: rgba(37, 99, 235, 0.08);
-  color: #2563eb;
-  border-left-color: #2563eb;
+  background: #111111;
+  color: #ffffff;
+  border-left-color: #FDF800;
   font-weight: 700;
+  box-shadow: 0 2px 8px rgba(17, 17, 17, 0.12);
 }
 .toc-h2 { padding-left: 1rem; }
-.toc-h3 { padding-left: 1.6rem; font-size: 0.73rem; }
+.toc-h3 { padding-left: 1.55rem; font-size: 0.73rem; }
+
+:deep(.article-body h1),
+:deep(.article-body h2),
+:deep(.article-body h3) {
+  scroll-margin-top: 5.5rem;
+}
 
 /* 操作按钮 */
 .sidebar-actions {

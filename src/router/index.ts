@@ -123,6 +123,17 @@ const router = createRouter({
       }
     },
     {
+      path: '/dashboard/knowledge',
+      name: 'dashboard-knowledge',
+      component: App,
+      meta: {
+        page: 'dashboard-knowledge',
+        requiresAuth: true,
+        permission: 'dashboard:knowledge',
+        roles: ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN'],
+      }
+    },
+    {
       path: '/system/user',
       name: 'system-user',
       component: App,

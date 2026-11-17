@@ -20,14 +20,9 @@ export default defineConfig(({ mode }) => {
         theme_color: '#ffffff',
         icons: [
           {
-            src: 'pwa-192x192.png',
-            sizes: '192x192',
-            type: 'image/png'
-          },
-          {
-            src: 'pwa-512x512.png',
-            sizes: '512x512',
-            type: 'image/png'
+            src: '/favicon.svg',
+            sizes: 'any',
+            type: 'image/svg+xml'
           }
         ],
         display: 'standalone',
@@ -45,6 +40,11 @@ export default defineConfig(({ mode }) => {
     server: {
       host: '127.0.0.1',
       proxy: {
+        '/api/quant': {
+          target: env.VITE_QUANT_BACKEND_URL || 'http://localhost:8000',
+          changeOrigin: true,
+          secure: false,
+        },
         '/api': {
           target: backendUrl,
           changeOrigin: true,

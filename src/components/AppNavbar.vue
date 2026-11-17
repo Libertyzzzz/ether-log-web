@@ -3,8 +3,8 @@ import { ref, computed, watch, onMounted, onUnmounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   User, LogOut, FlaskConical, House, FileText,
-  Folder, Tag, MessageSquare, ChevronDown, Twitter, Instagram, Github,
-  Settings, Users, Shield, KeyRound, Search, Coffee, Sparkles
+  Twitter, Instagram, Github,
+  Settings, Search, Coffee, Sparkles
 } from 'lucide-vue-next'
 import type { LoginUser } from '../types/blog'
 import { getLoginUserName } from '../utils/article'
@@ -17,9 +17,10 @@ const canAccessDashboardArticle = computed(() => hasPermission('dashboard:articl
 const canAccessDashboardCategory = computed(() => hasPermission('dashboard:category') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 const canAccessDashboardTag = computed(() => hasPermission('dashboard:tag') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
 const canAccessDashboardComment = computed(() => hasPermission('dashboard:comment') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+const canAccessDashboardKnowledge = computed(() => hasPermission('dashboard:knowledge') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
 
 const canAccessDashboard = computed(() =>
-  canAccessDashboardArticle.value || canAccessDashboardCategory.value || canAccessDashboardTag.value || canAccessDashboardComment.value
+  canAccessDashboardArticle.value || canAccessDashboardCategory.value || canAccessDashboardTag.value || canAccessDashboardComment.value || canAccessDashboardKnowledge.value
 )
 
 const canAccessSystemUser = computed(() => hasPermission('system:user') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
@@ -27,7 +28,11 @@ const canAccessSystemRole = computed(() => hasPermission('system:role') || hasRo
 const canAccessSystemPermission = computed(() => hasPermission('system:permission') || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN']))
 const canAccessSystem = computed(() => canAccessSystemUser.value || canAccessSystemRole.value || canAccessSystemPermission.value)
 
-const showAdminEntries = computed(() => isBlogContext.value && props.isLoggedIn)
+const canAccessAdmin = computed(() =>
+  props.isLoggedIn && (canAccessDashboard.value || canAccessSystem.value || hasRole(['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR']))
+)
+
+const showAdminEntries = computed(() => (isBlogContext.value && props.isLoggedIn) || canAccessAdmin.value)
 const showSystemDropdown = ref(false)
 
 const props = defineProps<{
@@ -75,6 +80,7 @@ function goTo(page: string) {
     'dashboard-comment': '/dashboard/comment',
     'dashboard-media': '/dashboard/media',
     'dashboard-sensitive-words': '/dashboard/sensitive-words',
+    'dashboard-knowledge': '/dashboard/knowledge',
     'system-user': '/system/user',
     'system-role': '/system/role',
     'system-permission': '/system/permission',
@@ -276,44 +282,34 @@ onUnmounted(() => {
         </div>
 
         <div class="portfolio-actions">
-          <!-- 博客页面：管理入口（取代社交图标位置） -->
-          <template v-if="showAdminEntries">
-            <button class="portfolio-admin-entry" type="button" @click="goTo('profile')">
-              <User :size="15" />
-              个人主页
-            </button>
-            <button v-if="canAccessDashboard" class="portfolio-admin-entry" type="button" @click="goTo('dashboard')">
-              <FileText :size="15" />
-              数据面板
-            </button>
-            <div v-if="canAccessSystem" class="portfolio-system-wrap" @click.stop>
-              <button
-                class="portfolio-admin-entry has-chevron"
-                type="button"
-                @click="showSystemDropdown = !showSystemDropdown; emit('closeUserMenu')"
-              >
-                <Settings :size="15" />
-                系统管理
-                <ChevronDown :size="12" class="portfolio-chevron" :class="{ 'is-open': showSystemDropdown }" />
-              </button>
-              <Transition name="dropdown-fade">
-                <div v-if="showSystemDropdown" class="portfolio-system-menu">
-                  <button v-if="canAccessSystemUser" class="portfolio-system-item" type="button" @click="goTo('system-user')">
-                    <Users :size="14" /> 用户管理
-                  </button>
-                  <button v-if="canAccessSystemRole" class="portfolio-system-item" type="button" @click="goTo('system-role')">
-                    <Shield :size="14" /> 角色管理
-                  </button>
-                  <button v-if="canAccessSystemPermission" class="portfolio-system-item" type="button" @click="goTo('system-permission')">
-                    <KeyRound :size="14" /> 权限管理
-                  </button>
-                </div>
-              </Transition>
-            </div>
-          </template>
+          <!-- 登录用户在前台博客中的个人主页入口 -->
+          <button
+            v-if="isLoggedIn && isBlogContext"
+            class="portfolio-admin-entry"
+            :class="{ active: route.name === 'profile' }"
+            type="button"
+            title="个人主页"
+            @click="goTo('profile')"
+          >
+            <User :size="15" />
+            个人主页
+          </button>
 
-          <!-- 非博客页面：社交图标 -->
-          <template v-else>
+          <!-- 具有管理权限的账号，在顶栏直接展示「管理后台」胶囊按钮（一键直达 /dashboard） -->
+          <button
+            v-if="canAccessAdmin"
+            class="portfolio-admin-entry portfolio-admin-entry--admin"
+            :class="{ active: String(route.name).startsWith('dashboard') || String(route.name).startsWith('system') }"
+            type="button"
+            title="管理后台"
+            @click="goTo('dashboard')"
+          >
+            <Settings :size="15" />
+            管理后台
+          </button>
+
+          <!-- 未登录，或普通用户在非博客页面展示社交媒体图标 -->
+          <template v-if="!isBlogContext && !canAccessAdmin">
             <a class="portfolio-social" href="https://x.com/ether" target="_blank" rel="noopener" title="X">
               <Twitter :size="16" />
             </a>
@@ -349,7 +345,16 @@ onUnmounted(() => {
                   </div>
                 </div>
                 <div class="dropdown-divider"></div>
-                <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
+                <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); goTo('profile')">
+                  <User :size="14" /> 个人主页
+                </button>
+                <button v-if="canAccessAdmin" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); goTo('dashboard')">
+                  <Settings :size="14" /> 管理后台
+                </button>
+                <div class="dropdown-divider"></div>
+                <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')">
+                  <LogOut :size="14" /> 退出登录
+                </button>
               </div>
             </Transition>
           </div>
@@ -379,11 +384,13 @@ onUnmounted(() => {
             </div>
           </div>
           <div class="dropdown-divider"></div>
-          <button v-if="canAccessDashboardArticle" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-article' })"><FileText :size="14" /> 文章管理</button>
-          <button v-if="canAccessDashboardCategory" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-category' })"><Folder :size="14" /> 分类管理</button>
-          <button v-if="canAccessDashboardTag" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-tag' })"><Tag :size="14" /> 标签管理</button>
-          <button v-if="canAccessDashboardComment" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); router.push({ name: 'dashboard-comment' })"><MessageSquare :size="14" /> 评论管理</button>
-          <div v-if="canAccessDashboardArticle || canAccessDashboardCategory || canAccessDashboardTag || canAccessDashboardComment" class="dropdown-divider"></div>
+          <button class="dropdown-item" type="button" @click="$emit('closeUserMenu'); goTo('profile')">
+            <User :size="14" /> 个人主页
+          </button>
+          <button v-if="canAccessAdmin" class="dropdown-item" type="button" @click="$emit('closeUserMenu'); goTo('dashboard')">
+            <Settings :size="14" /> 管理后台
+          </button>
+          <div class="dropdown-divider"></div>
           <button class="dropdown-item danger" type="button" @click="$emit('closeUserMenu'); $emit('logout')"><LogOut :size="14" /> 退出登录</button>
         </div>
       </Transition>
@@ -1340,8 +1347,8 @@ kbd {
 .portfolio-admin-entry {
   display: inline-flex;
   align-items: center;
-  gap: 0.28rem;
-  padding: 0.38rem 0.6rem;
+  gap: 0.32rem;
+  padding: 0.38rem 0.65rem;
   background: #ffffff;
   color: #111827;
   border: 1px solid #e2e8f0;
@@ -1359,15 +1366,21 @@ kbd {
   color: #ffffff;
   border-color: #111827;
 }
-.portfolio-admin-entry.has-chevron {
-  padding-right: 0.55rem;
+.portfolio-admin-entry.active {
+  background: #111827;
+  color: #ffffff;
+  border-color: #111827;
 }
-.portfolio-admin-entry .portfolio-chevron {
-  margin-left: 0.08rem;
-  transition: transform 0.2s ease;
+.portfolio-admin-entry--admin {
+  background: rgba(248, 250, 252, 0.95);
+  border-color: rgba(203, 213, 225, 0.85);
+  color: #1e293b;
 }
-.portfolio-admin-entry .portfolio-chevron.is-open {
-  transform: rotate(180deg);
+.portfolio-admin-entry--admin:hover,
+.portfolio-admin-entry--admin.active {
+  background: #0f172a;
+  color: #ffffff;
+  border-color: #0f172a;
 }
 
 /* ══════════════════════════════════════════════════
@@ -1545,7 +1558,7 @@ kbd {
   border-radius: 0.5rem;
   font-size: 0.78rem;
   font-weight: 600;
-  color: #ef4444;
+  color: #334155;
   cursor: pointer;
   display: flex;
   align-items: center;
@@ -1555,6 +1568,15 @@ kbd {
 }
 
 .portfolio-user-menu-simple .dropdown-item:hover {
+  background: #f1f5f9;
+  color: #0f172a;
+}
+
+.portfolio-user-menu-simple .dropdown-item.danger {
+  color: #ef4444;
+}
+
+.portfolio-user-menu-simple .dropdown-item.danger:hover {
   background: #fef2f2;
   color: #dc2626;
 }
