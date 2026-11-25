@@ -4,6 +4,7 @@ import type { LoginUser, UserPermissionInfo } from '../types/blog'
 import {
   hasAuthToken,
   login as apiLogin,
+  previewLogin as apiPreviewLogin,
   refreshToken as apiRefreshToken,
   fetchUserProfile as apiFetchUserProfile,
   updateUserProfile as apiUpdateUserProfile,
@@ -38,6 +39,14 @@ export const isSuperAdmin = computed(() => {
   return !!(
     userPermissions.value?.isSuperAdmin ||
     userPermissions.value?.roleCodes?.includes('ROLE_SUPER_ADMIN')
+  )
+})
+
+export const isReadOnlyViewer = computed(() => {
+  return !!(
+    getStoredItem('authDemoMode') === 'true' ||
+    loginUser.value?.username === 'viewer' ||
+    userPermissions.value?.roleCodes?.includes('ROLE_VIEWER')
   )
 })
 
@@ -308,6 +317,7 @@ export function useAuth() {
     removeStoredItem('authToken')
     removeStoredItem('authTokenExpire')
     removeStoredItem('authUser')
+    removeStoredItem('authDemoMode')
     removeStoredItem(PERMISSIONS_KEY)
     clearRefreshTimer()
     removeAuthEventListeners()
@@ -323,6 +333,7 @@ export function useAuth() {
 
     try {
       const loginData = await apiLogin(email, password)
+      removeStoredItem('authDemoMode')
       setStoredItem('authToken', loginData.token)
       if (typeof loginData.expire === 'number') setTokenExpire(loginData.expire)
       setStoredItem('authUser', JSON.stringify(loginData.user))
@@ -354,6 +365,53 @@ export function useAuth() {
       } else {
         loginError.value = '登录接口暂不可用，请确认后端服务和代理配置是否正常。'
       }
+      return false
+    } finally {
+      isLoggingIn.value = false
+    }
+  }
+
+  async function loginWithPreviewCode(code: string): Promise<boolean> {
+    const trimmed = (code || '').trim()
+    if (!trimmed) return false
+
+    isLoggingIn.value = true
+    loginError.value = ''
+
+    const viewerPermPayload: UserPermissionInfo = {
+      userId: -999,
+      isSuperAdmin: false,
+      roleCodes: ['ROLE_VIEWER', 'ROLE_ADMIN'],
+      permissionCodes: [
+        'dashboard',
+        'dashboard:article',
+        'dashboard:category',
+        'dashboard:tag',
+        'dashboard:comment',
+        'dashboard:media',
+        'dashboard:sensitive',
+        'dashboard:knowledge',
+        'dashboard:knowledge:index',
+        'system',
+        'system:user',
+        'system:role',
+        'system:permission',
+      ],
+    }
+
+    try {
+      const loginData = await apiPreviewLogin(trimmed)
+      setStoredItem('authDemoMode', 'true')
+      setStoredItem('authToken', loginData.token)
+      if (typeof loginData.expire === 'number') setTokenExpire(loginData.expire)
+      setStoredItem('authUser', JSON.stringify(loginData.user))
+      setStoredItem(PERMISSIONS_KEY, JSON.stringify(viewerPermPayload))
+      loginUser.value = loginData.user
+      userPermissions.value = viewerPermPayload
+      isLoggedIn.value = true
+      setupAxiosInterceptor()
+      return true
+    } catch {
       return false
     } finally {
       isLoggingIn.value = false
@@ -430,6 +488,7 @@ export function useAuth() {
     loginUser,
     userPermissions,
     isSuperAdmin,
+    isReadOnlyViewer,
     userRoles,
     userPermissionCodes,
     isLoggingIn,
@@ -442,6 +501,7 @@ export function useAuth() {
     initFromLocalStorage,
     clearLoginState,
     login,
+    loginWithPreviewCode,
     logout,
     fetchUserProfile,
     updateUserProfile,

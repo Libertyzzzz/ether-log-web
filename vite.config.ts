@@ -71,6 +71,9 @@ export default defineConfig(({ mode }) => {
         output: {
           manualChunks: {
             'vue-vendor': ['vue', 'vue-router'],
+            'echarts-vendor': ['echarts'],
+            'editor-vendor': ['@tiptap/vue-3', '@tiptap/starter-kit'],
+            'icons-vendor': ['lucide-vue-next'],
           },
         },
       },

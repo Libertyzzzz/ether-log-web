@@ -1,8 +1,9 @@
 import { createRouter, createWebHistory } from 'vue-router'
 import App from '../App.vue'
-import Assessment from '../views/Assessment.vue'
 import { hasAuthToken } from '../api'
 import { hasPermission, hasRole } from '../composables/useAuth'
+
+const Assessment = () => import('../views/Assessment.vue')
 
 const router = createRouter({
   history: createWebHistory(),
@@ -52,7 +53,20 @@ const router = createRouter({
       meta: {
         page: 'dashboard',
         requiresAuth: true,
-        permission: 'dashboard',
+        permission: [
+          'dashboard',
+          'dashboard:article',
+          'dashboard:category',
+          'dashboard:tag',
+          'dashboard:comment',
+          'dashboard:media',
+          'dashboard:sensitive',
+          'dashboard:knowledge',
+          'system',
+          'system:user',
+          'system:role',
+          'system:permission',
+        ],
         roles: ['ROLE_SUPER_ADMIN', 'ROLE_ADMIN', 'ROLE_EDITOR'],
       }
     },
@@ -235,15 +249,22 @@ router.beforeEach((to, _from, next) => {
     return next({ path: '/' })
   }
 
-  if (requiredRole && !hasRole(requiredRole)) {
-    return next({ path: '/' })
-  }
-  if (requiredRoles && !hasRole(requiredRoles)) {
-    return next({ path: '/' })
-  }
+  if (requiredRole || requiredRoles || requiredPermission) {
+    const roleMatched =
+      (requiredRole ? hasRole(requiredRole) : false) ||
+      (requiredRoles ? hasRole(requiredRoles) : false)
+    const permMatched = requiredPermission ? hasPermission(requiredPermission) : false
 
-  if (requiredPermission && !hasPermission(requiredPermission)) {
-    return next({ path: '/' })
+    // 如果路由同时配置了角色和权限（如后台路由），满足对应细粒度权限或具备对应角色即可放行
+    if (requiredPermission && (requiredRole || requiredRoles)) {
+      if (!permMatched && !roleMatched) {
+        return next({ path: '/' })
+      }
+    } else if (requiredPermission && !permMatched) {
+      return next({ path: '/' })
+    } else if ((requiredRole || requiredRoles) && !roleMatched) {
+      return next({ path: '/' })
+    }
   }
 
   next()

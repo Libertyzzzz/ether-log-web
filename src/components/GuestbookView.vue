@@ -12,16 +12,29 @@ defineProps<{
 <template>
   <div class="gb-page">
     <div class="gb-container">
-      <!-- Unified Editorial Hero -->
+      <!-- Unified Matte-Black Studio Hero -->
       <header class="gb-hero">
         <div class="gb-hero-main">
-          <span class="gb-eyebrow">Community / Guestbook</span>
-          <h1>留言板</h1>
+          <div class="gb-hero-title-row">
+            <h1>留言板</h1>
+            <span class="gb-status-pill">
+              <MessageSquareHeart :size="13" />
+              Open for Feedback
+            </span>
+          </div>
           <p class="gb-sub">欢迎留下你的想法、问题、建议，或者只是打个招呼。支持匿名访客与 Markdown 语法。</p>
         </div>
-        <div class="gb-hero-badge">
-          <MessageSquareHeart :size="15" />
-          <span>Open for Feedback</span>
+
+        <div class="gb-hero-aside">
+          <div class="gb-aside-item">
+            <span>支持格式</span>
+            <strong>Markdown · 代码块</strong>
+          </div>
+          <div class="gb-aside-divider"></div>
+          <div class="gb-aside-item">
+            <span>访客权限</span>
+            <strong>免登录直接留言</strong>
+          </div>
         </div>
       </header>
 
@@ -51,7 +64,7 @@ defineProps<{
             </h3>
             <p class="gb-card-text">你的每一条留言我都会认真阅读。如果是 BUG 报告或技术交流，会尽快回复。</p>
             <div class="gb-card-footer">
-              <Coffee :size="14" />
+              <Coffee :size="13" />
               <span>Enjoy your stay here.</span>
             </div>
           </div>
@@ -65,7 +78,7 @@ defineProps<{
 .gb-page {
   min-height: 100dvh;
   background: #ffffff;
-  padding: 5.75rem 0 4rem;
+  padding: 5.5rem 0 4rem;
   color: #111111;
 }
 
@@ -77,67 +90,99 @@ defineProps<{
   box-sizing: border-box;
 }
 
-/* ── Unified Editorial Hero ── */
+/* ── Unified Matte-Black Studio Hero ── */
 .gb-hero {
   display: flex;
   justify-content: space-between;
-  align-items: flex-end;
+  align-items: center;
   gap: 1.5rem;
-  padding-bottom: 2rem;
-  margin-bottom: 2rem;
-  border-bottom: 1px solid rgba(0, 0, 0, 0.08);
+  padding: 1.65rem 2rem;
+  margin-bottom: 1.75rem;
+  border-radius: 16px;
+  background: #111111;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  color: #ffffff;
 }
 
-.gb-eyebrow {
-  display: inline-block;
-  padding: 0.3rem 0.9rem;
-  background: #FDF800;
-  color: #111111;
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
+.gb-hero-title-row {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+
+.gb-status-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.28rem 0.75rem;
   border-radius: 999px;
-  margin-bottom: 1rem;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: rgba(255, 255, 255, 0.9);
+  font-size: 0.72rem;
+  font-weight: 650;
+  white-space: nowrap;
 }
 
 .gb-hero h1 {
   margin: 0;
-  font-size: clamp(2.1rem, 1.4rem + 2.5vw, 3.25rem);
+  font-size: clamp(1.85rem, 1.35rem + 1.8vw, 2.5rem);
   font-weight: 800;
-  line-height: 1.05;
+  line-height: 1.1;
   letter-spacing: -0.025em;
-  color: #111111;
+  color: #ffffff;
 }
 
 .gb-sub {
-  margin: 0.85rem 0 0;
-  color: rgba(0, 0, 0, 0.58);
-  font-size: 0.98rem;
-  line-height: 1.65;
-  max-width: 560px;
+  margin: 0.65rem 0 0;
+  color: rgba(255, 255, 255, 0.68);
+  font-size: 0.92rem;
+  line-height: 1.6;
+  max-width: 520px;
 }
 
-.gb-hero-badge {
-  display: inline-flex;
+.gb-hero-aside {
+  display: flex;
   align-items: center;
-  gap: 0.45rem;
-  padding: 0.48rem 0.9rem;
-  border-radius: 999px;
-  background: #f8fafc;
-  border: 1px solid rgba(0, 0, 0, 0.08);
-  color: #111111;
-  font-size: 0.78rem;
-  font-weight: 650;
-  white-space: nowrap;
+  gap: 1.25rem;
+  padding: 1rem 1.35rem;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
   flex-shrink: 0;
+}
+
+.gb-aside-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+}
+
+.gb-aside-item span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.gb-aside-item strong {
+  font-size: 0.92rem;
+  font-weight: 750;
+  color: #ffffff;
+  white-space: nowrap;
+}
+
+.gb-aside-divider {
+  width: 1px;
+  height: 2rem;
+  background: rgba(255, 255, 255, 0.12);
 }
 
 /* ── Main Layout ── */
 .gb-main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 320px;
-  gap: 1.75rem;
+  grid-template-columns: minmax(0, 1fr) 310px;
+  gap: 1.5rem;
   align-items: start;
 }
 
@@ -150,44 +195,43 @@ defineProps<{
   flex-direction: column;
   gap: 1rem;
   position: sticky;
-  top: 5.5rem;
+  top: 5.25rem;
 }
 
 .gb-card {
   background: #ffffff;
-  border-radius: 16px;
-  padding: 1.25rem;
+  border-radius: 14px;
+  padding: 1.2rem;
   border: 1px solid rgba(0, 0, 0, 0.08);
   transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
 
 .gb-card:hover {
-  border-color: rgba(0, 0, 0, 0.16);
+  border-color: rgba(0, 0, 0, 0.15);
   box-shadow: 0 8px 24px rgba(0, 0, 0, 0.04);
 }
 
 .gb-card.featured {
   background: #fafaf9;
-  border-color: rgba(0, 0, 0, 0.1);
 }
 
 .gb-card-title {
   display: flex;
   align-items: center;
   gap: 0.55rem;
-  font-size: 0.94rem;
+  font-size: 0.92rem;
   font-weight: 750;
   color: #111111;
-  margin: 0 0 0.9rem;
+  margin: 0 0 0.85rem;
 }
 
 .gb-card-icon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
-  border-radius: 8px;
+  width: 26px;
+  height: 26px;
+  border-radius: 7px;
   background: #FDF800;
   color: #111111;
   flex-shrink: 0;
@@ -204,14 +248,14 @@ defineProps<{
   list-style: none;
   display: flex;
   flex-direction: column;
-  gap: 0.55rem;
+  gap: 0.5rem;
 }
 
 .gb-rules li {
-  font-size: 0.85rem;
+  font-size: 0.83rem;
   color: rgba(0, 0, 0, 0.65);
   line-height: 1.5;
-  padding-left: 1rem;
+  padding-left: 0.95rem;
   position: relative;
 }
 
@@ -219,7 +263,7 @@ defineProps<{
   content: "";
   position: absolute;
   left: 0;
-  top: 0.5em;
+  top: 0.52em;
   width: 5px;
   height: 5px;
   border-radius: 50%;
@@ -227,7 +271,7 @@ defineProps<{
 }
 
 .gb-card-text {
-  font-size: 0.88rem;
+  font-size: 0.84rem;
   color: rgba(0, 0, 0, 0.65);
   line-height: 1.65;
   margin: 0 0 0.85rem;
@@ -237,10 +281,10 @@ defineProps<{
   display: inline-flex;
   align-items: center;
   gap: 0.45rem;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   color: #111111;
   font-weight: 700;
-  padding: 0.3rem 0.7rem;
+  padding: 0.28rem 0.7rem;
   background: #ffffff;
   border: 1px solid rgba(0, 0, 0, 0.08);
   border-radius: 999px;
@@ -248,6 +292,17 @@ defineProps<{
 
 /* ── Responsive ── */
 @media (max-width: 960px) {
+  .gb-hero {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .gb-hero-aside {
+    width: 100%;
+    box-sizing: border-box;
+    justify-content: space-between;
+  }
+
   .gb-main-grid {
     grid-template-columns: 1fr;
     gap: 1.25rem;
@@ -268,15 +323,19 @@ defineProps<{
   }
 
   .gb-hero {
-    flex-direction: column;
-    align-items: flex-start;
-    gap: 1rem;
-    padding-bottom: 1.5rem;
-    margin-bottom: 1.5rem;
+    padding: 1.35rem;
+    border-radius: 14px;
+    gap: 1.1rem;
+    margin-bottom: 1.25rem;
+  }
+
+  .gb-hero-aside {
+    padding: 0.85rem 1rem;
+    gap: 0.9rem;
   }
 
   .gb-sub {
-    font-size: 0.92rem;
+    font-size: 0.88rem;
   }
 
   .gb-card {

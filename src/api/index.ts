@@ -125,6 +125,23 @@ axios.interceptors.request.use(
       config.headers = config.headers || {}
       if (!config.headers.Authorization) config.headers.Authorization = token
     }
+
+    // 只读预览模式拦截：保护线上生产数据，拦截后台写操作
+    const isDemoMode = getStoredItem('authDemoMode') === 'true'
+    const method = (config.method || 'get').toLowerCase()
+    const url = config.url || ''
+    if (isDemoMode && ['post', 'put', 'delete', 'patch'].includes(method)) {
+      const allowedDemoPostPaths = ['/api/auth/', '/api/quant/', '/api/v2/assessment/', '/api/agent/']
+      const isAllowed = allowedDemoPostPaths.some((prefix) => url.startsWith(prefix))
+      if (!isAllowed) {
+        const msg = '当前为只读预览权限，不支持修改或删除数据'
+        dispatchForbiddenEvent(msg, url, config)
+        const err = new Error(msg) as Error & { _forbiddenHandled?: boolean }
+        err._forbiddenHandled = true
+        return Promise.reject(err)
+      }
+    }
+
     return config
   },
   (error) => Promise.reject(error),
@@ -471,6 +488,65 @@ export async function login(email: string, password: string): Promise<LoginData>
     }
   }
   return loginData
+}
+
+export async function previewLogin(code: string): Promise<LoginData> {
+  const response = await axios.post<ResultResponse<LoginData>>('/api/auth/preview-login', { code })
+  if (response.data.code !== 200 || !response.data.data?.token) {
+    throw new Error(response.data.message || '预览链接无效或已过期')
+  }
+  const loginData = response.data.data
+  const fromApi = normalizeExpire(loginData.expire)
+  if (fromApi) {
+    loginData.expire = fromApi
+  }
+  return loginData
+}
+
+export interface PreviewLinkConfig {
+  enabled: boolean
+  code: string
+}
+
+export async function fetchPreviewLinkConfig(): Promise<PreviewLinkConfig> {
+  const response = await axios.get<ResultResponse<PreviewLinkConfig>>('/api/auth/preview-link')
+  if (response.data.code === 200 && response.data.data) {
+    return response.data.data
+  }
+  return {
+    enabled: getStoredItem('previewLinkEnabled') !== 'false',
+    code: getStoredItem('previewLinkCode') || 'nx_preview_2026',
+  }
+}
+
+export async function updatePreviewLinkConfig(
+  action: 'reset' | 'toggle',
+  enabled?: boolean
+): Promise<PreviewLinkConfig> {
+  try {
+    const response = await axios.post<ResultResponse<PreviewLinkConfig>>('/api/auth/preview-link/reset', {
+      action,
+      enabled,
+    })
+    if (response.data.code === 200 && response.data.data) {
+      setStoredItem('previewLinkCode', response.data.data.code)
+      setStoredItem('previewLinkEnabled', String(response.data.data.enabled))
+      return response.data.data
+    }
+  } catch {
+    // 后端未重启时本地降级生成
+  }
+  if (action === 'toggle' && typeof enabled === 'boolean') {
+    setStoredItem('previewLinkEnabled', String(enabled))
+    return {
+      enabled,
+      code: getStoredItem('previewLinkCode') || 'nx_preview_2026',
+    }
+  }
+  const newCode = 'nx_' + Math.random().toString(36).slice(2, 10) + Date.now().toString(36).slice(-4)
+  setStoredItem('previewLinkCode', newCode)
+  setStoredItem('previewLinkEnabled', 'true')
+  return { enabled: true, code: newCode }
 }
 
 export async function refreshToken(): Promise<RefreshTokenData> {

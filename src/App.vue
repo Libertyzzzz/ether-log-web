@@ -1,37 +1,42 @@
 <script setup lang="ts">
-import { computed, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
+import { computed, defineAsyncComponent, nextTick, onMounted, onUnmounted, reactive, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import axios from 'axios'
 import QRCode from 'qrcode'
 import confetti from 'canvas-confetti'
 import AppFooter from './components/AppFooter.vue'
 import AppNavbar from './components/AppNavbar.vue'
-import AIAssistant from './components/AIAssistant.vue'
-import { useAIAssistant } from './composables/useAIAssistantGlobal'
-import SidebarNav from './components/SidebarNav.vue'
-import ArticleDetailView from './components/ArticleDetailView.vue'
-import DashboardPage from './components/DashboardPage.vue'
-import MediaHubPage from './components/MediaHubPage.vue'
-import SensitiveWordPage from './components/SensitiveWordPage.vue'
-import ArticlePage from './components/dashboard/ArticlePage.vue'
-import CategoryPage from './components/dashboard/CategoryPage.vue'
-import TagPage from './components/dashboard/TagPage.vue'
-import CommentPage from './components/dashboard/CommentPage.vue'
-import UserPage from './components/system/UserPage.vue'
-import RolePage from './components/system/RolePage.vue'
-import PermissionPage from './components/system/PermissionPage.vue'
-import KnowledgeBasePage from './components/dashboard/KnowledgeBasePage.vue'
-import GuestbookView from './components/GuestbookView.vue'
 import HomePage from './components/HomePage.vue'
-import BlogHomePage from './components/BlogHomePage.vue'
-import LoginModal from './components/LoginModal.vue'
 import AppToast from './components/AppToast.vue'
 import AppConfirmDialog from './components/AppConfirmDialog.vue'
-import SearchModal from './components/SearchModal.vue'
-import ProfilePage from './components/ProfilePage.vue'
-import PublishModal from './components/PublishModal.vue'
-import QuantLabPage from './components/QuantLabPage.vue'
-import DownloadsPage from './components/DownloadsPage.vue'
+import { useAIAssistant } from './composables/useAIAssistantGlobal'
+
+// 非首屏页面与重型组件（ECharts / Tiptap / 管理后台等）全部按需异步分包加载
+const AIAssistant = defineAsyncComponent(() => import('./components/AIAssistant.vue'))
+const SidebarNav = defineAsyncComponent(() => import('./components/SidebarNav.vue'))
+const ArticleDetailView = defineAsyncComponent(() => import('./components/ArticleDetailView.vue'))
+const BlogHomePage = defineAsyncComponent(() => import('./components/BlogHomePage.vue'))
+const GuestbookView = defineAsyncComponent(() => import('./components/GuestbookView.vue'))
+const DownloadsPage = defineAsyncComponent(() => import('./components/DownloadsPage.vue'))
+const ProfilePage = defineAsyncComponent(() => import('./components/ProfilePage.vue'))
+const QuantLabPage = defineAsyncComponent(() => import('./components/QuantLabPage.vue'))
+const LoginModal = defineAsyncComponent(() => import('./components/LoginModal.vue'))
+const SearchModal = defineAsyncComponent(() => import('./components/SearchModal.vue'))
+const PublishModal = defineAsyncComponent(() => import('./components/PublishModal.vue'))
+
+// 管理后台异步分包（普通访客不下载任何后台代码）
+const AdminLayout = defineAsyncComponent(() => import('./components/admin/AdminLayout.vue'))
+const DashboardPage = defineAsyncComponent(() => import('./components/DashboardPage.vue'))
+const MediaHubPage = defineAsyncComponent(() => import('./components/MediaHubPage.vue'))
+const SensitiveWordPage = defineAsyncComponent(() => import('./components/SensitiveWordPage.vue'))
+const ArticlePage = defineAsyncComponent(() => import('./components/dashboard/ArticlePage.vue'))
+const CategoryPage = defineAsyncComponent(() => import('./components/dashboard/CategoryPage.vue'))
+const TagPage = defineAsyncComponent(() => import('./components/dashboard/TagPage.vue'))
+const CommentPage = defineAsyncComponent(() => import('./components/dashboard/CommentPage.vue'))
+const KnowledgeBasePage = defineAsyncComponent(() => import('./components/dashboard/KnowledgeBasePage.vue'))
+const UserPage = defineAsyncComponent(() => import('./components/system/UserPage.vue'))
+const RolePage = defineAsyncComponent(() => import('./components/system/RolePage.vue'))
+const PermissionPage = defineAsyncComponent(() => import('./components/system/PermissionPage.vue'))
 import type {
   ArticleDetail,
   ArticleListItem,
@@ -102,6 +107,7 @@ const {
   initFromLocalStorage,
   clearLoginState,
   login: authLogin,
+  loginWithPreviewCode,
   logout: authLogout,
   fetchUserProfile,
   updateUserProfile,
@@ -263,6 +269,9 @@ function handleFilterCategory(label: string) {
 const articleForDetail = computed(() => selectedArticle.value || selectedArticlePreview.value)
 const isArticleDetailOpen = computed(() => Boolean(articleForDetail.value))
 const currentPage = computed(() => (route.meta.page as string) || 'home')
+const isAdminConsolePage = computed(
+  () => currentPage.value.startsWith('dashboard') || currentPage.value.startsWith('system')
+)
 const showActionsOnPage = computed(() => currentPage.value === 'profile' || currentPage.value === 'dashboard')
 const totalViews = computed(() =>
   articles.value.reduce((sum, item) => sum + (item.viewCount || 0), 0)
@@ -1190,6 +1199,10 @@ onMounted(async () => {
   window.addEventListener('api:forbidden', (evt: Event) => {
     const detail = (evt as CustomEvent).detail
     const rawMessage = detail?.message || '抱歉，你没有该操作的权限'
+    if (rawMessage.includes('只读预览')) {
+      showAppToast(`🔒 ${rawMessage}`, 'info')
+      return
+    }
     const friendlyMessage = rawMessage.length > 60
       ? '抱歉，你没有该操作的权限，请联系管理员授权'
       : rawMessage
@@ -1197,7 +1210,18 @@ onMounted(async () => {
   })
 
   await checkGateStatus()
-  initFromLocalStorage()
+
+  // 优先识别专属预览链接参数 (?preview=xxx)，先换取真实后端 JWT 再初始化后续数据请求
+  const urlObj = new URL(window.location.href)
+  const previewCode = urlObj.searchParams.get('preview')
+  if (previewCode) {
+    urlObj.searchParams.delete('preview')
+    window.history.replaceState({}, '', urlObj.pathname + urlObj.search + urlObj.hash)
+    await loginWithPreviewCode(previewCode)
+  } else {
+    initFromLocalStorage()
+  }
+
   fetchUserProfile(true)
   await fetchCategories()
   fetchTags()
@@ -1239,6 +1263,7 @@ onUnmounted(() => {
 
     <div v-else class="main-site-shell" :class="{ locked: !accessGranted }" :aria-hidden="!accessGranted">
       <AppNavbar
+        v-if="!isAdminConsolePage"
         :is-logged-in="isLoggedIn"
         :login-user="loginUser"
         :show-user-menu="showUserMenu"
@@ -1350,79 +1375,88 @@ onUnmounted(() => {
             @update-profile="handleProfileUpdate"
           />
 
-          <DashboardPage
-            v-if="currentPage === 'dashboard'"
-            :articles="dashboardArticles"
-            :categories="categories"
-            :tags="tags"
-            :is-loading-articles="isLoadingAdminArticles"
-            :pending-comments="pendingComments"
-            :is-loading-pending="isLoadingPending"
-            :comment-count="commentCount"
-            :total-views="totalViews"
-            :page="adminPage"
-            :total="adminTotal"
-            :page-size="ADMIN_PAGE_SIZE"
+          <AdminLayout
+            v-if="isAdminConsolePage"
+            :current-page="currentPage"
+            :login-user="loginUser"
+            :pending-comment-count="commentCount"
             @new-article="openPublishModal"
-            @edit-article="openPublishModal"
-            @delete-article="deleteArticle"
-            @open-article="openArticleDetail"
-            @approve-comment="handleApproveComment"
-            @delete-comment="handleDeleteComment"
-            @page-change="handleAdminPageChange"
-            @refresh-categories="fetchCategories"
-            @refresh-tags="fetchTags"
-          />
+            @logout="handleLogout"
+          >
+            <DashboardPage
+              v-if="currentPage === 'dashboard'"
+              :articles="dashboardArticles"
+              :categories="categories"
+              :tags="tags"
+              :is-loading-articles="isLoadingAdminArticles"
+              :pending-comments="pendingComments"
+              :is-loading-pending="isLoadingPending"
+              :comment-count="commentCount"
+              :total-views="totalViews"
+              :page="adminPage"
+              :total="adminTotal"
+              :page-size="ADMIN_PAGE_SIZE"
+              @new-article="openPublishModal"
+              @edit-article="openPublishModal"
+              @delete-article="deleteArticle"
+              @open-article="openArticleDetail"
+              @approve-comment="handleApproveComment"
+              @delete-comment="handleDeleteComment"
+              @page-change="handleAdminPageChange"
+              @refresh-categories="fetchCategories"
+              @refresh-tags="fetchTags"
+            />
 
-          <MediaHubPage
-            v-if="currentPage === 'dashboard-media'"
-            @back="router.push('/dashboard')"
-          />
+            <MediaHubPage
+              v-if="currentPage === 'dashboard-media'"
+              @back="router.push('/dashboard')"
+            />
 
-          <SensitiveWordPage
-            v-if="currentPage === 'dashboard-sensitive-words'"
-            @back="router.push('/dashboard')"
-          />
+            <SensitiveWordPage
+              v-if="currentPage === 'dashboard-sensitive-words'"
+              @back="router.push('/dashboard')"
+            />
 
-          <KnowledgeBasePage
-            v-if="currentPage === 'dashboard-knowledge'"
-            @back="router.push('/dashboard')"
-          />
+            <KnowledgeBasePage
+              v-if="currentPage === 'dashboard-knowledge'"
+              @back="router.push('/dashboard')"
+            />
 
-          <ArticlePage
-            v-if="currentPage === 'dashboard-article'"
-            @back="router.push('/dashboard')"
-          />
+            <ArticlePage
+              v-if="currentPage === 'dashboard-article'"
+              @back="router.push('/dashboard')"
+            />
 
-          <CategoryPage
-            v-if="currentPage === 'dashboard-category'"
-            @back="router.push('/dashboard')"
-          />
+            <CategoryPage
+              v-if="currentPage === 'dashboard-category'"
+              @back="router.push('/dashboard')"
+            />
 
-          <TagPage
-            v-if="currentPage === 'dashboard-tag'"
-            @back="router.push('/dashboard')"
-          />
+            <TagPage
+              v-if="currentPage === 'dashboard-tag'"
+              @back="router.push('/dashboard')"
+            />
 
-          <CommentPage
-            v-if="currentPage === 'dashboard-comment'"
-            @back="router.push('/dashboard')"
-          />
+            <CommentPage
+              v-if="currentPage === 'dashboard-comment'"
+              @back="router.push('/dashboard')"
+            />
 
-          <UserPage
-            v-if="currentPage === 'system-user'"
-            @back="router.push('/dashboard')"
-          />
+            <UserPage
+              v-if="currentPage === 'system-user'"
+              @back="router.push('/dashboard')"
+            />
 
-          <RolePage
-            v-if="currentPage === 'system-role'"
-            @back="router.push('/dashboard')"
-          />
+            <RolePage
+              v-if="currentPage === 'system-role'"
+              @back="router.push('/dashboard')"
+            />
 
-          <PermissionPage
-            v-if="currentPage === 'system-permission'"
-            @back="router.push('/dashboard')"
-          />
+            <PermissionPage
+              v-if="currentPage === 'system-permission'"
+              @back="router.push('/dashboard')"
+            />
+          </AdminLayout>
 
           <GuestbookView
             v-if="currentPage === 'guestbook'"

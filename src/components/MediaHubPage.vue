@@ -14,7 +14,7 @@ defineEmits<{
 }>()
 
 type MediaStatus = 'temporary' | 'permanent' | 'orphan'
-type FileType = 'jpg' | 'png' | 'webp' | 'gif'
+type FileType = 'jpg' | 'png' | 'webp' | 'gif' | 'svg'
 type UsageType = 'article' | 'avatar' | 'ad' | 'other'
 
 interface MediaItem {
@@ -37,8 +37,9 @@ interface MediaItem {
 function mapImageVo(item: ImageInfoVo): MediaItem {
   const isTemp = item.isTemporary
   const status: MediaStatus = isTemp ? 'temporary' : (item.referenceCount === 0 ? 'orphan' : 'permanent')
-  const ext = item.mimeType?.split('/').pop() || 'jpg'
-  const format = (['jpg', 'png', 'webp', 'gif'].includes(ext) ? ext : 'jpg') as FileType
+  const extRaw = item.mimeType?.split('/').pop() || 'jpg'
+  const ext = extRaw === 'svg+xml' ? 'svg' : extRaw
+  const format = (['jpg', 'png', 'webp', 'gif', 'svg'].includes(ext) ? ext : 'jpg') as FileType
   const usageTypeMap: Record<string, UsageType> = {
     '1': 'article', '2': 'avatar', '3': 'article', '4': 'other', '100': 'other',
   }
@@ -93,7 +94,7 @@ async function loadData() {
     params.usageType = selectedUsage.value
   }
   if (selectedFormat.value !== 'all') {
-    const mimeMap: Record<FileType, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif' }
+    const mimeMap: Record<FileType, string> = { jpg: 'image/jpeg', png: 'image/png', webp: 'image/webp', gif: 'image/gif', svg: 'image/svg+xml' }
     params.mimeType = mimeMap[selectedFormat.value]
   }
 

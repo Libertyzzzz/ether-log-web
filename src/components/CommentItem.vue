@@ -35,6 +35,9 @@ const errorMsg = ref('')
 const hasChildren = computed(() => props.comment.children && props.comment.children.length > 0)
 const childCount = computed(() => props.comment.children?.length || 0)
 const anonymousProfileReadyItem = computed(() => isAnonymousProfileReady())
+const avatarFailed = ref(false)
+const authorDisplayName = computed(() => props.comment.nickname || props.comment.author || '访客')
+const authorInitial = computed(() => authorDisplayName.value.trim().charAt(0).toUpperCase())
 
 function toggleCollapse() {
   collapsed.value = !collapsed.value
@@ -113,14 +116,17 @@ async function submitReply(): Promise<boolean> {
     <div class="comment-main">
       <div class="comment-header">
         <img
-          :src="comment.avatar || 'https://api.dicebear.com/7.x/avataaars/svg?seed=' + (comment.author || comment.id)"
+          v-if="comment.avatar && !avatarFailed"
+          :src="comment.avatar"
           alt=""
           class="comment-avatar"
+          @error="avatarFailed = true"
         />
-        <span class="comment-author">{{ comment.nickname || comment.author }}</span>
+        <span v-else class="comment-avatar-fallback">{{ authorInitial }}</span>
+        <span class="comment-author">{{ authorDisplayName }}</span>
         <span v-if="comment.parentNickname" class="comment-reply-to">@{{ comment.parentNickname }}</span>
         <span class="comment-time">{{ comment.createTime }}</span>
-        <span class="comment-reply-btn" @click="openReply">回复</span>
+        <button type="button" class="comment-reply-btn" @click="openReply">回复</button>
       </div>
       <p class="comment-content">{{ comment.content }}</p>
 
@@ -185,19 +191,44 @@ async function submitReply(): Promise<boolean> {
 </template>
 
 <style scoped>
-.comment-tree-item { margin-bottom: 12px; }
-.comment-main { background: white; border: 1px solid #eef2f7; border-radius: 8px; padding: 12px; }
-.comment-header { display: flex; align-items: center; margin-bottom: 8px; }
-.comment-avatar { width: 36px; height: 36px; border-radius: 50%; object-fit: cover; margin-right: 10px; }
-.comment-author { font-weight: 700; color: #0f172a; margin-right: 10px; font-size: 14px; }
-.comment-reply-to { color: #2563eb; font-size: 12px; margin-right: 10px; font-weight: 500; }
-.comment-time { font-size: 12px; color: #6b7280; }
-.comment-reply-btn {
-  margin-left: auto; font-size: 12px; color: #2563eb; cursor: pointer;
-  padding: 2px 8px; border-radius: 4px; transition: background 0.15s;
+.comment-tree-item { margin-bottom: 0; }
+.comment-main {
+  background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.08);
+  border-radius: 14px;
+  padding: 1rem 1.15rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.comment-reply-btn:hover { background: #dbeafe; }
-.comment-content { color: #374151; line-height: 1.5; font-size: 14px; margin: 0; }
+.comment-main:hover {
+  border-color: rgba(0, 0, 0, 0.15);
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.03);
+}
+.comment-header { display: flex; align-items: center; margin-bottom: 0.65rem; gap: 0.6rem; }
+.comment-avatar {
+  width: 34px; height: 34px; border-radius: 50%; object-fit: cover;
+  border: 1px solid rgba(0, 0, 0, 0.08); background: #f8fafc; flex-shrink: 0;
+}
+.comment-avatar-fallback {
+  width: 34px; height: 34px; border-radius: 50%;
+  background: #111111; color: #ffffff;
+  font-size: 0.82rem; font-weight: 800;
+  display: inline-flex; align-items: center; justify-content: center;
+  flex-shrink: 0;
+}
+.comment-author { font-weight: 750; color: #111111; font-size: 0.88rem; }
+.comment-reply-to {
+  padding: 0.1rem 0.45rem; border-radius: 999px;
+  background: #f1f5f9; color: #475569; font-size: 0.72rem; font-weight: 600;
+}
+.comment-time { font-size: 0.75rem; color: #94a3b8; }
+.comment-reply-btn {
+  margin-left: auto; font-size: 0.75rem; font-weight: 650; color: #475569;
+  background: #ffffff; border: 1px solid rgba(0, 0, 0, 0.08);
+  cursor: pointer; padding: 0.24rem 0.7rem; border-radius: 999px;
+  transition: all 0.15s ease;
+}
+.comment-reply-btn:hover { background: #111111; border-color: #111111; color: #ffffff; }
+.comment-content { color: #334155; line-height: 1.65; font-size: 0.88rem; margin: 0; }
 
 .comment-children-wrapper { margin-top: 12px; }
 .comment-collapse-bar {

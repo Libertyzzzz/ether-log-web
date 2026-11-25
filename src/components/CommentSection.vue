@@ -149,14 +149,42 @@ onMounted(() => {
 <template>
   <div :class="['comment-section', `variant-${variant || 'card'}`]">
     <div class="comment-header-line">
-      <h2 class="comment-section-title">{{ variant === 'inline' ? '评论' : '留言' }} ({{ totalComments }})</h2>
+      <div class="comment-title-group">
+        <h2 class="comment-section-title">{{ variant === 'inline' ? '评论' : '全部留言' }}</h2>
+        <span class="comment-count-pill">{{ totalComments }}</span>
+      </div>
       <div v-if="!isLoggedIn" class="comment-login-inline">游客可直接留言</div>
     </div>
 
+    <!-- 留言板模式：输入框置顶，无需翻过所有留言才能写 -->
+    <div v-if="variant !== 'inline'" class="inline-composer top-composer">
+      <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">
+        <span>写下你的留言、建议或技术交流...</span>
+        <span class="composer-trigger-pill">写留言</span>
+      </div>
+      <div v-else class="composer-expanded">
+        <div v-if="!isLoggedIn && anonymousChecked && anonymousHasCommented === false" class="anonymous-form">
+          <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
+          <input v-model="anonymousEmail" type="email" placeholder="邮箱（必填）" :disabled="isSubmitting" />
+          <input v-model="anonymousWebsite" type="text" placeholder="个人网站（选填）" :disabled="isSubmitting" />
+        </div>
+        <div v-else-if="!isLoggedIn && (anonymousProfileReady || anonymousHasCommented)" class="anonymous-identity-hint">
+          <span>以 <b>{{ anonymousNickname }}</b> 身份发表</span>
+          <span class="identity-switch" @click="clearAnonymousProfile">切换身份</span>
+        </div>
+        <textarea v-model="newCommentContent" placeholder="支持 Markdown 语法，写下你的留言..." rows="4" :disabled="isSubmitting"></textarea>
+        <div class="composer-actions">
+          <button @click="submitFromComposer" :disabled="isSubmitting || !newCommentContent.trim()">发布留言</button>
+          <button @click="cancelComposer" type="button">取消</button>
+        </div>
+        <div v-if="commentError" class="comment-error">{{ commentError }}</div>
+      </div>
+    </div>
+
     <div class="comment-list-container">
-      <p v-if="isLoadingComments" class="loading-message">加载评论中...</p>
+      <p v-if="isLoadingComments" class="loading-message">加载留言中...</p>
       <p v-else-if="commentError && !comments.length" class="error-message">{{ commentError }}</p>
-      <p v-else-if="!comments.length" class="no-comments-message">{{ variant === 'inline' ? '还没有评论，来抢沙发吧 ☕' : '暂无评论，快来发表第一条评论吧！' }}</p>
+      <p v-else-if="!comments.length" class="no-comments-message">{{ variant === 'inline' ? '还没有评论，来抢沙发吧 ☕' : '暂无留言，快来留下第一条足迹吧！' }}</p>
       <div v-else class="comment-tree">
         <CommentItemComponent
           v-for="comment in comments"
@@ -172,8 +200,9 @@ onMounted(() => {
       </div>
     </div>
 
-    <div class="inline-composer">
-      <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">{{ variant === 'inline' ? '写下你的评论...' : '写下你的留言...' }}</div>
+    <!-- 文章详情页 inline 模式：输入框保持在底部 -->
+    <div v-if="variant === 'inline'" class="inline-composer">
+      <div v-if="!composerOpen" class="composer-placeholder" @click="openComposer">写下你的评论...</div>
       <div v-else class="composer-expanded">
         <div v-if="!isLoggedIn && anonymousChecked && anonymousHasCommented === false" class="anonymous-form">
           <input v-model="anonymousNickname" type="text" placeholder="昵称（必填）" :disabled="isSubmitting" />
@@ -196,61 +225,95 @@ onMounted(() => {
 </template>
 
 <style scoped>
-.comment-section { margin-top: 12px; padding: 14px; background: #f9fafb; border-radius: 8px; }
-.comment-section-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; color: #0f172a; }
-.comment-header-line { display: flex; align-items: center; gap: 12px; justify-content: space-between; }
-.comment-login-inline { color: #6b7280; font-size: 14px; }
+.comment-section { padding: 0; background: transparent; border-radius: 0; }
+.comment-header-line {
+  display: flex; align-items: center; gap: 12px; justify-content: space-between;
+  margin-bottom: 1rem;
+}
+.comment-title-group { display: flex; align-items: center; gap: 0.55rem; }
+.comment-section-title { font-size: 1.08rem; font-weight: 800; margin: 0; color: #111111; }
+.comment-count-pill {
+  padding: 0.12rem 0.55rem; border-radius: 999px;
+  background: #f1f5f9; color: #475569; font-size: 0.76rem; font-weight: 750;
+}
+.comment-login-inline {
+  padding: 0.22rem 0.65rem; border-radius: 999px;
+  background: #f8fafc; border: 1px solid rgba(0, 0, 0, 0.08);
+  color: #64748b; font-size: 0.74rem; font-weight: 600;
+}
 
 .comment-list-container { margin-bottom: 16px; }
-.comment-tree { display: flex; flex-direction: column; }
+.comment-tree { display: flex; flex-direction: column; gap: 0.75rem; }
 
 .loading-message, .no-comments-message, .error-message {
-  text-align: center; color: #6b7280; padding: 20px;
+  text-align: center; color: #64748b; padding: 28px 20px;
+  background: #fafaf9; border: 1px dashed rgba(0, 0, 0, 0.1); border-radius: 14px;
+  font-size: 0.88rem;
 }
 .error-message { color: #ef4444; }
 
 .inline-composer { margin-top: 12px; }
+.top-composer { margin-top: 0; margin-bottom: 1.25rem; }
 .composer-placeholder {
-  padding: 14px; background: white; border: 1px dashed #e6eef6;
-  border-radius: 8px; color: #6b7280; cursor: text; width: 100%;
+  display: flex; align-items: center; justify-content: space-between; gap: 1rem;
+  padding: 0.9rem 1.1rem; background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 14px; color: #64748b; cursor: pointer; width: 100%;
+  box-sizing: border-box; font-size: 0.88rem;
+  transition: border-color 0.2s ease, box-shadow 0.2s ease;
 }
-.composer-expanded { width: 100%; }
+.composer-placeholder:hover {
+  border-color: #111111;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.04);
+}
+.composer-trigger-pill {
+  padding: 0.32rem 0.85rem; border-radius: 999px;
+  background: #111111; color: #ffffff; font-size: 0.76rem; font-weight: 700;
+  flex-shrink: 0;
+}
+.composer-expanded {
+  width: 100%; padding: 1rem 1.1rem; background: #ffffff;
+  border: 1px solid rgba(0, 0, 0, 0.12); border-radius: 14px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.04); box-sizing: border-box;
+}
 .composer-expanded textarea {
-  width: 100%; padding: 10px; border: 1px solid #e6eef6;
-  border-radius: 8px; min-height: 140px; resize: vertical; margin-bottom: 8px;
-  font-size: 14px; outline: none; transition: border-color 0.15s;
+  width: 100%; padding: 0.75rem 0.85rem; border: 1px solid rgba(0, 0, 0, 0.1);
+  border-radius: 10px; min-height: 110px; resize: vertical; margin-bottom: 0.75rem;
+  font-size: 0.88rem; outline: none; transition: border-color 0.15s; box-sizing: border-box;
 }
-.composer-expanded textarea:focus { border-color: #2563eb; }
+.composer-expanded textarea:focus { border-color: #111111; }
 
-.anonymous-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 8px; }
+.anonymous-form { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; margin-bottom: 10px; }
 .anonymous-form input {
-  padding: 8px 10px; border: 1px solid #e6eef6; border-radius: 6px;
-  font-size: 14px; outline: none; transition: border-color 0.15s;
+  padding: 8px 10px; border: 1px solid rgba(0, 0, 0, 0.1); border-radius: 8px;
+  font-size: 0.84rem; outline: none; transition: border-color 0.15s;
 }
-.anonymous-form input:focus { border-color: #2563eb; }
+.anonymous-form input:focus { border-color: #111111; }
 
 .anonymous-identity-hint {
   display: flex; align-items: center; gap: 12px;
-  padding: 8px 12px; background: #f0f9ff;
-  border: 1px solid #bae6fd; border-radius: 6px;
-  font-size: 14px; color: #0c4a6e; margin-bottom: 8px;
+  padding: 8px 12px; background: #fafaf9;
+  border: 1px solid rgba(0, 0, 0, 0.08); border-radius: 8px;
+  font-size: 0.82rem; color: #334155; margin-bottom: 10px;
 }
-.anonymous-identity-hint b { color: #0c4a6e; font-weight: 600; }
+.anonymous-identity-hint b { color: #111111; font-weight: 700; }
 .identity-switch {
-  margin-left: auto; color: #2563eb; cursor: pointer;
-  text-decoration: underline; font-size: 13px;
+  margin-left: auto; color: #111111; cursor: pointer;
+  text-decoration: underline; font-size: 0.78rem; font-weight: 600;
 }
-.identity-switch:hover { color: #1d4ed8; }
 
 .composer-actions { display: flex; gap: 8px; justify-content: flex-end; }
 .composer-actions button {
-  padding: 8px 12px; border-radius: 6px; border: none; cursor: pointer; font-size: 14px;
+  padding: 0.48rem 1.1rem; border-radius: 999px; border: 1px solid transparent;
+  cursor: pointer; font-size: 0.82rem; font-weight: 700; transition: all 0.15s ease;
 }
-.composer-actions button:first-child { background: #2563eb; color: white; }
-.composer-actions button:first-child:hover:not(:disabled) { background: #1d4ed8; }
-.composer-actions button:first-child:disabled { background: #93c5fd; cursor: not-allowed; }
-.composer-actions button:last-child { background: #e6eef6; color: #334155; }
-.composer-actions button:last-child:hover { background: #dbeafe; }
+.composer-actions button:first-child { background: #111111; color: #ffffff; }
+.composer-actions button:first-child:hover:not(:disabled) { background: #27272a; }
+.composer-actions button:first-child:disabled { opacity: 0.45; cursor: not-allowed; }
+.composer-actions button:last-child {
+  background: #ffffff; border-color: rgba(0, 0, 0, 0.12); color: #475569;
+}
+.composer-actions button:last-child:hover { border-color: #111111; color: #111111; }
 
 .comment-error { color: #ef4444; font-size: 14px; margin-top: 8px; }
 

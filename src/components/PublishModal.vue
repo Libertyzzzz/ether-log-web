@@ -486,7 +486,7 @@ onBeforeUnmount(() => {
             :ref="setImageInput"
             class="file-input-hidden"
             type="file"
-            accept="image/jpeg,image/png,image/webp,image/gif"
+            accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
             :disabled="isUploadingImage"
             @change="$emit('uploadMarkdownImage', $event)"
           />
@@ -633,7 +633,7 @@ onBeforeUnmount(() => {
               <input 
                 :ref="setCoverImageInput" 
                 type="file" 
-                accept="image/jpeg,image/png,image/webp,image/gif" 
+                accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" 
                 hidden 
                 @change="handleCoverImageChange"
                 @click.stop
@@ -1271,9 +1271,11 @@ onBeforeUnmount(() => {
   max-width: 100%;
   max-height: 34rem;
   object-fit: contain;
-  border-radius: 0.75rem;
+  border-radius: 0.5rem;
   margin: 1.5rem 0;
-  box-shadow: 0 20px 70px rgba(15, 23, 42, 0.12);
+  background: #ffffff;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.04);
 }
 
 :deep(.rich-editor-content pre) {
